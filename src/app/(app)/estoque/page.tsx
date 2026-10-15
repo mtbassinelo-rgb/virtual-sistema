@@ -38,11 +38,13 @@ export default async function Estoque({ searchParams }: { searchParams: Promise<
   });
 
   // Tabela: uma linha por produto, uma coluna por depósito
-  const porProduto = new Map<string, { codigo: string; nome: string; dep: Record<string, { saldo: number; aReceber: number }> }>();
+  type Linha = { codigo: string; nome: string; dep: Record<string, { saldo: number; aReceber: number }> };
+  const porProduto = new Map<string, Linha>();
   for (const s of d.saldos) {
-    const p = porProduto.get(s.produto_id) ?? { codigo: s.codigo, nome: s.produto, dep: {} };
-    p.dep[s.deposito_id] = { saldo: Number(s.saldo), aReceber: Number(s.a_receber) };
-    porProduto.set(s.produto_id, p);
+    const chave = String(s.produto_id);
+    const p: Linha = porProduto.get(chave) ?? { codigo: String(s.codigo), nome: String(s.produto), dep: {} };
+    p.dep[String(s.deposito_id)] = { saldo: Number(s.saldo), aReceber: Number(s.a_receber) };
+    porProduto.set(chave, p);
   }
   const operaAlgum = d.depositos.some((x) => x.opera);
   const linhas = Array.from({ length: 6 }, (_, i) => i);
