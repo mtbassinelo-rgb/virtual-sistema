@@ -3,3 +3,5 @@ infra/.env
 !infra/.env.exemplo
 node_modules/
 .next/
+dados/
+servidor.log

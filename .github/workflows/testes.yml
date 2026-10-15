@@ -1,13 +1,13 @@
 name: Testes
 
-# Roda a cada envio para o GitHub: cria um banco limpo, aplica as migrações
-# e executa todos os testes de regras. Nada vai para o ar se falhar.
+# Roda a cada envio para o GitHub. Nada vai para o ar se algo falhar.
 on:
   push:
   pull_request:
 
 jobs:
   banco:
+    name: Regras do banco
     runs-on: ubuntu-24.04
     services:
       postgres:
@@ -25,11 +25,53 @@ jobs:
       - uses: actions/checkout@v4
       - name: Cliente do Postgres
         run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
-      - name: Aplicar migrações
-        run: ./db/migrar.sh
-      - name: Aplicar migrações de novo (não pode quebrar)
-        run: ./db/migrar.sh
-      - name: Testes do banco
+      - name: Aplicar migrações duas vezes (não pode quebrar)
+        run: ./db/migrar.sh && ./db/migrar.sh
+      - name: Testes do banco (banco limpo)
         run: |
           psql "$DATABASE_URL" -q -c "drop schema app cascade; drop schema if exists teste cascade; drop table public.migracoes; drop role if exists vc_app; drop role if exists vc_sync;" || true
           ./db/testar.sh
+
+  aplicacao:
+    name: Aplicação web
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: teste
+          POSTGRES_DB: virtual
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL_ADMIN: postgresql://postgres:teste@localhost:5432/virtual
+      DATABASE_URL: postgresql://vc_app:app-teste@localhost:5432/virtual
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Instalar dependências
+        run: npm install --no-audit --no-fund
+      - name: Verificar tipos
+        run: npm run typecheck
+      - name: Compilar
+        run: npm run build
+      - name: Preparar banco e usuários de teste
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+          DATABASE_URL=$DATABASE_URL_ADMIN ./db/migrar.sh
+          psql "$DATABASE_URL_ADMIN" -c "alter role vc_app login password 'app-teste'"
+          psql "$DATABASE_URL_ADMIN" -f scripts/dados-exemplo.sql
+          SENHA=senha-de-teste-123 node scripts/criar-usuario.mjs gerente@teste.local "Gerente Teste" gerente
+          SENHA=senha-de-teste-123 node scripts/criar-usuario.mjs keila@teste.local "Keila Teste" vendedora Keila
+      - name: Teste de fumaça (sobe o sistema, entra e navega)
+        run: |
+          npm run start -- -p 3000 > servidor.log 2>&1 &
+          for i in $(seq 1 40); do curl -sf http://localhost:3000/login > /dev/null && break; sleep 1; done
+          node scripts/teste-fumaca.mjs http://localhost:3000
+      - name: Log do servidor (se falhar)
+        if: failure()
+        run: cat servidor.log || true

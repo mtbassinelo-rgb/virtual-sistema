@@ -1,0 +1,316 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { exigirUsuario, ehGestao, podeEscrever } from "@/lib/auth";
+import { comUsuario } from "@/lib/db";
+import {
+  dinheiro, data, dataHora, hojeISO, linkWhatsApp, STATUS_COMERCIAL, STATUS_PAGAMENTO, COR_PAGAMENTO,
+  MODALIDADES, CONFERENCIA, TIPO_ATENDIMENTO, type Moeda,
+} from "@/lib/formato";
+import { Avisos, Selo } from "../../avisos";
+import {
+  anexarComprovante, atualizarPedido, conferirPagamento, reconhecerBling, recusarPagamento,
+  registrarAtendimento, registrarPagamento,
+} from "../acoes";
+
+export const metadata = { title: "Pedido" };
+
+export default async function Pedido({ params, searchParams }: {
+  params: Promise<{ id: string }>; searchParams: Promise<{ ok?: string; erro?: string }>;
+}) {
+  const u = await exigirUsuario();
+  const { id } = await params;
+  const avisos = await searchParams;
+  if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
+
+  const d = await comUsuario(u.id, async (c) => {
+    const p = (await c.query("select * from app.v_pedidos where id = $1", [id])).rows[0];
+    if (!p) return null;
+    const cliente = p.cliente_id
+      ? (await c.query("select id, nome, whatsapp, telefone, categoria_preco, pais from app.clientes where id = $1", [p.cliente_id])).rows[0]
+      : null;
+    const itens = (await c.query(
+      "select codigo, descricao, quantidade, preco_unitario, desconto, total from app.pedido_itens where pedido_id = $1 order by codigo", [id])).rows;
+    const bling = p.bling_id
+      ? (await c.query("select numero, situacao_nome, total, itens, sincronizado_em, mudou_em from app.bling_pedidos where bling_id = $1", [p.bling_id])).rows[0]
+      : null;
+    const pagamentos = (await c.query(
+      `select g.*, ur.nome as registrado_nome, uc.nome as conferido_nome
+         from app.pagamentos g
+         left join app.usuarios ur on ur.id = g.registrado_por
+         left join app.usuarios uc on uc.id = g.conferido_por
+        where g.pedido_id = $1 order by g.registrado_em`, [id])).rows;
+    const comprovantes = (await c.query(
+      `select c.id, c.pagamento_id, c.nome_original, c.enviado_em from app.comprovantes c
+         join app.pagamentos g on g.id = c.pagamento_id where g.pedido_id = $1 order by c.enviado_em`, [id])).rows;
+    const atendimentos = (await c.query(
+      `select a.*, u.nome as usuario_nome from app.atendimentos a left join app.usuarios u on u.id = a.usuario_id
+        where a.pedido_id = $1 or a.id = $2 order by a.em desc`, [id, p.atendimento_id])).rows;
+    const depositos = (await c.query(
+      ehGestao(u)
+        ? "select id, nome from app.depositos where ativo order by nome"
+        : `select d.id, d.nome from app.depositos d join app.vendedora_depositos vd on vd.deposito_id = d.id
+            where vd.vendedora_id = $1 and d.ativo order by d.nome`,
+      ehGestao(u) ? [] : [p.vendedora_id])).rows;
+    const historico = (await c.query(
+      `select a.em, a.acao, a.tabela, a.antes, a.depois, a.motivo, u.nome
+         from app.auditoria a left join app.usuarios u on u.id = a.usuario_id
+        where (a.tabela = 'pedidos' and a.registro_id = $1)
+           or (a.tabela = 'pagamentos' and a.registro_id in (select id::text from app.pagamentos where pedido_id = $1::uuid))
+        order by a.em desc limit 50`, [id])).rows;
+    return { p, cliente, itens, bling, pagamentos, comprovantes, atendimentos, depositos, historico };
+  });
+  if (!d) notFound();
+  const { p, cliente } = d;
+  const moeda = p.moeda as Moeda;
+  const escrever = podeEscrever(u);
+  const gestao = ehGestao(u);
+  const ehBling = p.origem === "bling";
+
+  const mensagemCobranca =
+    `Olá ${cliente?.nome ?? ""}! Tudo bem? Aqui é a ${p.vendedora_nome}, da Virtual Cosméticos. ` +
+    (Number(p.saldo) > 0
+      ? `Seu pedido${p.bling_numero ? " nº " + p.bling_numero : ""} tem saldo de ${dinheiro(p.saldo, moeda)}` +
+        (p.vencimento ? `, com vencimento em ${data(p.vencimento)}` : "") + `. Pode me enviar o comprovante quando pagar?`
+      : `Seu pedido${p.bling_numero ? " nº " + p.bling_numero : ""} está ${STATUS_COMERCIAL[p.status_comercial].toLowerCase()}.` +
+        (p.previsao_envio ? ` Previsão de envio: ${data(p.previsao_envio)}.` : ""));
+  const whats = linkWhatsApp(cliente?.whatsapp ?? cliente?.telefone, mensagemCobranca);
+  const itensBling: { codigo?: string; descricao?: string; quantidade?: number; valor?: number }[] =
+    d.bling && Array.isArray(d.bling.itens) ? d.bling.itens : [];
+
+  return (
+    <>
+      <section className="linha entre">
+        <div>
+          <Link href="/pedidos">← Pedidos</Link>
+          <h1 style={{ marginTop: 4 }}>
+            {p.bling_numero ? `Pedido ${p.bling_numero}` : "Pedido sem nº do Bling"} · {cliente?.nome ?? "Sem cliente"}
+          </h1>
+          <div className="linha pequeno suave">
+            <span>{data(p.data_pedido)}</span><span>{p.vendedora_nome}</span><span>Canal: {p.canal}</span>
+            <span>Origem: {p.origem}</span>
+            <Selo cor={COR_PAGAMENTO[p.status_pagamento]}>{STATUS_PAGAMENTO[p.status_pagamento]}</Selo>
+            <Selo>{STATUS_COMERCIAL[p.status_comercial]}</Selo>
+            {p.envio_atrasado && <Selo cor="erro">envio atrasado</Selo>}
+          </div>
+        </div>
+        <div className="linha">
+          {cliente && <Link className="botao" href={`/clientes/${cliente.id}`}>Ficha do cliente</Link>}
+          {whats && <a className="botao whatsapp" href={whats} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
+        </div>
+      </section>
+
+      <Avisos ok={avisos.ok} erro={avisos.erro} />
+
+      {p.bling_mudou && (
+        <div className="aviso-caixa aviso linha entre">
+          <span>Este pedido <b>mudou no Bling</b> desde a última revisão
+            {p.divergencia_valor && <> (Bling: {dinheiro(p.bling_total, moeda)}, sistema: {dinheiro(p.valor_total, moeda)})</>}.</span>
+          {escrever && (
+            <form action={reconhecerBling}><input type="hidden" name="pedido_id" value={p.id} /><button>Marcar como revisado</button></form>
+          )}
+        </div>
+      )}
+
+      <div className="indicadores">
+        <div className="indicador"><span className="rotulo">Total</span><span className="valor num">{dinheiro(p.valor_total, moeda)}</span></div>
+        <div className="indicador"><span className="rotulo">Recebido (conferido)</span><span className="valor num">{dinheiro(p.recebido, moeda)}</span></div>
+        <div className="indicador"><span className="rotulo">A conferir</span><span className="valor num">{dinheiro(p.a_conferir, moeda)}</span></div>
+        <div className="indicador"><span className="rotulo">Saldo pendente</span><span className="valor num">{dinheiro(p.saldo, moeda)}</span></div>
+        <div className="indicador"><span className="rotulo">Vencimento</span><span className="valor">{data(p.vencimento)}</span>
+          {p.credito_concedido && <span className="pequeno suave">crédito concedido</span>}</div>
+        <div className="indicador"><span className="rotulo">Previsão de envio</span><span className="valor">{data(p.previsao_envio)}</span></div>
+      </div>
+
+      <div className="duas-colunas">
+        <div className="coluna">
+          <section className="painel">
+            <h2>Itens</h2>
+            {d.itens.length > 0 ? (
+              <div className="tabela"><table>
+                <thead><tr><th>Código</th><th>Produto</th><th>Qtd</th><th>Preço</th><th>Total</th></tr></thead>
+                <tbody>{d.itens.map((i, k) => (
+                  <tr key={k}><td className="num">{i.codigo}</td><td>{i.descricao}</td><td className="num">{Number(i.quantidade)}</td>
+                    <td className="num">{dinheiro(i.preco_unitario, moeda)}</td><td className="num">{dinheiro(i.total, moeda)}</td></tr>))}
+                </tbody></table></div>
+            ) : itensBling.length > 0 ? (
+              <div className="tabela"><table>
+                <thead><tr><th>Código</th><th>Produto</th><th>Qtd</th><th>Valor</th></tr></thead>
+                <tbody>{itensBling.map((i, k) => (
+                  <tr key={k}><td className="num">{i.codigo}</td><td>{i.descricao ?? "—"}</td><td className="num">{i.quantidade}</td>
+                    <td className="num">{dinheiro(i.valor ?? null, moeda)}</td></tr>))}
+                </tbody></table></div>
+            ) : <p className="suave">Itens não informados (pedido vindo da planilha).</p>}
+            {ehBling && <p className="pequeno suave">Itens e valores deste pedido vêm do Bling e só mudam lá.</p>}
+          </section>
+
+          <section className="painel" id="pagamentos">
+            <h2>Pagamentos</h2>
+            {d.pagamentos.length === 0 && <p className="suave">Nenhum pagamento registrado.</p>}
+            {d.pagamentos.map((g) => (
+              <div key={g.id} className="painel" style={{ background: "var(--afundado)" }}>
+                <div className="linha entre">
+                  <b className="num">{dinheiro(g.valor, moeda)}</b>
+                  <Selo cor={g.status_conferencia === "conferido" ? "ok" : g.status_conferencia === "recusado" ? "erro" : "aviso"}>
+                    {CONFERENCIA[g.status_conferencia]}
+                  </Selo>
+                </div>
+                <div className="pequeno suave">
+                  {data(g.data)} · {MODALIDADES[g.modalidade]}{g.banco ? ` · ${g.banco}` : ""} · registrado por {g.registrado_nome ?? "—"}
+                  {g.observacao ? ` · ${g.observacao}` : ""}
+                </div>
+                {g.status_conferencia !== "pendente" && (
+                  <div className="pequeno">
+                    {g.status_conferencia === "conferido"
+                      ? `Conferido por ${g.conferido_nome} em ${dataHora(g.conferido_em)} com o pedido ${g.conferencia_bling_numero} do Bling.`
+                      : `Recusado por ${g.conferido_nome} em ${dataHora(g.conferido_em)}: ${g.motivo_recusa}`}
+                  </div>
+                )}
+                <div className="linha pequeno">
+                  {d.comprovantes.filter((c) => c.pagamento_id === g.id).map((c) => (
+                    <a key={c.id} href={`/comprovantes/${c.id}`} target="_blank" rel="noopener noreferrer">📎 {c.nome_original ?? "comprovante"}</a>
+                  ))}
+                  {d.comprovantes.every((c) => c.pagamento_id !== g.id) && <span className="suave">Sem comprovante</span>}
+                </div>
+                {escrever && g.status_conferencia === "pendente" && (
+                  <form action={anexarComprovante} className="linha">
+                    <input type="hidden" name="pedido_id" value={p.id} /><input type="hidden" name="pagamento_id" value={g.id} />
+                    <input type="file" name="comprovante" accept="image/*,application/pdf" style={{ maxWidth: 260 }} />
+                    <button>Anexar comprovante</button>
+                  </form>
+                )}
+                {gestao && g.status_conferencia === "pendente" && (
+                  <div className="duas-colunas" style={{ gap: 10 }}>
+                    <form action={conferirPagamento} className="campos">
+                      <input type="hidden" name="pedido_id" value={p.id} /><input type="hidden" name="pagamento_id" value={g.id} />
+                      <label>Nº do pedido no Bling
+                        <input name="bling_numero" inputMode="numeric" required defaultValue={p.bling_numero ?? ""} />
+                      </label>
+                      <button className="principal">Conferir</button>
+                    </form>
+                    <form action={recusarPagamento} className="campos">
+                      <input type="hidden" name="pedido_id" value={p.id} /><input type="hidden" name="pagamento_id" value={g.id} />
+                      <label>Motivo da recusa<input name="motivo" required placeholder="Ex.: não localizado no banco" /></label>
+                      <button className="perigo">Recusar</button>
+                    </form>
+                  </div>
+                )}
+              </div>
+            ))}
+            {escrever && p.status_comercial !== "cancelado" && (
+              <details open={d.pagamentos.length === 0}>
+                <summary>Registrar pagamento</summary>
+                <form action={registrarPagamento} className="campos" style={{ marginTop: 10 }}>
+                  <input type="hidden" name="pedido_id" value={p.id} />
+                  <label>Valor ({moeda === "GS" ? "Gs" : "R$"})<input name="valor" inputMode="decimal" required /></label>
+                  <label>Data<input name="data" type="date" required defaultValue={hojeISO()} /></label>
+                  <label>Modalidade
+                    <select name="modalidade" defaultValue="transferencia">
+                      {Object.entries(MODALIDADES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                    </select>
+                  </label>
+                  <label>Banco / conta<input name="banco" placeholder="Ex.: Continental, Ueno" /></label>
+                  <label className="largo">Comprovante (foto ou PDF)
+                    <input name="comprovante" type="file" accept="image/*,application/pdf" />
+                  </label>
+                  <label className="largo">Observação<input name="observacao" /></label>
+                  <button className="principal">Registrar</button>
+                </form>
+                <p className="pequeno suave">O pagamento só conta como recebido depois que o gerente conferir com o nº do pedido no Bling.</p>
+              </details>
+            )}
+          </section>
+        </div>
+
+        <div className="coluna">
+          <section className="painel">
+            <h2>Dados comerciais</h2>
+            {escrever ? (
+              <form action={atualizarPedido} className="campos">
+                <input type="hidden" name="pedido_id" value={p.id} />
+                <label>Status comercial
+                  <select name="status_comercial" defaultValue={p.status_comercial}>
+                    {Object.entries(STATUS_COMERCIAL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  </select>
+                </label>
+                <label>Previsão de envio<input name="previsao_envio" type="date" defaultValue={p.previsao_envio ?? ""} /></label>
+                <label>Depósito
+                  <select name="deposito_id" defaultValue={p.deposito_id ?? ""} disabled={p.status_comercial !== "em_separacao"}>
+                    <option value="">—</option>
+                    {d.depositos.map((x) => <option key={x.id} value={x.id}>{x.nome}</option>)}
+                  </select>
+                </label>
+                <label>Vencimento<input name="vencimento" type="date" defaultValue={p.vencimento ?? ""} /></label>
+                <label style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <input type="checkbox" name="credito_concedido" defaultChecked={p.credito_concedido} style={{ width: "auto" }} /> Crédito concedido
+                </label>
+                <label className="largo">Observações<textarea name="observacoes" defaultValue={p.observacoes ?? ""} /></label>
+                <label className="largo">Motivo da alteração (vai para o histórico)<input name="motivo" /></label>
+                <button className="principal">Salvar</button>
+              </form>
+            ) : (
+              <p>{p.observacoes ?? <span className="suave">Sem observações.</span>}</p>
+            )}
+            {d.bling && (
+              <p className="pequeno suave">
+                Bling: pedido {d.bling.numero}, situação {d.bling.situacao_nome ?? "—"}, total {dinheiro(d.bling.total, moeda)}.
+                Sincronizado em {dataHora(d.bling.sincronizado_em)}.
+              </p>
+            )}
+          </section>
+
+          {cliente && (
+            <section className="painel">
+              <h2>Atendimento</h2>
+              {escrever && (
+                <form action={registrarAtendimento} className="campos">
+                  <input type="hidden" name="pedido_id" value={p.id} /><input type="hidden" name="cliente_id" value={cliente.id} />
+                  <label>Tipo
+                    <select name="tipo" defaultValue="whatsapp">
+                      {Object.entries(TIPO_ATENDIMENTO).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                    </select>
+                  </label>
+                  <label>Resultado<input name="resultado" placeholder="Ex.: vai pagar sexta" /></label>
+                  <label className="largo">O que foi conversado<textarea name="nota" /></label>
+                  <label style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <input type="checkbox" name="vincular" style={{ width: "auto" }} /> É o atendimento que gerou o pedido
+                  </label>
+                  <button>Registrar</button>
+                </form>
+              )}
+              {d.atendimentos.length === 0 ? <p className="suave">Nenhum atendimento ligado a este pedido.</p> : (
+                <ul className="lista-simples">
+                  {d.atendimentos.map((a) => (
+                    <li key={a.id}>
+                      <b>{TIPO_ATENDIMENTO[a.tipo]}</b> · {dataHora(a.em)} · {a.usuario_nome}
+                      {a.id === p.atendimento_id && <> <Selo cor="marca">originou o pedido</Selo></>}
+                      {a.resultado && <div>{a.resultado}</div>}
+                      {a.nota && <div className="suave">{a.nota}</div>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
+
+          {d.historico.length > 0 && (
+            <section className="painel">
+              <h2>Histórico de alterações</h2>
+              <ul className="lista-simples pequeno">
+                {d.historico.map((h, k) => (
+                  <li key={k}>
+                    {dataHora(h.em)} · {h.nome ?? "Sistema"} · {h.tabela === "pagamentos" ? "pagamento" : "pedido"} ·{" "}
+                    {h.acao === "INSERT" ? "criado" : h.acao === "UPDATE" ? "alterado" : "removido"}
+                    {h.acao === "UPDATE" && h.depois && (
+                      <span className="suave"> ({Object.keys(h.depois).join(", ")})</span>
+                    )}
+                    {h.motivo && <div className="suave">Motivo: {h.motivo}</div>}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
