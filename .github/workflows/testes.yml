@@ -1,0 +1,33 @@
+name: Testes
+
+# Roda a cada envio para o GitHub: cria um banco limpo, aplica as migrações
+# e executa todos os testes de regras. Nada vai para o ar se falhar.
+on:
+  push:
+  pull_request:
+
+jobs:
+  banco:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: teste
+          POSTGRES_DB: vc_teste
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:teste@localhost:5432/vc_teste
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cliente do Postgres
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - name: Aplicar migrações
+        run: ./db/migrar.sh
+      - name: Aplicar migrações de novo (não pode quebrar)
+        run: ./db/migrar.sh
+      - name: Testes de regras
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/testes/regras.sql

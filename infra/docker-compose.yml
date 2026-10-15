@@ -1,0 +1,66 @@
+# Servidor da Virtual Cosméticos (Hostinger VPS)
+# Dois ambientes no mesmo servidor: teste e produção, cada um com seu banco.
+# A aplicação web (serviços app-*) entra na próxima etapa.
+#
+# Subir:   docker compose --env-file .env up -d
+name: virtual
+
+services:
+  db-producao:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: virtual
+      POSTGRES_USER: virtual_admin
+      POSTGRES_PASSWORD: ${DB_PRODUCAO_SENHA:?defina no .env}
+    volumes:
+      - db_producao:/var/lib/postgresql/data
+    networks: [interna]
+
+  db-teste:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: virtual
+      POSTGRES_USER: virtual_admin
+      POSTGRES_PASSWORD: ${DB_TESTE_SENHA:?defina no .env}
+    volumes:
+      - db_teste:/var/lib/postgresql/data
+    networks: [interna]
+
+  # HTTPS automático para app.<dominio> (produção) e teste.<dominio>
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      DOMINIO: ${DOMINIO:?defina no .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_dados:/data
+    networks: [interna]
+
+  # Backup diário do banco de produção (guarda 30 dias no servidor;
+  # a cópia para fora do servidor é configurada em backup.sh)
+  backup:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      PGHOST: db-producao
+      PGUSER: virtual_admin
+      PGPASSWORD: ${DB_PRODUCAO_SENHA}
+      PGDATABASE: virtual
+    volumes:
+      - ./backup.sh:/backup.sh:ro
+      - backups:/backups
+    entrypoint: ["bash", "-c", "while true; do bash /backup.sh; sleep 86400; done"]
+    networks: [interna]
+
+volumes:
+  db_producao:
+  db_teste:
+  caddy_dados:
+  backups:
+
+networks:
+  interna:
