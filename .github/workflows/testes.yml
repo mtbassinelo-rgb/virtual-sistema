@@ -29,8 +29,7 @@ jobs:
         run: ./db/migrar.sh
       - name: Aplicar migrações de novo (não pode quebrar)
         run: ./db/migrar.sh
-      - name: Testes de regras
+      - name: Testes do banco
         run: |
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/testes/regras.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/testes/precos.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/testes/metas.sql
+          psql "$DATABASE_URL" -q -c "drop schema app cascade; drop schema if exists teste cascade; drop table public.migracoes; drop role if exists vc_app; drop role if exists vc_sync;" || true
+          ./db/testar.sh
