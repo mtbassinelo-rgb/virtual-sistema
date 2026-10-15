@@ -30,4 +30,6 @@ jobs:
       - name: Aplicar migrações de novo (não pode quebrar)
         run: ./db/migrar.sh
       - name: Testes de regras
-        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/testes/regras.sql
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/testes/regras.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/testes/precos.sql

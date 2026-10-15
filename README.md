@@ -34,6 +34,9 @@ de ir para o ar.
   consulta (só leitura).
 - **Auditoria:** toda alteração registra quem, quando, antes e depois. Ninguém
   altera nem apaga a auditoria, nem o administrador do banco.
+- **Preços:** no cadastro do cliente ficam o País (define a moeda: Gs ou R$) e a
+  categoria Normal ou VIP. O cliente só vê preços da tabela correspondente. O preço
+  usado num pedido fica congelado no item; reajustes valem a partir de uma data.
 - **Escrita em sistemas externos** (Bling, marketplaces): só por proposta aprovada
   pelo dono. A execução será feita na etapa de escrita.
 
