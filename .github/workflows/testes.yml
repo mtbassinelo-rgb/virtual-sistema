@@ -33,3 +33,4 @@ jobs:
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/testes/regras.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/testes/precos.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/testes/metas.sql

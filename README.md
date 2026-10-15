@@ -11,6 +11,7 @@ de ir para o ar.
 | `db/migrations/` | Estrutura do banco, em ordem. Nunca editar uma migração já aplicada: criar a próxima. |
 | `db/testes/` | Testes das regras do banco (permissões, conferência, saldo, auditoria, Bling). |
 | `db/migrar.sh` | Aplica as migrações pendentes. Pode rodar várias vezes. |
+| `docs/` | Arquitetura, áreas de cada perfil, metas e plano de saída do Bling. |
 | `infra/` | Instalação no servidor: Docker, HTTPS (Caddy), backup diário. |
 | `.github/workflows/` | Testes automáticos a cada envio ao GitHub. |
 
@@ -37,6 +38,8 @@ de ir para o ar.
 - **Preços:** no cadastro do cliente ficam o País (define a moeda: Gs ou R$) e a
   categoria Normal ou VIP. O cliente só vê preços da tabela correspondente. O preço
   usado num pedido fica congelado no item; reajustes valem a partir de uma data.
+- **Metas com premiação:** vendedora propõe meta por cliente; gerente aprova; o prêmio
+  só é liberado com a meta atingida e as compras do período pagas e conferidas.
 - **Escrita em sistemas externos** (Bling, marketplaces): só por proposta aprovada
   pelo dono. A execução será feita na etapa de escrita.
 
