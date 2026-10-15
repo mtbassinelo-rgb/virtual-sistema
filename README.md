@@ -13,7 +13,9 @@ de ir para o ar.
 | `db/migrar.sh` | Aplica as migrações pendentes. Pode rodar várias vezes. |
 | `docs/` | Arquitetura, áreas de cada perfil, metas e plano de saída do Bling. |
 | `infra/` | Instalação no servidor: Docker, HTTPS (Caddy), backup diário. |
-| `.github/workflows/` | Testes automáticos a cada envio ao GitHub. |
+| `src/` | Aplicação web (Next.js). |
+| `scripts/` | Criar usuários, dados de exemplo do ambiente de teste, teste de navegação. |
+| `.github/workflows/` | Testes automáticos a cada envio ao GitHub: regras do banco, aplicação (tipos, compilação, navegação real) e imagem do servidor. |
 
 ## Regras principais (garantidas pelo banco)
 
@@ -55,8 +57,8 @@ Use sempre um banco de teste: o script cria dados fictícios.
 
 ## Etapas
 
-1. Base: banco, regras, permissões, auditoria e instalação ← **em andamento**
-2. Aplicação web: login, clientes, pedidos, pagamentos, comprovantes, WhatsApp (link com mensagem pronta)
+1. Base: banco, regras, permissões, auditoria e instalação ✔
+2. Aplicação web: login, hoje, clientes, pedidos, pagamentos e conferência, comprovantes, metas, estoque e transferências, WhatsApp com mensagem pronta ✔ (primeira versão)
 3. Leitura do Bling (sincronização automática)
 4. Relatórios por período, cliente, vendedora e canal
 5. Escrita no Bling com aprovação
