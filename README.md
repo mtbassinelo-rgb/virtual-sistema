@@ -40,14 +40,15 @@ de ir para o ar.
   usado num pedido fica congelado no item; reajustes valem a partir de uma data.
 - **Metas com premiação:** vendedora propõe meta por cliente; gerente aprova; o prêmio
   só é liberado com a meta atingida e as compras do período pagas e conferidas.
+- **Estoque por depósito** (CD Foz e loja CDE): extrato imutável, saldo nunca negativo,
+  transferências com conferência no recebimento, e permissão de cada vendedora por depósito.
 - **Escrita em sistemas externos** (Bling, marketplaces): só por proposta aprovada
   pelo dono. A execução será feita na etapa de escrita.
 
 ## Rodar os testes
 
 ```bash
-DATABASE_URL=postgresql://usuario:senha@localhost/banco_de_teste ./db/migrar.sh
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/testes/regras.sql
+DATABASE_URL=postgresql://usuario:senha@localhost/banco_de_teste ./db/testar.sh
 ```
 
 Use sempre um banco de teste: o script cria dados fictícios.

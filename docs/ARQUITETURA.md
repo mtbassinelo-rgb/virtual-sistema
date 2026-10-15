@@ -47,6 +47,21 @@
 5. Prêmio liberado só com as compras do período pagas e conferidas.
 6. O gerente registra a entrega (pode ligar a um pedido de bonificação).
 
+## Estoque e depósitos
+- Depósitos: **CD Principal (Foz do Iguaçu)** e **Loja Ciudad del Este**. Outros podem ser criados.
+- O estoque é um extrato: compra, venda, transferência, ajuste, devolução e perda são
+  lançamentos que não se alteram nem se apagam. Erro se corrige com ajuste (com motivo).
+- O saldo nunca fica negativo: uma saída maior que o saldo é barrada.
+- **Transferência:** rascunho → enviada (sai da origem, fica "a receber" no destino)
+  → recebida, com a quantidade conferida na chegada. Diferença fica registrada.
+- **Quem opera cada depósito:** gerente, dono e os responsáveis do depósito
+  (ex.: quem atende na loja de CDE).
+- **De onde cada vendedora vende:** o gerente define os depósitos permitidos e o
+  padrão de cada vendedora. Pedido de depósito não autorizado é barrado.
+- Pedido marcado como "enviado" baixa o estoque do depósito; cancelado depois do
+  envio, a mercadoria volta como devolução.
+- Na fase A o estoque oficial continua no Bling; este roda em paralelo para conferência.
+
 ## Bling: de fonte oficial a emissor de nota
 
 O plano é tirar aos poucos tudo do Bling, deixando com ele só a emissão de NF-e.
