@@ -75,3 +75,17 @@ jobs:
       - name: Log do servidor (se falhar)
         if: failure()
         run: cat servidor.log || true
+
+  imagem:
+    name: Imagem para o servidor
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Montar a imagem Docker da aplicação
+        run: docker build -t virtual-app:ci .
+      - name: A imagem inicia
+        run: |
+          docker run -d --name app -e DATABASE_URL=postgresql://x:y@localhost/z -p 3000:3000 virtual-app:ci
+          for i in $(seq 1 30); do curl -sf http://localhost:3000/login > /dev/null && break; sleep 1; done
+          curl -sf http://localhost:3000/login | grep -q "Entrar" && echo "Imagem respondeu."
+          docker exec app node -e "require('@node-rs/argon2'); require('pg'); console.log('Dependências do script de usuários presentes.')"

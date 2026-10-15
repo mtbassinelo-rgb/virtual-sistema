@@ -1,6 +1,5 @@
 # Servidor da Virtual Cosméticos (Hostinger VPS)
 # Dois ambientes no mesmo servidor: teste e produção, cada um com seu banco.
-# A aplicação web (serviços app-*) entra na próxima etapa.
 #
 # Subir:   docker compose --env-file .env up -d
 name: virtual
@@ -26,6 +25,29 @@ services:
       POSTGRES_PASSWORD: ${DB_TESTE_SENHA:?defina no .env}
     volumes:
       - db_teste:/var/lib/postgresql/data
+    networks: [interna]
+
+  # Aplicação web: produção e teste (mesma imagem, bancos e arquivos separados)
+  app-producao:
+    build: ..
+    image: virtual-app:producao
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://vc_app:${APP_PRODUCAO_SENHA:?defina no .env}@db-producao/virtual
+    volumes:
+      - arquivos_producao:/dados
+    depends_on: [db-producao]
+    networks: [interna]
+
+  app-teste:
+    build: ..
+    image: virtual-app:teste
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://vc_app:${APP_TESTE_SENHA:?defina no .env}@db-teste/virtual
+    volumes:
+      - arquivos_teste:/dados
+    depends_on: [db-teste]
     networks: [interna]
 
   # HTTPS automático para app.<dominio> (produção) e teste.<dominio>
@@ -57,6 +79,8 @@ services:
     networks: [interna]
 
 volumes:
+  arquivos_producao:
+  arquivos_teste:
   db_producao:
   db_teste:
   caddy_dados:

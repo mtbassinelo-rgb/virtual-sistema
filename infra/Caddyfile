@@ -1,10 +1,11 @@
 # Caddy emite e renova os certificados HTTPS sozinho.
-# Enquanto a aplicação não está instalada, cada endereço mostra um aviso.
 
 app.{$DOMINIO} {
-	respond "Virtual Cosméticos: sistema em instalação." 200
+	encode gzip
+	reverse_proxy app-producao:3000
 }
 
 teste.{$DOMINIO} {
-	respond "Virtual Cosméticos: ambiente de teste em instalação." 200
+	encode gzip
+	reverse_proxy app-teste:3000
 }
