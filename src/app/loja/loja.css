@@ -52,8 +52,8 @@
 
 /* ---------- Abertura: a cartela de matizadores ---------- */
 .abertura { background: var(--roxo-escuro); color: #f6eefb; overflow: hidden; }
-.abertura-in { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); gap: 40px; align-items: center; padding-block: 56px 60px; }
-.abertura h1 { color: #fff; font-size: clamp(2rem, 4.6vw, 3.4rem); line-height: 1.08; font-weight: 700; max-width: 16ch; }
+.abertura-in { display: block; padding-block: 48px 52px; }
+.abertura h1 { color: #fff; font-size: clamp(1.9rem, 4.2vw, 3.1rem); line-height: 1.08; font-weight: 700; max-width: 22ch; }
 .abertura p { font-size: 1.08rem; max-width: 52ch; color: #e3d2ee; margin: 18px 0 0; }
 .abertura-acoes { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 28px; }
 .botao-cheio { background: var(--verde); color: var(--verde-tinta) !important; font-weight: 700; text-decoration: none; padding: 13px 22px; border-radius: 999px; font-family: var(--titulo); }
@@ -184,12 +184,13 @@
 .enviar:hover { filter: brightness(.95); }
 .enviar:disabled { opacity: .6; }
 
-/* ---------- Marcas ---------- */
-.marcas { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
-.marca-bloco { border-radius: var(--raio-g); padding: 18px 16px; min-height: 104px; display: flex; flex-direction: column; justify-content: space-between; text-decoration: none; }
-.marca-bloco b { font-family: var(--titulo); font-size: 1.2rem; line-height: 1.15; }
-.marca-bloco span { font-size: .85rem; opacity: .8; }
-.marca-bloco:hover { filter: brightness(1.05); }
+/* ---------- Marcas: lista limpa, nome e quantidade ---------- */
+.marcas { display: flex; flex-wrap: wrap; gap: 8px; }
+.marca-bloco { display: inline-flex; align-items: baseline; gap: 8px; padding: 9px 16px; border-radius: 999px; text-decoration: none;
+  background: var(--papel); border: 1.5px solid var(--linha-l); color: var(--roxo-tinta) !important; }
+.marca-bloco b { font-family: var(--titulo); font-weight: 600; font-size: .95rem; }
+.marca-bloco span { font-size: .78rem; color: var(--apagado); }
+.marca-bloco:hover { border-color: var(--roxo); color: var(--roxo) !important; }
 .etiqueta-vendido { position: absolute; top: 12px; right: 12px; border-radius: 999px; padding: 3px 10px; font-weight: 700; font-size: .75rem;
   font-family: var(--titulo); background: var(--roxo-tinta); color: var(--verde); }
 .limpar { display: flex; gap: 14px; flex-wrap: wrap; }
@@ -224,3 +225,24 @@
 .banner-texto { position: relative; z-index: 1; width: 100%; max-width: 1180px; margin: 0 auto; padding: 28px max(16px, env(safe-area-inset-left)); }
 .banner-texto h2 { color: #fff; font-size: clamp(1.5rem, 3.6vw, 2.6rem); max-width: 20ch; }
 .banner-texto p { margin: 8px 0 0; max-width: 52ch; color: #eadcf2; font-size: 1.02rem; }
+
+/* ---------- Submenu: categorias e marcas ---------- */
+.subnav { position: relative; z-index: 15; }
+.subnav .in { align-items: center; overflow: visible; flex-wrap: nowrap; }
+.subnav-rolagem { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.subnav-rolagem::-webkit-scrollbar { display: none; }
+.menu-cair { position: relative; flex-shrink: 0; }
+.menu-cair > summary { list-style: none; cursor: pointer; white-space: nowrap; font-weight: 700; font-size: .9rem; padding: 6px 12px;
+  border-radius: 999px; color: var(--roxo-tinta); }
+.menu-cair > summary::-webkit-details-marker { display: none; }
+.menu-cair > summary::after { content: ""; display: inline-block; width: 6px; height: 6px; margin-left: 8px; border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor; transform: translateY(-3px) rotate(45deg); }
+.menu-cair[open] > summary, .menu-cair > summary:hover { background: var(--roxo-suave); }
+.menu-painel { position: absolute; top: calc(100% + 6px); left: 0; background: var(--papel); border: 1px solid var(--linha-l); border-radius: 16px;
+  box-shadow: 0 16px 40px -12px rgba(42,14,54,.28); padding: 10px; min-width: 240px; max-height: min(70vh, 520px); overflow-y: auto;
+  display: grid; grid-template-columns: repeat(var(--colunas, 1), minmax(170px, 1fr)); gap: 2px; }
+.menu-painel a { padding: 8px 10px; border-radius: 10px; text-decoration: none; color: var(--roxo-tinta); display: flex; justify-content: space-between; gap: 12px; font-size: .92rem; }
+.menu-painel a:hover { background: var(--roxo-suave); color: var(--roxo); }
+.menu-painel a span { color: var(--apagado); font-size: .8rem; }
+.menu-painel .todas { grid-column: 1 / -1; font-weight: 700; color: var(--roxo); border-top: 1px solid var(--linha-l); margin-top: 4px; border-radius: 0 0 10px 10px; }
+@media (max-width: 720px) { .menu-painel { position: fixed; left: 12px; right: 12px; top: auto; --colunas: 1 !important; } }

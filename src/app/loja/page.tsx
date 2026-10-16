@@ -2,7 +2,7 @@ import Link from "next/link";
 import { pool } from "@/lib/db";
 import { clienteAtual, sha256, tokenCliente } from "@/lib/portal";
 import { dinheiro, data, type Moeda } from "@/lib/formato";
-import { CARTELA, LINHAS, corMarca, corRotulo, interno, linhaDe, marcaDe, nomeCurto } from "@/lib/vitrine";
+import { LINHAS, corRotulo, interno, linhaDe, marcaDe, nomeCurto } from "@/lib/vitrine";
 import { Quantidade } from "./carrinho";
 import { TEXTOS, idiomaAtual, type Textos } from "@/lib/idioma";
 
@@ -112,7 +112,7 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
         </section>
       )}
 
-      {!filtrando && !cliente && (
+      {!filtrando && !cliente && banners.length === 0 && (
         <section className="abertura">
           <div className="in abertura-in">
             <div className="abertura-texto">
@@ -122,15 +122,6 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
                 <a className="botao-cheio" href="#catalogo">{t.verProdutos(publicos.length.toLocaleString(idioma === "es" ? "es-PY" : "pt-BR"))}</a>
                 <Link className="botao-linha" href="/loja/cadastro">{t.querSerCliente}</Link>
               </div>
-            </div>
-            <div className="cartela" aria-label={t.cartela}>
-              {CARTELA.map((c, i) => (
-                <Link key={c.nome} href={`/loja?q=${encodeURIComponent(c.busca)}#catalogo`} className="mecha"
-                      style={{ background: c.fundo, color: c.tinta, ["--i" as string]: i }}>
-                  <span>{c.nome}</span>
-                </Link>
-              ))}
-              <p className="cartela-legenda">{t.cartelaLegenda}</p>
             </div>
           </div>
         </section>
@@ -187,11 +178,10 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
             <Link href="/loja/marcas">{t.verTodasMarcas}</Link>
           </div>
           <div className="marcas">
-            {listaMarcas.slice(0, 12).map(([m, qtd]) => {
-              const c = corMarca(m);
+            {listaMarcas.slice(0, 16).map(([m, qtd]) => {
               return (
-                <Link key={m} href={url({ marca: m, linha: null, q: null, promocao: null })} className="marca-bloco" style={{ background: c.fundo, color: c.tinta }}>
-                  <b>{m}</b><span>{n(qtd)}</span>
+                <Link key={m} href={url({ marca: m, linha: null, q: null, promocao: null })} className="marca-bloco">
+                  <b>{m}</b><span>{qtd}</span>
                 </Link>
               );
             })}

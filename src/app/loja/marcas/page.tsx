@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { pool } from "@/lib/db";
-import { corMarca, interno, marcaDe } from "@/lib/vitrine";
+import { interno, marcaDe } from "@/lib/vitrine";
 import { TEXTOS, idiomaAtual } from "@/lib/idioma";
 
 export const metadata = { title: "Marcas" };
@@ -22,10 +22,9 @@ export default async function Marcas() {
       <p className="suave" style={{ margin: 0 }}>{t.marcasTexto(lista.length)}</p>
       <div className="marcas">
         {lista.map(([m, n]) => {
-          const c = corMarca(m);
           return (
-            <Link key={m} href={`/loja?marca=${encodeURIComponent(m)}#catalogo`} className="marca-bloco" style={{ background: c.fundo, color: c.tinta }}>
-              <b>{m}</b><span>{n} {n === 1 ? t.produto : t.produtos}</span>
+            <Link key={m} href={`/loja?marca=${encodeURIComponent(m)}#catalogo`} className="marca-bloco">
+              <b>{m}</b><span>{n}</span>
             </Link>
           );
         })}

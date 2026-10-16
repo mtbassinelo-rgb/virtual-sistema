@@ -3,6 +3,7 @@ import { clienteAtual } from "@/lib/portal";
 import { pool } from "@/lib/db";
 import { linkWhatsApp, telefone } from "@/lib/formato";
 import { TEXTOS, idiomaAtual, textosCarrinho } from "@/lib/idioma";
+import { LINHAS, interno, linhaDe, marcaDe } from "@/lib/vitrine";
 import { BotaoCarrinho, Carrinho } from "./carrinho";
 import "./loja.css";
 
@@ -20,7 +21,17 @@ export default async function LayoutLoja({ children }: { children: React.ReactNo
   const numero = c?.vendedora_whatsapp
     ?? String((await pool.query("select app.whatsapp_empresa($1) as w", [idioma === "es" ? "GS" : "BRL"])).rows[0]?.w ?? "");
   const zap = linkWhatsApp(numero, t.zapMsg);
-  const linhas = ["kits", "matizadores", "cabelo", "corpo", "rosto", "maquiagem", "unhas"];
+  // Menu de categorias e marcas, com a quantidade de produtos de cada uma
+  const produtos = (await pool.query("select nome, marca, tipo from app.vitrine_publica()")).rows as { nome: string; marca: string | null; tipo: string }[];
+  const porLinha = new Map<string, number>(), porMarca = new Map<string, number>();
+  for (const p of produtos) {
+    if (interno(p.nome)) continue;
+    const l = p.tipo === "kit" ? "kits" : linhaDe(p.nome);
+    porLinha.set(l, (porLinha.get(l) ?? 0) + 1);
+    const m = marcaDe(p.nome, p.marca);
+    if (m) porMarca.set(m, (porMarca.get(m) ?? 0) + 1);
+  }
+  const marcas = [...porMarca.entries()].sort((a, b) => a[0].localeCompare(b[0], "pt-BR"));
 
   return (
     <div className="loja" lang={idioma === "es" ? "es" : "pt-BR"}>
@@ -47,11 +58,27 @@ export default async function LayoutLoja({ children }: { children: React.ReactNo
         </header>
         <nav className="subnav" aria-label={t.catalogo}>
           <div className="in">
-            <Link href="/loja?promocao=1#catalogo" className="promo">{t.promocoes}</Link>
-            <Link href="/loja?novidade=1#catalogo">{t.novidades}</Link>
-            <Link href="/loja#mais-vendidos">{t.maisVendidos}</Link>
-            <Link href="/loja/marcas">{t.marcas}</Link>
-            {linhas.map((l) => <Link key={l} href={`/loja?linha=${l}#catalogo`}>{t.linhas[l]}</Link>)}
+            <details className="menu-cair">
+              <summary>{t.categorias}</summary>
+              <div className="menu-painel">
+                {LINHAS.filter((l) => porLinha.get(l.chave)).map((l) => (
+                  <a key={l.chave} href={`/loja?linha=${l.chave}#catalogo`}>{t.linhas[l.chave]}<span>{porLinha.get(l.chave)}</span></a>
+                ))}
+              </div>
+            </details>
+            <details className="menu-cair">
+              <summary>{t.marcas}</summary>
+              <div className="menu-painel" style={{ ["--colunas" as string]: marcas.length > 10 ? 2 : 1 }}>
+                {marcas.map(([m, n]) => <a key={m} href={`/loja?marca=${encodeURIComponent(m)}#catalogo`}>{m}<span>{n}</span></a>)}
+                <a className="todas" href="/loja/marcas">{t.verTodasMarcas}</a>
+              </div>
+            </details>
+            <div className="subnav-rolagem">
+              <Link href="/loja?promocao=1#catalogo" className="promo">{t.promocoes}</Link>
+              <Link href="/loja?novidade=1#catalogo">{t.novidades}</Link>
+              <Link href="/loja#mais-vendidos">{t.maisVendidos}</Link>
+              <Link href="/loja?linha=kits#catalogo">{t.linhas.kits}</Link>
+            </div>
           </div>
         </nav>
 

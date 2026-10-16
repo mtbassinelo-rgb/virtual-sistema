@@ -26,7 +26,7 @@ const PT = {
     `Olá! Quero ser cliente da Virtual Cosméticos.\nEmpresa: ${d.nome}${d.contato ? `\nContato: ${d.contato}` : ""}${d.cidade ? `\nCidade: ${d.cidade}` : ""}${d.tipo ? `\nTipo: ${d.tipo}` : ""}${d.email ? `\nE-mail: ${d.email}` : ""}${d.mensagem ? `\nProcuro: ${d.mensagem}` : ""}`,
 
   jaSouCliente: "Já sou cliente", meusPedidos: "Meus pedidos", pedido: "Pedido",
-  promocoes: "Promoções", maisVendidos: "Mais vendidos", destaques: "Destaques", marcas: "Marcas", novidades: "Novidades",
+  categorias: "Categorias", promocoes: "Promoções", maisVendidos: "Mais vendidos", destaques: "Destaques", marcas: "Marcas", novidades: "Novidades",
   verTodas: "Ver todas", verTodosKits: "Ver todos os kits", verTodasMarcas: "Ver todas as marcas", verTodasPromocoes: "Ver todas as promoções",
   kitsCompletos: "Kits completos", catalogo: "Catálogo", tudo: "Tudo",
   heroTitulo: "Distribuidora de cosméticos direto de fábrica em Foz do Iguaçu.",
@@ -91,7 +91,7 @@ const ES: typeof PT = {
     `¡Hola! Quiero ser cliente de Virtual Cosméticos.\nEmpresa: ${d.nome}${d.contato ? `\nContacto: ${d.contato}` : ""}${d.cidade ? `\nCiudad: ${d.cidade}` : ""}${d.tipo ? `\nTipo: ${d.tipo}` : ""}${d.email ? `\nCorreo: ${d.email}` : ""}${d.mensagem ? `\nBusco: ${d.mensagem}` : ""}`,
 
   jaSouCliente: "Ya soy cliente", meusPedidos: "Mis pedidos", pedido: "Pedido",
-  promocoes: "Promociones", maisVendidos: "Más vendidos", destaques: "Destacados", marcas: "Marcas", novidades: "Novedades",
+  categorias: "Categorías", promocoes: "Promociones", maisVendidos: "Más vendidos", destaques: "Destacados", marcas: "Marcas", novidades: "Novedades",
   verTodas: "Ver todas", verTodosKits: "Ver todos los kits", verTodasMarcas: "Ver todas las marcas", verTodasPromocoes: "Ver todas las promociones",
   kitsCompletos: "Kits completos", catalogo: "Catálogo", tudo: "Todo",
   heroTitulo: "Distribuidora de cosméticos directo de fábrica en Foz do Iguaçu.",
