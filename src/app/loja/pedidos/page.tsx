@@ -2,6 +2,7 @@ import { pool } from "@/lib/db";
 import { exigirCliente } from "@/lib/portal";
 import { dinheiro, data, hojeISO, linkWhatsApp, telefone, type Moeda } from "@/lib/formato";
 import { enviarComprovante } from "../acoes";
+import { LimparCarrinho } from "../carrinho";
 
 export const metadata = { title: "Meus pedidos" };
 
@@ -28,13 +29,14 @@ export default async function MeusPedidos({ searchParams }: { searchParams: Prom
   const pedidos = (await pool.query("select * from app.portal_pedidos($1)", [sessao])).rows as Pedido[];
 
   return (
-    <>
+    <div className="in pagina">
+      {avisos.novo && <LimparCarrinho />}
       <h1>Meus pedidos</h1>
       {avisos.erro && <div className="aviso-caixa erro" role="alert">{avisos.erro}</div>}
       {avisos.ok && <div className="aviso-caixa ok" role="status">{avisos.ok}</div>}
       {avisos.novo && pedidos[0] && (() => {
         const p = pedidos[0];
-        const msg = `Olá! Sou ${cliente.nome}. Acabei de enviar um pedido pela área do cliente: ${p.itens.length} produto(s), total ${dinheiro(p.valor_total, p.moeda)}.`;
+        const msg = `Olá, ${cliente.vendedora}! Sou ${cliente.nome}. Acabei de enviar este pedido pelo site:\n${p.itens.map((i) => `• ${Number(i.quantidade)}× ${i.descricao}`).join("\n")}\nTotal: ${dinheiro(p.valor_total, p.moeda)}`;
         const link = linkWhatsApp(cliente.vendedora_whatsapp, msg);
         return link ? <a className="botao whatsapp" href={link} target="_blank" rel="noopener noreferrer">Avisar no WhatsApp ({telefone(cliente.vendedora_whatsapp)})</a> : null;
       })()}
@@ -101,6 +103,6 @@ export default async function MeusPedidos({ searchParams }: { searchParams: Prom
           </section>
         );
       })}
-    </>
+    </div>
   );
 }

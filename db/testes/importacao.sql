@@ -103,4 +103,19 @@ select teste.ok((select senha_hash from app.usuarios where id = '00000000-0000-0
 select teste.ok(app.whatsapp_empresa('GS') = '595994859971' and app.whatsapp_empresa('BRL') = '5545999972092'
   and app.whatsapp_empresa(null) = '5545999972092', 'Gs → número do Paraguai; R$ e site → número do Brasil');
 select teste.falha($$insert into app.contatos_empresa values ('outro','123','x')$$, null, 'Só os contatos Brasil e Paraguai');
+
+\echo '== Vitrine e pedidos de visitantes =='
+set role vc_app;
+select teste.como('');
+select teste.ok((select count(*) from app.vitrine_publica()) > 0, 'Vitrine pública lista produtos sem login');
+select teste.ok(app.registrar_pedido_site('Maria Salão', '+595 994 111222', 'PY', 'CDE',
+  format('[{"produto_id":"%s","quantidade":3},{"produto_id":"00000000-0000-0000-0000-000000000000","quantidade":1}]',
+         (select produto_id from app.vitrine_publica() limit 1))::jsonb, 'urgente') = '595994859971',
+  'Visitante do Paraguai: pedido registrado e vai para o WhatsApp do Paraguai');
+select teste.falha($$select app.registrar_pedido_site('Ana', '119', 'BR', null, '[]'::jsonb, null)$$, 'WhatsApp válido', 'WhatsApp inválido é recusado');
+select teste.falha($$select app.registrar_pedido_site('Ana', '45999990000', 'BR', null, '[{"produto_id":"00000000-0000-0000-0000-000000000000","quantidade":1}]'::jsonb, null)$$,
+  'vazio', 'Carrinho só com produto inexistente é recusado');
+select teste.ok((select count(*) from app.pedidos_site) = 0, 'Visitante não lê pedidos do site');
+reset role;
+select teste.ok((select jsonb_array_length(itens) from app.pedidos_site where nome = 'Maria Salão') = 1, 'Só o produto real foi guardado');
 \echo 'Testes de importação passaram.'

@@ -15,8 +15,9 @@ export default async function AreaInterna({ children }: { children: React.ReactN
     <>
       <header className="topo">
         <div className="topo-interno">
-          <Link href="/" className="marca">
-            Virtual Cosméticos<small>Sistema comercial</small>
+          <Link href="/" className="marca" style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <img src="/marca/icone.png" width={34} height={32} alt="" style={{ borderRadius: 7 }} />
+            <span>Virtual Cosméticos<small>Sistema comercial</small></span>
           </Link>
           <nav className="menu" aria-label="Seções">
             <Link href="/">Hoje</Link>

@@ -13,6 +13,7 @@ WORKDIR /app
 ENV NODE_ENV=production PORT=3000 HOSTNAME=0.0.0.0 ARQUIVOS_DIR=/dados/comprovantes
 COPY --from=compilacao /app/.next/standalone ./
 COPY --from=compilacao /app/.next/static ./.next/static
+COPY --from=compilacao /app/public ./public
 COPY --from=compilacao /app/scripts ./scripts
 COPY --from=dependencias /app/node_modules/@node-rs ./node_modules/@node-rs
 COPY --from=dependencias /app/node_modules/pg ./node_modules/pg

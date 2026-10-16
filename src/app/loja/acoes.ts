@@ -5,8 +5,8 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { redirect } from "next/navigation";
 import { pool, mensagemErro } from "@/lib/db";
-import { exigirCliente } from "@/lib/portal";
-import { numero, texto } from "@/lib/formato";
+import { clienteAtual, exigirCliente, sha256, tokenCliente } from "@/lib/portal";
+import { linkWhatsApp, numero, texto } from "@/lib/formato";
 import { pastaArquivos } from "@/lib/arquivos";
 
 const TIPOS: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "application/pdf": "pdf" };
@@ -54,4 +54,57 @@ export async function enviarComprovante(fd: FormData) {
     erro = mensagemErro(e);
   }
   redirect(`/loja/pedidos?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Comprovante enviado. Assim que for conferido, o pedido aparece como pago.")}`);
+}
+
+export type RespostaCarrinho = { erro?: string; url?: string; alternativa?: string };
+
+type Linha = { produto_id: string; quantidade: number };
+
+function lerItens(fd: FormData): Linha[] {
+  try {
+    const v = JSON.parse(String(fd.get("itens") ?? "[]"));
+    if (!Array.isArray(v)) return [];
+    return v.filter((i) => typeof i?.produto_id === "string" && /^[0-9a-f-]{36}$/.test(i.produto_id) && Number(i.quantidade) > 0)
+            .slice(0, 200).map((i) => ({ produto_id: i.produto_id, quantidade: Math.floor(Number(i.quantidade)) }));
+  } catch {
+    return [];
+  }
+}
+
+async function listaTexto(itens: Linha[]): Promise<string> {
+  const { rows } = await pool.query("select produto_id, nome from app.vitrine_publica() where produto_id = any($1::uuid[])",
+    [itens.map((i) => i.produto_id)]);
+  const nome = new Map(rows.map((r) => [String(r.produto_id), String(r.nome)]));
+  return itens.filter((i) => nome.has(i.produto_id)).map((i) => `• ${i.quantidade}× ${nome.get(i.produto_id)}`).join("\n");
+}
+
+/** Envia o carrinho: cliente com acesso → pedido no sistema; visitante → pedido do site + WhatsApp da empresa. */
+export async function enviarCarrinho(_: RespostaCarrinho, fd: FormData): Promise<RespostaCarrinho> {
+  const itens = lerItens(fd);
+  if (itens.length === 0) return { erro: "O pedido está vazio." };
+  const obs = texto(fd, "observacao").slice(0, 500);
+  const cliente = await clienteAtual();
+
+  if (cliente) {
+    const t = await tokenCliente();
+    try {
+      await pool.query("select app.portal_criar_pedido($1, $2, $3)", [sha256(t!), JSON.stringify(itens), obs]);
+      return { url: "/loja/pedidos?novo=1&ok=" + encodeURIComponent("Pedido enviado! A vendedora confere e avisa o total para pagamento.") };
+    } catch (e) {
+      const msg = `Olá, ${cliente.vendedora}! Sou ${cliente.nome}. Quero fazer este pedido:\n${await listaTexto(itens)}${obs ? "\nObs.: " + obs : ""}`;
+      return { erro: mensagemErro(e), alternativa: linkWhatsApp(cliente.vendedora_whatsapp, msg) ?? undefined };
+    }
+  }
+
+  const nome = texto(fd, "nome"), zap = texto(fd, "whatsapp"), pais = texto(fd, "pais") === "PY" ? "PY" : "BR", cidade = texto(fd, "cidade");
+  try {
+    const r = await pool.query("select app.registrar_pedido_site($1, $2, $3, $4, $5, $6) as numero",
+      [nome, zap, pais, cidade, JSON.stringify(itens), obs]);
+    const msg = `Olá! Sou ${nome}${cidade ? ` (${cidade})` : ""}. Quero fazer este pedido pelo site:\n${await listaTexto(itens)}` +
+      `${obs ? "\nObs.: " + obs : ""}\nPode me passar os preços de atacado?`;
+    const url = linkWhatsApp(String(r.rows[0].numero), msg);
+    return url ? { url } : { erro: "WhatsApp da empresa não configurado." };
+  } catch (e) {
+    return { erro: mensagemErro(e) };
+  }
 }

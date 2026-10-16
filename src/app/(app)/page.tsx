@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { exigirUsuario, ehGestao } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
-import { dinheiro, data, MODALIDADES, type Moeda } from "@/lib/formato";
+import { dinheiro, data, dataHora, linkWhatsApp, MODALIDADES, telefone, type Moeda } from "@/lib/formato";
 import { Selo } from "./avisos";
+import { marcarPedidoSiteAtendido } from "./acoes-site";
 
 export const metadata = { title: "Hoje" };
 
@@ -55,7 +56,12 @@ export default async function Hoje() {
          where v.status_comercial = 'em_separacao' and p.separacao_conferida_em is not null and p.total_confirmado_em is null
          order by p.separacao_conferida_em`)).rows;
     const pendencias = gestao ? (await c.query(`select count(*)::int n from app.estoque_pendencias where resolvida_em is null`)).rows[0].n : 0;
-    return { aConferir, metasPropostas, recusados, envioAtrasado, pagAtrasado, metasPerto, transferencias, portal, separar, confirmar, pendencias };
+    const site = (await c.query(`
+        select s.* from app.pedidos_site s
+         where s.atendido_em is null
+           and (app.pode_gerir() or s.pais = (select pais from app.vendedoras where id = app.minha_vendedora()))
+         order by s.criado_em desc limit 30`)).rows;
+    return { site, aConferir, metasPropostas, recusados, envioAtrasado, pagAtrasado, metasPerto, transferencias, portal, separar, confirmar, pendencias };
   });
 
   return (
@@ -91,6 +97,32 @@ export default async function Hoje() {
           <span className="valor">{d.transferencias.length}</span>
         </div>
       </div>
+
+      {d.site.length > 0 && (
+        <section className="painel">
+          <h2>Pedidos do site (ainda não são clientes)</h2>
+          <p className="pequeno suave">A pessoa montou o pedido no site e foi enviada para o WhatsApp da empresa. Responda com os preços e, se fechar, cadastre como cliente.</p>
+          <div className="tabela"><table>
+            <thead><tr><th>Quando</th><th>Quem</th><th>Itens</th><th></th></tr></thead>
+            <tbody>{d.site.map((s) => {
+              const itens = s.itens as { nome: string; quantidade: number }[];
+              const zap = linkWhatsApp(s.whatsapp, `Olá, ${s.nome}! Aqui é da Virtual Cosméticos, recebemos o seu pedido pelo site.`);
+              return (
+                <tr key={s.id}>
+                  <td className="num">{dataHora(s.criado_em)}</td>
+                  <td>
+                    <b>{s.nome}</b> <Selo>{s.pais === "PY" ? "Paraguai" : "Brasil"}</Selo>
+                    <div className="pequeno suave">{s.cidade ?? ""} {zap && <a href={zap} target="_blank" rel="noopener noreferrer">{telefone(s.whatsapp)}</a>}</div>
+                    {s.observacao && <div className="pequeno">{s.observacao}</div>}
+                  </td>
+                  <td className="pequeno">{itens.map((i, k) => <div key={k}>{Number(i.quantidade)}× {i.nome}</div>)}</td>
+                  <td><form action={marcarPedidoSiteAtendido}><input type="hidden" name="id" value={s.id} /><button>Atendido</button></form></td>
+                </tr>
+              );
+            })}</tbody>
+          </table></div>
+        </section>
+      )}
 
       {(d.portal.length > 0 || d.separar.length > 0 || d.confirmar.length > 0) && (
         <section className="painel">

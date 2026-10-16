@@ -16,8 +16,9 @@ export default async function Login({ searchParams }: { searchParams: Promise<{ 
   return (
     <div className="entrada">
       <div className="painel">
+        <img src="/marca/logo.png" width={202} height={116} alt="Virtual Cosméticos" style={{ alignSelf: "center", margin: "-8px 0 -12px" }} />
         <div>
-          <h1>Virtual Cosméticos</h1>
+          <h1 className="sr-only">Virtual Cosméticos</h1>
           <div className="suave pequeno">Sistema comercial · acesso da equipe</div>
         </div>
         {erro && <div className="aviso-caixa erro">{erro}</div>}
