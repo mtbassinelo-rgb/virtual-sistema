@@ -302,3 +302,8 @@
 .menu-site-painel a span { color: var(--apagado); font-weight: 400; font-size: .85rem; }
 .menu-site-topo { display: flex; justify-content: space-between; align-items: center; padding: 0 8px 8px; border-bottom: 1px solid var(--linha-l); }
 .menu-site-topo b { font-family: var(--titulo); color: var(--roxo); }
+
+.redes { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.redes a { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; padding: 7px 12px; border-radius: 999px;
+  border: 1.5px solid var(--linha-l); color: var(--roxo-tinta) !important; font-weight: 600; font-size: .88rem; }
+.redes a:hover { border-color: var(--roxo); color: var(--roxo) !important; }

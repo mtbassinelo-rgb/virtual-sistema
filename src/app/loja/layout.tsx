@@ -14,6 +14,24 @@ export const metadata = {
   robots: { index: true, follow: true },
 };
 
+const INSTAGRAM = "https://www.instagram.com/distribuidoravirtualcosmeticos";
+const FACEBOOK = "https://www.facebook.com/share/1BHjxdgnRH/";
+
+function Redes() {
+  return (
+    <div className="redes">
+      <a href={INSTAGRAM} target="_blank" rel="noopener noreferrer" aria-label="Instagram">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5" fill="none" stroke="currentColor" strokeWidth="1.8" /><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" strokeWidth="1.8" /><circle cx="17.3" cy="6.7" r="1.2" fill="currentColor" /></svg>
+        Instagram
+      </a>
+      <a href={FACEBOOK} target="_blank" rel="noopener noreferrer" aria-label="Facebook">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M14 8.5V7c0-.8.5-1.2 1.2-1.2H17V2.5h-2.6C11.6 2.5 10.5 4.3 10.5 7v1.5H8V12h2.5v9.5H14V12h2.7l.4-3.5H14Z" fill="currentColor" /></svg>
+        Facebook
+      </a>
+    </div>
+  );
+}
+
 export default async function LayoutLoja({ children }: { children: React.ReactNode }) {
   const c = await clienteAtual();
   const idioma = await idiomaAtual();
@@ -56,7 +74,7 @@ export default async function LayoutLoja({ children }: { children: React.ReactNo
               { titulo: t.clientes, links: c
                 ? [{ href: "/loja/pedidos", texto: t.meusPedidos }, { href: "/loja/sair", texto: t.sair }]
                 : [{ href: "/loja/cadastro", texto: t.querSerCliente }, { href: "/loja/acesso", texto: t.jaSouCliente }] },
-              { links: [{ href: `/loja/idioma?l=${t.idiomaCodigo}`, texto: t.idioma }] },
+              { links: [{ href: `/loja/idioma?l=${t.idiomaCodigo}`, texto: t.idioma }, { href: INSTAGRAM, texto: "Instagram" }, { href: FACEBOOK, texto: "Facebook" }] },
             ]} />
             <Link href="/loja" className="marca" aria-label="Virtual Cosméticos">
               <img src="/marca/icone.png" width={42} height={40} alt="" />
@@ -110,6 +128,7 @@ export default async function LayoutLoja({ children }: { children: React.ReactNo
               <h3>{t.atendimento}</h3>
               {zap && <a href={zap} target="_blank" rel="noopener noreferrer">WhatsApp {telefone(numero)}</a>}
               <p>{t.rodapeZap}</p>
+              <Redes />
             </div>
             <div>
               <h3>{c ? c.nome : t.clientes}</h3>
