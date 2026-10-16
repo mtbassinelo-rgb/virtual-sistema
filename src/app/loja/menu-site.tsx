@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-type Grupo = { titulo?: string; links: { href: string; texto: string; qtd?: number }[] };
+type Grupo = { titulo?: string; linha?: boolean; links: { href: string; texto: string; qtd?: number }[] };
 
 /** Menu lateral (três risquinhos): mapa do site com categorias, marcas e páginas. */
 export function MenuSite({ rotulo, fechar, grupos }: { rotulo: string; fechar: string; grupos: Grupo[] }) {
@@ -26,11 +26,20 @@ export function MenuSite({ rotulo, fechar, grupos }: { rotulo: string; fechar: s
               <b>Virtual Cosméticos</b>
               <button type="button" className="fechar" onClick={() => setAberto(false)} aria-label={fechar}>×</button>
             </div>
-            {grupos.map((g, i) => (
-              <div key={i} style={{ display: "contents" }}>
-                {g.titulo && <h3>{g.titulo}</h3>}
+            {grupos.map((g, i) => g.titulo ? (
+              <details key={i} className="menu-sub">
+                <summary>{g.titulo}</summary>
+                <div className="menu-sub-itens">
+                  {g.links.map((l) => (
+                    <a key={l.href} href={l.href} onClick={() => setAberto(false)}>{l.texto}{l.qtd != null && <span>{l.qtd}</span>}</a>
+                  ))}
+                </div>
+              </details>
+            ) : (
+              <div key={i} className={g.linha ? "menu-linha" : "menu-grupo"}>
                 {g.links.map((l) => (
-                  <a key={l.href} href={l.href} onClick={() => setAberto(false)}>{l.texto}{l.qtd != null && <span>{l.qtd}</span>}</a>
+                  <a key={l.href} href={l.href} onClick={() => setAberto(false)}
+                     {...(l.href.startsWith("http") ? { target: "_blank", rel: "noopener noreferrer" } : {})}>{l.texto}</a>
                 ))}
               </div>
             ))}

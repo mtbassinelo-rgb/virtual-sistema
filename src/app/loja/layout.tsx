@@ -69,12 +69,12 @@ export default async function LayoutLoja({ children }: { children: React.ReactNo
                 { href: "/loja#mais-vendidos", texto: t.maisVendidos },
               ] },
               { titulo: t.categorias, links: LINHAS.filter((l) => porLinha.get(l.chave)).map((l) => ({ href: `/loja?linha=${l.chave}#catalogo`, texto: t.linhas[l.chave], qtd: porLinha.get(l.chave) })) },
-              { titulo: t.marcas, links: [...marcas.slice().sort((a, b) => b[1] - a[1]).slice(0, 10).map(([m, n]) => ({ href: `/loja?marca=${encodeURIComponent(m)}#catalogo`, texto: m, qtd: n })),
+              { titulo: t.marcas, links: [...marcas.slice().sort((a, b) => b[1] - a[1]).slice(0, 12).map(([m, n]) => ({ href: `/loja?marca=${encodeURIComponent(m)}#catalogo`, texto: m, qtd: n })),
                 { href: "/loja/marcas", texto: t.verTodasMarcas }] },
-              { titulo: t.clientes, links: c
+              { titulo: c ? c.nome : t.clientes, links: c
                 ? [{ href: "/loja/pedidos", texto: t.meusPedidos }, { href: "/loja/sair", texto: t.sair }]
                 : [{ href: "/loja/cadastro", texto: t.querSerCliente }, { href: "/loja/acesso", texto: t.jaSouCliente }] },
-              { links: [{ href: `/loja/idioma?l=${t.idiomaCodigo}`, texto: t.idioma }, { href: INSTAGRAM, texto: "Instagram" }, { href: FACEBOOK, texto: "Facebook" }] },
+              { linha: true, links: [{ href: `/loja/idioma?l=${t.idiomaCodigo}`, texto: t.idioma }, { href: INSTAGRAM, texto: "Instagram" }, { href: FACEBOOK, texto: "Facebook" }] },
             ]} />
             <Link href="/loja" className="marca" aria-label="Virtual Cosméticos">
               <img src="/marca/icone.png" width={42} height={40} alt="" />

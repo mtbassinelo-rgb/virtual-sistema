@@ -307,3 +307,21 @@
 .redes a { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; padding: 7px 12px; border-radius: 999px;
   border: 1.5px solid var(--linha-l); color: var(--roxo-tinta) !important; font-weight: 600; font-size: .88rem; }
 .redes a:hover { border-color: var(--roxo); color: var(--roxo) !important; }
+
+/* Menu lateral enxuto: itens principais + submenus que abrem ao tocar */
+.menu-site-painel { gap: 0; padding: 14px 12px 24px; }
+.menu-grupo { display: flex; flex-direction: column; padding: 8px 0; border-bottom: 1px solid var(--linha-l); }
+.menu-site-painel .menu-grupo a { padding: 8px 10px; }
+.menu-sub { border-bottom: 1px solid var(--linha-l); }
+.menu-sub > summary { list-style: none; cursor: pointer; padding: 12px 10px; font-weight: 700; color: var(--roxo-tinta); display: flex;
+  justify-content: space-between; align-items: center; border-radius: 10px; }
+.menu-sub > summary::-webkit-details-marker { display: none; }
+.menu-sub > summary::after { content: ""; width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg); transition: transform .15s; }
+.menu-sub[open] > summary::after { transform: rotate(45deg); }
+.menu-sub > summary:hover { background: var(--roxo-suave); }
+.menu-sub-itens { display: flex; flex-direction: column; padding: 0 0 8px 10px; }
+.menu-site-painel .menu-sub-itens a { padding: 7px 10px; font-weight: 500; font-size: .92rem; }
+.menu-linha { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 14px; }
+.menu-site-painel .menu-linha a { border: 1.5px solid var(--linha-l); border-radius: 999px; padding: 6px 12px; font-size: .85rem; }
+@media (prefers-reduced-motion: reduce) { .menu-sub > summary::after { transition: none; } }
