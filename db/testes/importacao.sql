@@ -133,4 +133,16 @@ select teste.ok((select foto from app.vitrine_publica() where produto_id = :'nov
 select teste.como(:'KEILA');
 select teste.falha($$select app.salvar_produto(null, 'X-1', 'Produto X', null, null, null, null, true)$$, 'Só gerente ou dono', 'Vendedora não cadastra produto');
 reset role;
+
+\echo '== Destaques da vitrine =='
+set role vc_app;
+select teste.como('');
+select teste.ok((select vendidos_90d from app.vitrine_extras() where produto_id = '00000000-0000-0000-0000-00000000aa10') > 0,
+  'Kit vendido aparece entre os mais vendidos');
+select teste.como(:'GERENTE');
+select app.definir_destaque(:'novo', true);
+select teste.ok((select destaque from app.vitrine_extras() where produto_id = :'novo'), 'Gerente marca produto como destaque');
+select teste.como(:'KEILA');
+select teste.falha(format($$select app.definir_destaque(%L, false)$$, :'novo'), 'Só gerente ou dono', 'Vendedora não escolhe destaque');
+reset role;
 \echo 'Testes de importação passaram.'

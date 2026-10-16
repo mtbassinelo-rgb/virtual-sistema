@@ -70,6 +70,8 @@ ok((await abrir("/primeiro-acesso/token-invalido")).html.includes("já foi usado
 const vitrine = await abrir("/loja");
 ok(vitrine.status === 200 && vitrine.html.includes("Cartela de matizadores") && !vitrine.html.includes("Gs "), "Vitrine pública abre sem login e sem preços");
 ok((await abrir("/loja?linha=kits")).status === 200 && (await abrir("/loja?q=shampoo")).status === 200, "Filtro por linha e busca funcionam");
+ok((await abrir("/loja/marcas")).status === 200 && (await abrir("/loja?promocao=1")).status === 200 && (await abrir("/loja?marca=Soul")).status === 200,
+  "Marcas, promoções e filtro por marca abrem");
 ok([302, 303, 307, 308].includes((await abrir("/loja/pedidos")).status), "Meus pedidos sem link manda para a tela de acesso");
 ok((await fetch(base + "/marca/icone.png")).status === 200, "Logo é servido");
 ok((await fetch(base + "/fotos/..%2Fetc%2Fpasswd")).status === 404, "Rota de fotos não aceita caminho estranho");

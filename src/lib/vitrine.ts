@@ -89,3 +89,15 @@ export const CARTELA = [
   { nome: "Ruivo acobreado", busca: "ruivo", fundo: "#B5532E", tinta: "#FFF3EC" },
   { nome: "Rosé", busca: "rosa", fundo: "#E6A3BD", tinta: "#3B1027" },
 ];
+
+/** Cor fixa de cada marca nos blocos de "Marcas" (sempre a mesma para a mesma marca). */
+const PALETA_MARCAS = [
+  { fundo: "#822AA1", tinta: "#FFFFFF" }, { fundo: "#3A1250", tinta: "#E8D5F2" }, { fundo: "#F1E6F6", tinta: "#3A1250" },
+  { fundo: "#B4436C", tinta: "#FFF0F5" }, { fundo: "#E9CFA3", tinta: "#3A2410" }, { fundo: "#A9D6C6", tinta: "#123326" },
+  { fundo: "#34509C", tinta: "#EEF2FF" }, { fundo: "#D5D8E2", tinta: "#2B1638" },
+];
+export function corMarca(marca: string) {
+  let h = 0;
+  for (const ch of marca) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return PALETA_MARCAS[h % PALETA_MARCAS.length];
+}

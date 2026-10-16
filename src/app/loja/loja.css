@@ -183,3 +183,18 @@
 .enviar { font: inherit; font-family: var(--titulo); font-weight: 700; font-size: 1rem; cursor: pointer; border: 0; border-radius: 999px; padding: 14px; background: var(--zap); color: #fff; }
 .enviar:hover { filter: brightness(.95); }
 .enviar:disabled { opacity: .6; }
+
+/* ---------- Marcas ---------- */
+.marcas { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+.marca-bloco { border-radius: var(--raio-g); padding: 18px 16px; min-height: 104px; display: flex; flex-direction: column; justify-content: space-between; text-decoration: none; }
+.marca-bloco b { font-family: var(--titulo); font-size: 1.2rem; line-height: 1.15; }
+.marca-bloco span { font-size: .85rem; opacity: .8; }
+.marca-bloco:hover { filter: brightness(1.05); }
+.etiqueta-vendido { position: absolute; top: 12px; right: 12px; border-radius: 999px; padding: 3px 10px; font-weight: 700; font-size: .75rem;
+  font-family: var(--titulo); background: var(--roxo-tinta); color: var(--verde); }
+.limpar { display: flex; gap: 14px; flex-wrap: wrap; }
+.subnav { background: var(--papel); border-bottom: 1px solid var(--linha-l); }
+.subnav .in { display: flex; gap: 4px; overflow-x: auto; padding-block: 6px; }
+.subnav a { white-space: nowrap; text-decoration: none; color: var(--roxo-tinta); font-weight: 600; font-size: .9rem; padding: 6px 12px; border-radius: 999px; }
+.subnav a:hover { background: var(--roxo-suave); }
+.subnav a.promo { color: var(--roxo); }

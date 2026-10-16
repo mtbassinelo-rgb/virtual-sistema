@@ -39,6 +39,20 @@ export default async function LayoutLoja({ children }: { children: React.ReactNo
             </nav>
           </div>
         </header>
+        <nav className="subnav" aria-label="Seções do catálogo">
+          <div className="in">
+            <Link href="/loja?promocao=1#catalogo" className="promo">Promoções</Link>
+            <Link href="/loja#mais-vendidos">Mais vendidos</Link>
+            <Link href="/loja/marcas">Marcas</Link>
+            <Link href="/loja?linha=kits#catalogo">Kits</Link>
+            <Link href="/loja?linha=matizadores#catalogo">Matizadores</Link>
+            <Link href="/loja?linha=cabelo#catalogo">Cabelo</Link>
+            <Link href="/loja?linha=corpo#catalogo">Corpo e banho</Link>
+            <Link href="/loja?linha=rosto#catalogo">Rosto</Link>
+            <Link href="/loja?linha=maquiagem#catalogo">Maquiagem</Link>
+            <Link href="/loja?linha=unhas#catalogo">Unhas e cílios</Link>
+          </div>
+        </nav>
 
         <main className="principal">{children}</main>
 

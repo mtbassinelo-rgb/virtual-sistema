@@ -2,7 +2,7 @@ import Link from "next/link";
 import { pool } from "@/lib/db";
 import { clienteAtual, sha256, tokenCliente } from "@/lib/portal";
 import { dinheiro, data, type Moeda } from "@/lib/formato";
-import { CARTELA, LINHAS, corRotulo, interno, linhaDe, marcaDe, nomeCurto } from "@/lib/vitrine";
+import { CARTELA, LINHAS, corMarca, corRotulo, interno, linhaDe, marcaDe, nomeCurto } from "@/lib/vitrine";
 import { Quantidade } from "./carrinho";
 
 export const metadata = { title: { absolute: "Virtual Cosméticos · Atacado de cosméticos para salões e revendas" } };
@@ -13,12 +13,13 @@ type Preco = {
   disponibilidade: "disponivel" | "ultimas" | "indisponivel"; disponivel_abastecedor: boolean; prazo_abastecimento: string | null;
   ultima_compra: string | null; destaque: "promocao" | "recompra" | "sugestao" | null;
 };
-type Produto = Publico & { linha: string; marcaNome: string | null; p?: Preco };
+type Extra = { produto_id: string; vendidos_90d: string; promo_pct: string | null; promo_fim: string | null; destaque: boolean };
+type Produto = Publico & { linha: string; marcaNome: string | null; p?: Preco; x?: Extra };
 
 const POR_PAGINA = 48;
 const sem = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
-export default async function Vitrine({ searchParams }: { searchParams: Promise<{ q?: string; linha?: string; pagina?: string; erro?: string }> }) {
+export default async function Vitrine({ searchParams }: { searchParams: Promise<{ q?: string; linha?: string; marca?: string; promocao?: string; pagina?: string; erro?: string }> }) {
   const f = await searchParams;
   const cliente = await clienteAtual();
   const token = cliente ? await tokenCliente() : null;
@@ -31,16 +32,29 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
     meta = (await pool.query("select * from app.portal_meta($1)", [sha256(token)])).rows[0] ?? null;
   }
   const moeda: Moeda = cliente?.moeda ?? "BRL";
+  const extras = new Map<string, Extra>();
+  for (const r of (await pool.query("select * from app.vitrine_extras()")).rows as Extra[]) extras.set(r.produto_id, r);
 
   let todos: Produto[] = publicos.filter((p) => !interno(p.nome)).map((p) => ({
-    ...p, linha: p.tipo === "kit" ? "kits" : linhaDe(p.nome), marcaNome: marcaDe(p.nome, p.marca), p: precos.get(p.produto_id),
+    ...p, linha: p.tipo === "kit" ? "kits" : linhaDe(p.nome), marcaNome: marcaDe(p.nome, p.marca), p: precos.get(p.produto_id), x: extras.get(p.produto_id),
   }));
   const contagem = new Map<string, number>();
   for (const p of todos) contagem.set(p.linha, (contagem.get(p.linha) ?? 0) + 1);
+  const marcas = new Map<string, number>();
+  for (const p of todos) if (p.marcaNome) marcas.set(p.marcaNome, (marcas.get(p.marcaNome) ?? 0) + 1);
+  const listaMarcas = [...marcas.entries()].sort((a, b) => b[1] - a[1]);
+  const pct = (p: Produto) => Number(p.p?.desconto_pct ?? p.x?.promo_pct ?? 0);
+  const emPromocao = todos.filter((p) => pct(p) > 0).sort((a, b) => pct(b) - pct(a));
+  const vendidos = todos.filter((p) => Number(p.x?.vendidos_90d ?? 0) > 0).sort((a, b) => Number(b.x!.vendidos_90d) - Number(a.x!.vendidos_90d));
+  const destaques = [...vendidos, ...todos.filter((p) => p.x?.destaque && !vendidos.includes(p))].slice(0, 12);
 
   const q = (f.q ?? "").trim();
   const linha = LINHAS.find((l) => l.chave === f.linha)?.chave ?? null;
+  const marca = f.marca && marcas.has(f.marca) ? f.marca : null;
+  const soPromo = f.promocao === "1";
   if (linha) todos = todos.filter((p) => p.linha === linha);
+  if (marca) todos = todos.filter((p) => p.marcaNome === marca);
+  if (soPromo) todos = todos.filter((p) => pct(p) > 0);
   if (q) {
     const termos = sem(q).split(/\s+/).filter(Boolean);
     todos = todos.filter((p) => { const t = sem(`${p.nome} ${p.marcaNome ?? ""} ${p.codigo}`); return termos.every((x) => t.includes(x)); });
@@ -53,10 +67,10 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
   const paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
   const pagina = Math.min(paginas, Math.max(1, Number(f.pagina) || 1));
   const lista = todos.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA);
-  const filtrando = Boolean(q || linha);
+  const filtrando = Boolean(q || linha || marca || soPromo);
   const url = (mud: Record<string, string | number | null>) => {
     const u = new URLSearchParams();
-    const v = { q: q || null, linha, pagina: null as string | number | null, ...mud };
+    const v = { q: q || null, linha, marca, promocao: soPromo ? "1" : null, pagina: null as string | number | null, ...mud };
     for (const [k, x] of Object.entries(v)) if (x !== null && x !== "" && !(k === "pagina" && x === 1)) u.set(k, String(x));
     const s = u.toString();
     return `/loja${s ? "?" + s : ""}#catalogo`;
@@ -106,6 +120,42 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
         </section>
       )}
 
+      {!filtrando && emPromocao.length > 0 && (
+        <section className="in faixa" id="promocoes">
+          <div className="faixa-titulo">
+            <h2>Promoções</h2>
+            <Link href={url({ promocao: "1", linha: null, marca: null, q: null })}>Ver todas as promoções</Link>
+          </div>
+          <div className="trilho">{emPromocao.slice(0, 12).map((p) => <Cartao key={p.produto_id} p={p} moeda={moeda} cliente={Boolean(cliente)} />)}</div>
+        </section>
+      )}
+
+      {!filtrando && destaques.length > 0 && (
+        <section className="in faixa" id="mais-vendidos">
+          <div className="faixa-titulo"><h2>{vendidos.length > 0 ? "Mais vendidos" : "Destaques"}</h2></div>
+          <div className="trilho">{destaques.map((p) => <Cartao key={p.produto_id} p={p} moeda={moeda} cliente={Boolean(cliente)} />)}</div>
+        </section>
+      )}
+
+      {!filtrando && listaMarcas.length > 0 && (
+        <section className="in faixa" id="marcas">
+          <div className="faixa-titulo">
+            <h2>Marcas</h2>
+            <Link href="/loja/marcas">Ver todas as marcas</Link>
+          </div>
+          <div className="marcas">
+            {listaMarcas.slice(0, 12).map(([m, n]) => {
+              const c = corMarca(m);
+              return (
+                <Link key={m} href={url({ marca: m, linha: null, q: null, promocao: null })} className="marca-bloco" style={{ background: c.fundo, color: c.tinta }}>
+                  <b>{m}</b><span>{n} {n === 1 ? "produto" : "produtos"}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       {kits.length > 0 && (
         <section className="in faixa">
           <div className="faixa-titulo">
@@ -118,7 +168,7 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
 
       <section className="in catalogo" id="catalogo">
         <div className="catalogo-topo">
-          <h2>{linha ? LINHAS.find((l) => l.chave === linha)!.nome : q ? `Resultados para “${q}”` : "Catálogo"}</h2>
+          <h2>{marca ?? (soPromo ? "Promoções" : linha ? LINHAS.find((l) => l.chave === linha)!.nome : q ? `Resultados para “${q}”` : "Catálogo")}</h2>
           <span className="contagem">{total.toLocaleString("pt-BR")} {total === 1 ? "produto" : "produtos"}</span>
         </div>
         <nav className="linhas" aria-label="Linhas de produto">
@@ -128,11 +178,17 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
           ))}
         </nav>
         {f.erro && <div className="aviso-erro" role="alert">{f.erro}</div>}
-        {q && <p className="limpar"><Link href={url({ q: null })}>Limpar a busca</Link></p>}
+        {(q || marca || soPromo) && (
+          <p className="limpar">
+            {q && <Link href={url({ q: null })}>Limpar a busca</Link>}
+            {marca && <Link href={url({ marca: null })}>Todas as marcas</Link>}
+            {soPromo && <Link href={url({ promocao: null })}>Todos os produtos</Link>}
+          </p>
+        )}
 
         {lista.length === 0 ? (
           <div className="vazio-busca">
-            <p>Nenhum produto com “{q}”. Tente outra palavra, como “shampoo” ou “kit”, ou peça no WhatsApp.</p>
+            <p>{soPromo ? "Nenhuma promoção agora. Volte em breve ou peça no WhatsApp." : `Nenhum produto${q ? ` com “${q}”` : " aqui"}. Tente outra palavra, como “shampoo” ou “kit”, ou peça no WhatsApp.`}</p>
           </div>
         ) : (
           <div className="grade">{lista.map((p) => <Cartao key={p.produto_id} p={p} moeda={moeda} cliente={Boolean(cliente)} />)}</div>
@@ -176,8 +232,9 @@ function Cartao({ p, moeda, cliente }: { p: Produto; moeda: Moeda; cliente: bool
             <span className="rotulo-marca">{p.marcaNome ? LINHAS.find((l) => l.chave === p.linha)?.nome : nomeCurto(p.nome, null).split(" ").slice(0, 3).join(" ")}</span>
           </>
         )}
-        {pr?.desconto_pct && <span className="etiqueta-promo">−{Number(pr.desconto_pct)}%</span>}
-        {p.linha === "kits" && !pr?.desconto_pct && <span className="etiqueta-kit">Kit</span>}
+        {(pr?.desconto_pct || p.x?.promo_pct) && <span className="etiqueta-promo">−{Number(pr?.desconto_pct ?? p.x?.promo_pct)}%</span>}
+        {p.linha === "kits" && !(pr?.desconto_pct || p.x?.promo_pct) && <span className="etiqueta-kit">Kit</span>}
+        {Number(p.x?.vendidos_90d ?? 0) > 0 && <span className="etiqueta-vendido">Mais vendido</span>}
       </div>
       <div className="cartao-corpo">
         <h3>{p.nome}</h3>
