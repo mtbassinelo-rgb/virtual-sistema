@@ -98,9 +98,11 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
               const conteudo = (
                 <>
                   {b.imagem && <img src={b.imagem} alt="" />}
+                  {!b.imagem && <img className="banner-icone" src="/marca/icone.png" alt="" />}
                   <div className="banner-texto">
                     <h2>{b.titulo}</h2>
                     {b.subtitulo && <p>{b.subtitulo}</p>}
+                    {b.link && <span className="banner-acao">{t.verAgora}</span>}
                   </div>
                 </>
               );

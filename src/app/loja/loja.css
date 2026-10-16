@@ -246,3 +246,13 @@
 .menu-painel a span { color: var(--apagado); font-size: .8rem; }
 .menu-painel .todas { grid-column: 1 / -1; font-weight: 700; color: var(--roxo); border-top: 1px solid var(--linha-l); margin-top: 4px; border-radius: 0 0 10px 10px; }
 @media (max-width: 720px) { .menu-painel { position: fixed; left: 12px; right: 12px; top: auto; --colunas: 1 !important; } }
+
+.banner:not(.com-imagem) { background: radial-gradient(120% 140% at 85% 20%, #9b3fc0 0%, var(--roxo) 38%, var(--roxo-escuro) 100%); }
+.banner .banner-icone { position: absolute; right: max(4%, calc((100% - 1180px) / 2)); top: 50%; transform: translateY(-50%) rotate(-8deg);
+  width: clamp(120px, 24vw, 300px); height: auto; border-radius: 22%; box-shadow: 0 30px 60px -20px rgba(0,0,0,.45); }
+.banner-acao { display: inline-block; margin-top: 18px; background: var(--verde); color: var(--verde-tinta); font-family: var(--titulo);
+  font-weight: 700; padding: 11px 20px; border-radius: 999px; }
+@media (max-width: 640px) {
+  .banner .banner-icone { width: 96px; top: 22px; transform: rotate(-8deg); }
+  .banner:not(.com-imagem) .banner-texto { padding-top: 120px; }
+}
