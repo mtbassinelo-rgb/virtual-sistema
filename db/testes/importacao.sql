@@ -99,4 +99,8 @@ select teste.falha($$select app.usar_convite_usuario('hash-valido', '$argon2id$v
 select teste.falha($$select * from app.usuario_convites$$, 'permission denied', 'Aplicação não lê a tabela de convites');
 reset role;
 select teste.ok((select senha_hash from app.usuarios where id = '00000000-0000-0000-0000-000000000003') like '$argon2id$%xxxx', 'Senha gravada');
+\echo '== WhatsApp da empresa =='
+select teste.ok(app.whatsapp_empresa('GS') = '595994859971' and app.whatsapp_empresa('BRL') = '5545999972092'
+  and app.whatsapp_empresa(null) = '5545999972092', 'Gs → número do Paraguai; R$ e site → número do Brasil');
+select teste.falha($$insert into app.contatos_empresa values ('outro','123','x')$$, null, 'Só os contatos Brasil e Paraguai');
 \echo 'Testes de importação passaram.'

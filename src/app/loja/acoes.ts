@@ -27,7 +27,7 @@ export async function enviarPedido(fd: FormData) {
     erro = mensagemErro(e);
   }
   if (erro) redirect(`/loja?erro=${encodeURIComponent(erro)}`);
-  redirect(`/loja/pedidos?ok=${encodeURIComponent("Pedido enviado! Sua vendedora vai confirmar e avisar o total para pagamento.")}`);
+  redirect(`/loja/pedidos?novo=1&ok=${encodeURIComponent("Pedido enviado! Sua vendedora vai confirmar e avisar o total para pagamento.")}`);
 }
 
 export async function enviarComprovante(fd: FormData) {

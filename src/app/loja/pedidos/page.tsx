@@ -1,6 +1,6 @@
 import { pool } from "@/lib/db";
 import { exigirCliente } from "@/lib/portal";
-import { dinheiro, data, hojeISO, type Moeda } from "@/lib/formato";
+import { dinheiro, data, hojeISO, linkWhatsApp, telefone, type Moeda } from "@/lib/formato";
 import { enviarComprovante } from "../acoes";
 
 export const metadata = { title: "Meus pedidos" };
@@ -22,8 +22,8 @@ type Pedido = {
   itens: { descricao: string; quantidade: number; pedida: number; preco: number; total: number }[];
 };
 
-export default async function MeusPedidos({ searchParams }: { searchParams: Promise<{ ok?: string; erro?: string }> }) {
-  const { sessao } = await exigirCliente();
+export default async function MeusPedidos({ searchParams }: { searchParams: Promise<{ ok?: string; erro?: string; novo?: string }> }) {
+  const { sessao, cliente } = await exigirCliente();
   const avisos = await searchParams;
   const pedidos = (await pool.query("select * from app.portal_pedidos($1)", [sessao])).rows as Pedido[];
 
@@ -32,6 +32,12 @@ export default async function MeusPedidos({ searchParams }: { searchParams: Prom
       <h1>Meus pedidos</h1>
       {avisos.erro && <div className="aviso-caixa erro" role="alert">{avisos.erro}</div>}
       {avisos.ok && <div className="aviso-caixa ok" role="status">{avisos.ok}</div>}
+      {avisos.novo && pedidos[0] && (() => {
+        const p = pedidos[0];
+        const msg = `Olá! Sou ${cliente.nome}. Acabei de enviar um pedido pela área do cliente: ${p.itens.length} produto(s), total ${dinheiro(p.valor_total, p.moeda)}.`;
+        const link = linkWhatsApp(cliente.vendedora_whatsapp, msg);
+        return link ? <a className="botao whatsapp" href={link} target="_blank" rel="noopener noreferrer">Avisar no WhatsApp ({telefone(cliente.vendedora_whatsapp)})</a> : null;
+      })()}
       {pedidos.length === 0 && <div className="painel vazio">Você ainda não fez pedidos por aqui.</div>}
       {pedidos.map((p) => {
         const e = ETAPAS[p.etapa] ?? { texto: p.etapa, cor: "" };

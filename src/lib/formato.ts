@@ -109,6 +109,14 @@ export function linkWhatsApp(numero: string | null | undefined, mensagem: string
   return `https://wa.me/${digitos}?text=${encodeURIComponent(mensagem)}`;
 }
 
+/** 5545999972092 → +55 45 99997-2092 · 595994859971 → +595 994 859971 */
+export function telefone(numero: string | null | undefined): string {
+  const d = (numero ?? "").replace(/\D/g, "");
+  if (d.startsWith("55") && d.length === 13) return `+55 ${d.slice(2, 4)} ${d.slice(4, 9)}-${d.slice(9)}`;
+  if (d.startsWith("595") && d.length === 12) return `+595 ${d.slice(3, 6)} ${d.slice(6)}`;
+  return d ? `+${d}` : "";
+}
+
 export function texto(fd: FormData, campo: string): string {
   return String(fd.get(campo) ?? "").trim();
 }
