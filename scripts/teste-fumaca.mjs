@@ -94,7 +94,7 @@ const reuso = await fetch(`${base}/loja/entrar/${convite}`, { redirect: "manual"
 ok((reuso.headers.get("location") ?? "").includes("motivo=link"), "Link usado de novo é recusado");
 const cat = await abrir("/loja", cookieCliente);
 ok(cat.status === 200 && cat.html.includes("Kit Platinum") && cat.html.includes("Gs "), "Catálogo do cliente abre com preços em Gs e o kit");
-ok(cat.html.includes("CD de Foz"), "Cliente da loja vê a opção de pedir do CD de Foz");
+ok(cat.html.includes("Sob encomenda"), "Cliente da loja vê os produtos sob encomenda (vêm do CD)");
 ok(cat.html.includes("wa.me/"), "Área do cliente mostra o WhatsApp da empresa");
 ok((await abrir("/loja/acesso")).html.includes("wa.me/5545999972092"), "Sem login, o site mostra o WhatsApp principal (Brasil)");
 const meus = await abrir("/loja/pedidos", cookieCliente);
