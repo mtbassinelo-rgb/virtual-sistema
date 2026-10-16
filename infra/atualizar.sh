@@ -27,5 +27,7 @@ docker run --rm --network virtual_interna postgres:16 psql "postgresql://virtual
   -qc "alter role vc_app login password '${!app_var}'"
 # 3) aplicação
 docker compose --env-file .env build "app-$alvo"
-docker compose --env-file .env up -d "app-$alvo" caddy
+docker compose --env-file .env up -d "app-$alvo"
+# o Caddyfile é montado como arquivo: depois do git pull o contêiner só enxerga a versão nova se for recriado
+docker compose --env-file .env up -d --force-recreate caddy
 echo "Ambiente $alvo atualizado."
