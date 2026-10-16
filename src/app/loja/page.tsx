@@ -8,7 +8,7 @@ import { TEXTOS, idiomaAtual, type Textos } from "@/lib/idioma";
 
 export const metadata = { title: { absolute: "Virtual Cosméticos · Atacado de cosméticos para salões e revendas" } };
 
-type Publico = { produto_id: string; codigo: string; nome: string; marca: string | null; tipo: string; foto: string | null; tem_estoque: boolean; novidade: boolean };
+type Publico = { produto_id: string; codigo: string; nome: string; marca: string | null; tipo: string; foto: string | null; tem_estoque: boolean; novidade: boolean; unidades_caixa: number | null };
 type Preco = {
   produto_id: string; preco: string; preco_tabela: string; desconto_pct: string | null; limite_qtd: string | null;
   disponibilidade: "disponivel" | "ultimas" | "indisponivel"; disponivel_abastecedor: boolean; prazo_abastecimento: string | null;
@@ -17,10 +17,10 @@ type Preco = {
 type Extra = { produto_id: string; vendidos_90d: string; promo_pct: string | null; promo_fim: string | null; destaque: boolean };
 type Produto = Publico & { linha: string; marcaNome: string | null; p?: Preco; x?: Extra };
 
-const POR_PAGINA = 48;
+const POR_PAGINA = 60;
 const sem = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
-export default async function Vitrine({ searchParams }: { searchParams: Promise<{ q?: string; linha?: string; marca?: string; promocao?: string; novidade?: string; pagina?: string; erro?: string }> }) {
+export default async function Vitrine({ searchParams }: { searchParams: Promise<{ q?: string; linha?: string; marca?: string; promocao?: string; novidade?: string; vista?: string; pagina?: string; erro?: string }> }) {
   const f = await searchParams;
   const cliente = await clienteAtual();
   const idioma = await idiomaAtual();
@@ -75,10 +75,11 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
   const paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
   const pagina = Math.min(paginas, Math.max(1, Number(f.pagina) || 1));
   const lista = todos.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA);
+  const vista = f.vista === "grade" ? "grade" : "lista";
   const filtrando = Boolean(q || linha || marca || soPromo || soNovidade);
   const url = (mud: Record<string, string | number | null>) => {
     const u = new URLSearchParams();
-    const v = { q: q || null, linha, marca, promocao: soPromo ? "1" : null, novidade: soNovidade ? "1" : null, pagina: null as string | number | null, ...mud };
+    const v = { q: q || null, linha, marca, promocao: soPromo ? "1" : null, novidade: soNovidade ? "1" : null, vista: vista === "grade" ? "grade" : null, pagina: null as string | number | null, ...mud };
     for (const [k, x] of Object.entries(v)) if (x !== null && x !== "" && !(k === "pagina" && x === 1)) u.set(k, String(x));
     const s = u.toString();
     return `/loja${s ? "?" + s : ""}#catalogo`;
@@ -206,6 +207,10 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
           <h2>{titulo}</h2>
           <span className="contagem">{n(total)}</span>
         </div>
+        <div className="vistas" role="group" aria-label={t.catalogo}>
+          <Link href={url({ vista: null })} className={vista === "lista" ? "ativa" : ""} aria-current={vista === "lista" ? "true" : undefined}>{t.lista}</Link>
+          <Link href={url({ vista: "grade" })} className={vista === "grade" ? "ativa" : ""} aria-current={vista === "grade" ? "true" : undefined}>{t.grade}</Link>
+        </div>
         <nav className="linhas" aria-label={t.catalogo}>
           <Link href={url({ linha: null })} className={!linha ? "ativa" : ""}>{t.tudo}</Link>
           {LINHAS.filter((l) => contagem.get(l.chave)).map((l) => (
@@ -224,7 +229,9 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
         {lista.length === 0 ? (
           <div className="vazio-busca"><p>{soPromo ? t.semPromocao : t.semResultado(q)}</p></div>
         ) : (
-          <div className="grade">{lista.map(cartao)}</div>
+          vista === "grade"
+            ? <div className="grade">{lista.map(cartao)}</div>
+            : <div className="catalogo-lista">{lista.map((p) => <LinhaCatalogo key={p.produto_id} p={p} moeda={moeda} cliente={Boolean(cliente)} t={t} />)}</div>
         )}
 
         {paginas > 1 && (
@@ -250,7 +257,7 @@ function Cartao({ p, moeda, cliente, t }: { p: Produto; moeda: Moeda; cliente: b
   const cor = corRotulo(p.nome, p.linha);
   const pr = p.p;
   const semEstoque = pr ? pr.disponibilidade === "indisponivel" && !pr.disponivel_abastecedor : false;
-  const item = { id: p.produto_id, nome: p.nome, marca: p.marcaNome, preco: pr ? Number(pr.preco) : null, limite: pr?.limite_qtd ? Number(pr.limite_qtd) : null };
+  const item = itemCarrinho(p);
   const promo = pr?.desconto_pct ?? p.x?.promo_pct;
   return (
     <article className="cartao">
@@ -268,14 +275,8 @@ function Cartao({ p, moeda, cliente, t }: { p: Produto; moeda: Moeda; cliente: b
       </div>
       <div className="cartao-corpo">
         <h3>{p.nome}</h3>
-        {cliente ? (
-          pr ? (
-            <div className="preco">
-              {dinheiro(pr.preco, moeda)}
-              {pr.desconto_pct && <s>{dinheiro(pr.preco_tabela, moeda)}</s>}
-            </div>
-          ) : <div className="preco-consulta">{t.precoVendedora}</div>
-        ) : null}
+        {p.unidades_caixa && <div className="caixa-info">{t.caixaCom(p.unidades_caixa)}</div>}
+        <Precos p={p} moeda={moeda} cliente={cliente} t={t} />
         {pr && (
           <div className="estoque">
             {pr.disponibilidade === "disponivel" && t.emEstoque}
@@ -287,6 +288,53 @@ function Cartao({ p, moeda, cliente, t }: { p: Produto; moeda: Moeda; cliente: b
         {pr?.ultima_compra && <div className="estoque">{t.comprouEm(data(pr.ultima_compra))}</div>}
         <Quantidade item={item} rotulo={cliente ? t.adicionarPedido : t.adicionar} />
       </div>
+    </article>
+  );
+}
+
+function itemCarrinho(p: Produto) {
+  const pr = p.p;
+  return { id: p.produto_id, nome: p.nome, marca: p.marcaNome, preco: pr ? Number(pr.preco) : null,
+           limite: pr?.limite_qtd ? Number(pr.limite_qtd) : null, caixa: p.unidades_caixa };
+}
+
+/** Preço principal = caixa fechada (unidade × peças); embaixo, o preço da unidade. */
+function Precos({ p, moeda, cliente, t }: { p: Produto; moeda: Moeda; cliente: boolean; t: Textos }) {
+  const pr = p.p;
+  if (!cliente) return null;
+  if (!pr) return <div className="preco-consulta">{t.precoVendedora}</div>;
+  const un = Number(pr.preco), cx = p.unidades_caixa;
+  return (
+    <div className="precos">
+      <div className="preco">
+        {dinheiro(cx ? un * cx : un, moeda)} <small>{cx ? t.porCaixa : t.porUnidade}</small>
+        {pr.desconto_pct && <s>{dinheiro(cx ? Number(pr.preco_tabela) * cx : pr.preco_tabela, moeda)}</s>}
+      </div>
+      {cx && <div className="preco-un">{dinheiro(un, moeda)} {t.porUnidade}</div>}
+    </div>
+  );
+}
+
+/** Linha do catálogo em lista: mais produtos por tela, como um catálogo impresso. */
+function LinhaCatalogo({ p, moeda, cliente, t }: { p: Produto; moeda: Moeda; cliente: boolean; t: Textos }) {
+  const cor = corRotulo(p.nome, p.linha);
+  const pr = p.p;
+  const promo = pr?.desconto_pct ?? p.x?.promo_pct;
+  return (
+    <article className="linha-cat">
+      <div className="linha-img" style={{ background: cor.fundo, color: cor.tinta }}>
+        {p.foto ? <img src={p.foto} alt="" loading="lazy" /> : <span>{(p.marcaNome ?? t.linhas[p.linha] ?? "").slice(0, 2)}</span>}
+      </div>
+      <div className="linha-info">
+        <h3>{p.nome}</h3>
+        <div className="linha-meta">
+          {[p.marcaNome, t.linhas[p.linha], p.unidades_caixa ? t.caixaCom(p.unidades_caixa) : null].filter(Boolean).join(" · ")}
+          {promo && <span className="etiqueta-mini promo">−{Number(promo)}%</span>}
+          {p.novidade && !promo && <span className="etiqueta-mini">{t.novo}</span>}
+        </div>
+      </div>
+      <div className="linha-preco"><Precos p={p} moeda={moeda} cliente={cliente} t={t} /></div>
+      <div className="linha-qtd"><Quantidade item={itemCarrinho(p)} rotulo={t.adicionar} /></div>
     </article>
   );
 }

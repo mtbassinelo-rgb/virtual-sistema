@@ -5,6 +5,7 @@ import { linkWhatsApp, telefone } from "@/lib/formato";
 import { TEXTOS, idiomaAtual, textosCarrinho } from "@/lib/idioma";
 import { LINHAS, interno, linhaDe, marcaDe } from "@/lib/vitrine";
 import { BotaoCarrinho, Carrinho } from "./carrinho";
+import { MenuSite } from "./menu-site";
 import "./loja.css";
 
 export const metadata = {
@@ -42,6 +43,21 @@ export default async function LayoutLoja({ children }: { children: React.ReactNo
       <Carrinho cliente={c ? { nome: c.nome, vendedora: c.vendedora, moeda: c.moeda } : null} t={textosCarrinho(t, c)}>
         <header className="topo">
           <div className="in topo-in">
+            <MenuSite rotulo={t.menu} fechar={t.fechar} grupos={[
+              { links: [
+                { href: "/loja", texto: t.inicio },
+                { href: "/loja?promocao=1#catalogo", texto: t.promocoes },
+                { href: "/loja?novidade=1#catalogo", texto: t.novidades },
+                { href: "/loja#mais-vendidos", texto: t.maisVendidos },
+              ] },
+              { titulo: t.categorias, links: LINHAS.filter((l) => porLinha.get(l.chave)).map((l) => ({ href: `/loja?linha=${l.chave}#catalogo`, texto: t.linhas[l.chave], qtd: porLinha.get(l.chave) })) },
+              { titulo: t.marcas, links: [...marcas.slice().sort((a, b) => b[1] - a[1]).slice(0, 10).map(([m, n]) => ({ href: `/loja?marca=${encodeURIComponent(m)}#catalogo`, texto: m, qtd: n })),
+                { href: "/loja/marcas", texto: t.verTodasMarcas }] },
+              { titulo: t.clientes, links: c
+                ? [{ href: "/loja/pedidos", texto: t.meusPedidos }, { href: "/loja/sair", texto: t.sair }]
+                : [{ href: "/loja/cadastro", texto: t.querSerCliente }, { href: "/loja/acesso", texto: t.jaSouCliente }] },
+              { links: [{ href: `/loja/idioma?l=${t.idiomaCodigo}`, texto: t.idioma }] },
+            ]} />
             <Link href="/loja" className="marca" aria-label="Virtual Cosméticos">
               <img src="/marca/icone.png" width={42} height={40} alt="" />
               <span className="marca-txt"><b>Virtual</b>Cosméticos</span>

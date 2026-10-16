@@ -170,4 +170,12 @@ select teste.falha($$select app.registrar_cadastro_site('X Shop', null, '5545911
 select teste.ok((select count(*) from app.cadastros_site) = 0, 'Visitante não lê os cadastros');
 reset role;
 select teste.ok((select tipo from app.cadastros_site where nome = 'Salão Bella') = 'salao', 'Cadastro guardado para a equipe');
+
+\echo '== Caixa fechada =='
+set role vc_app;
+select teste.como(:'GERENTE');
+select teste.ok(app.definir_caixas('[{"codigo":"NOVO-02","unidades":"12"},{"codigo":"NAO-EXISTE","unidades":"6"}]'::jsonb) = 1, 'Peças por caixa gravadas');
+select teste.falha($$select app.definir_caixas('[{"codigo":"NOVO-02","unidades":"0"}]'::jsonb)$$, 'entre 1 e 1000', 'Caixa com zero peças é recusada');
+select teste.ok((select unidades_caixa from app.vitrine_publica() where codigo = 'NOVO-02') = 12, 'Vitrine mostra as peças por caixa');
+reset role;
 \echo 'Testes de importação passaram.'

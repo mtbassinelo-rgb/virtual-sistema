@@ -47,7 +47,13 @@ async function enviarPrecos(fd: FormData) {
         if (v != null) itens.push({ codigo, tabela: c.tabela, valor: v });
       }
     }
-    const r = await comUsuario(u.id, (c) => c.query("select app.importar_precos($1::jsonb) as r", [JSON.stringify(itens)]));
+    const iCaixa = cab.indexOf("peças por caixa");
+    const caixas = iCaixa < 0 ? [] : linhas.slice(1).filter((l) => (l[iCaixa] ?? "").trim() !== "" && (l[iCod] ?? "").trim())
+      .map((l) => ({ codigo: l[iCod].trim(), unidades: l[iCaixa].replace(/\D/g, "") }));
+    const r = await comUsuario(u.id, async (c) => {
+      if (caixas.length) await c.query("select app.definir_caixas($1::jsonb)", [JSON.stringify(caixas)]);
+      return c.query("select app.importar_precos($1::jsonb) as r", [JSON.stringify(itens)]);
+    });
     const s = r.rows[0].r as { alterados: number; codigos_desconhecidos: string[] };
     destino = "ok=" + encodeURIComponent(`${s.alterados} preço(s) atualizado(s), valendo a partir de hoje.` +
       (s.codigos_desconhecidos.length ? ` Códigos não encontrados: ${s.codigos_desconhecidos.slice(0, 15).join(", ")}${s.codigos_desconhecidos.length > 15 ? "…" : ""}` : ""));
@@ -86,7 +92,7 @@ export default async function Precos({ searchParams }: { searchParams: Promise<{
       <section className="painel">
         <h2>1. Baixar a planilha</h2>
         <div><a className="botao principal" href="/estoque/precos/modelo">Baixar tabela de preços (CSV)</a></div>
-        <p className="pequeno suave">Vem com todos os produtos, o custo e o preço do Bling como referência. Preencha as colunas PY Normal (Gs), PY VIP (Gs), BR Normal (R$) e BR VIP (R$). Célula vazia não altera nada.</p>
+        <p className="pequeno suave">Vem com todos os produtos, o custo e o preço do Bling como referência. Preencha as colunas PY Normal (Gs), PY VIP (Gs), BR Normal (R$) e BR VIP (R$) com o preço da UNIDADE, e "Peças por caixa" (o site mostra o preço da caixa fechada e o da unidade). Célula vazia não altera nada.</p>
       </section>
       <form action={enviarPrecos} className="painel campos">
         <h2 className="largo">2. Enviar a planilha preenchida</h2>

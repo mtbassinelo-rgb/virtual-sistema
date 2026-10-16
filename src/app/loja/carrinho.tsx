@@ -4,7 +4,8 @@ import { createContext, useActionState, useContext, useEffect, useMemo, useState
 import { enviarCarrinho, type RespostaCarrinho } from "./acoes";
 import type { TextosCarrinho } from "@/lib/idioma";
 
-export type ItemCarrinho = { id: string; nome: string; marca: string | null; preco: number | null; qtd: number; limite?: number | null };
+/** qtd = caixas fechadas quando o produto tem "caixa" (peças por caixa); senão, unidades. preco = por unidade. */
+export type ItemCarrinho = { id: string; nome: string; marca: string | null; preco: number | null; qtd: number; limite?: number | null; caixa?: number | null };
 export type ClienteCarrinho = { nome: string; vendedora: string; moeda: "GS" | "BRL" } | null;
 
 type Ctx = {
@@ -45,7 +46,8 @@ export function Carrinho({ children, cliente, t }: { children: React.ReactNode; 
   const valor = useMemo<Ctx>(() => ({
     t, itens, aberto, abrir,
     definir: (item, qtd) => setItens((atual) => {
-      const q = Math.max(0, Math.min(Math.floor(qtd), item.limite ?? 9999));
+      const maxCaixas = item.limite ? Math.floor(item.limite / (item.caixa || 1)) || 1 : 9999;
+      const q = Math.max(0, Math.min(Math.floor(qtd), maxCaixas));
       const resto = atual.filter((i) => i.id !== item.id);
       if (q === 0) return resto;
       const existente = atual.find((i) => i.id === item.id);
@@ -89,7 +91,7 @@ export function Quantidade({ item, rotulo }: { item: Omit<ItemCarrinho, "qtd">; 
   return (
     <div className="passo" role="group" aria-label={`${t.quantidade}: ${item.nome}`}>
       <button type="button" onClick={() => definir(item, qtd - 1)} aria-label={t.diminuir}>−</button>
-      <input inputMode="numeric" value={qtd} aria-label={t.quantidade}
+      <input inputMode="numeric" value={item.caixa ? `${qtd} ${t.cx}` : qtd} aria-label={t.quantidade}
              onChange={(e) => definir(item, Number(e.target.value.replace(/\D/g, "")) || 0)} />
       <button type="button" onClick={() => definir(item, qtd + 1)} aria-label={t.aumentar} disabled={item.limite != null && qtd >= item.limite}>+</button>
     </div>
@@ -110,9 +112,10 @@ function Gaveta({ cliente }: { cliente: ClienteCarrinho }) {
     }
   }, [estado]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const total = cliente ? itens.reduce((s, i) => s + (i.preco ?? 0) * i.qtd, 0) : 0;
+  const un = (i: ItemCarrinho) => i.qtd * (i.caixa || 1);
+  const total = cliente ? itens.reduce((s, i) => s + (i.preco ?? 0) * un(i), 0) : 0;
   const semPreco = cliente ? itens.filter((i) => i.preco == null).length : 0;
-  const payload = JSON.stringify(itens.map((i) => ({ produto_id: i.id, quantidade: i.qtd })));
+  const payload = JSON.stringify(itens.map((i) => ({ produto_id: i.id, quantidade: un(i), caixas: i.caixa ? i.qtd : null })));
 
   return (
     <div className={`gaveta ${aberto ? "aberta" : ""}`} aria-hidden={!aberto}>
@@ -132,7 +135,8 @@ function Gaveta({ cliente }: { cliente: ClienteCarrinho }) {
                 <li key={i.id}>
                   <div>
                     <div className="g-nome">{i.nome}</div>
-                    {cliente && <div className="g-preco">{i.preco != null ? fmt(i.preco * i.qtd, cliente.moeda) : t.precoConfirmar}</div>}
+                    {i.caixa ? <div className="g-caixa">{t.caixas.replace("9999", String(i.qtd))} · {un(i)} {t.un}</div> : null}
+                    {cliente && <div className="g-preco">{i.preco != null ? fmt(i.preco * un(i), cliente.moeda) : t.precoConfirmar}</div>}
                   </div>
                   <div className="passo">
                     <button type="button" onClick={() => definir(i, i.qtd - 1)} aria-label={`${t.diminuir}: ${i.nome}`}>−</button>
