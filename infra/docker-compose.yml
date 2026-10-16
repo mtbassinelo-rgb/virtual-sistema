@@ -34,6 +34,7 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://vc_app:${APP_PRODUCAO_SENHA:?defina no .env}@db-producao/virtual
+      PORTAL_URL: ${PORTAL_URL:-}
     volumes:
       - arquivos_producao:/dados
     depends_on: [db-producao]

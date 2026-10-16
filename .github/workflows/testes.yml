@@ -89,3 +89,8 @@ jobs:
           for i in $(seq 1 30); do curl -sf http://localhost:3000/login > /dev/null && break; sleep 1; done
           curl -sf http://localhost:3000/login | grep -q "Entrar" && echo "Imagem respondeu."
           docker exec app node -e "require('@node-rs/argon2'); require('pg'); console.log('Dependências do script de usuários presentes.')"
+      - name: Configuração do servidor (Caddy e Docker Compose)
+        run: |
+          docker run --rm -v "$PWD/infra/Caddyfile:/etc/caddy/Caddyfile:ro" -e DOMINIO=exemplo.com caddy:2 caddy validate --config /etc/caddy/Caddyfile
+          cd infra && cp .env.exemplo .env && docker compose --env-file .env config -q && rm .env
+          bash -n instalar.sh && bash -n atualizar.sh && bash -n backup.sh

@@ -1,11 +1,27 @@
 # Caddy emite e renova os certificados HTTPS sozinho.
 
+# Equipe (produção)
 app.{$DOMINIO} {
 	encode gzip
 	reverse_proxy app-producao:3000
 }
 
+# Ambiente de teste
 teste.{$DOMINIO} {
 	encode gzip
 	reverse_proxy app-teste:3000
+}
+
+# Domínio principal: área do cliente (atacado). O resto vai para o endereço da equipe.
+{$DOMINIO}, www.{$DOMINIO} {
+	encode gzip
+	@raiz path /
+	redir @raiz /loja
+	@cliente path /loja /loja/* /_next/*
+	handle @cliente {
+		reverse_proxy app-producao:3000
+	}
+	handle {
+		redir https://app.{$DOMINIO}{uri}
+	}
 }

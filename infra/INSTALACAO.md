@@ -6,29 +6,23 @@ Depois disso, cada atualização é um comando (ver "Atualizar").
 ## Antes de começar
 
 1. **VPS:** Hostinger KVM 2 com **Ubuntu 24.04**.
-2. **Domínio:** crie dois registros do tipo **A** apontando para o IP da VPS:
-   `app` (produção) e `teste` (ambiente de teste).
+2. **Domínio:** crie registros do tipo **A** apontando para o IP da VPS:
+   `@` (área do cliente), `www`, `app` (equipe) e `teste` (ambiente de teste).
 3. **GitHub:** repositório `mtbassinelo-rgb/virtual-sistema` (já criado).
 
 ## Passo a passo (terminal do painel da Hostinger)
 
 ```bash
-# 1. Instalar Docker
-curl -fsSL https://get.docker.com | sh
-
-# 2. Baixar o código (o GitHub pede autorização na primeira vez)
-git clone https://github.com/mtbassinelo-rgb/virtual-sistema.git /opt/virtual
-cd /opt/virtual/infra
-
-# 3. Configuração: domínio e senhas longas (só neste servidor, nunca no GitHub)
-cp .env.exemplo .env
-nano .env
-
-# 4. Subir tudo: bancos, aplicação, HTTPS e backup
-./atualizar.sh teste
-./atualizar.sh producao
-docker compose --env-file .env up -d backup
+curl -fsSL https://raw.githubusercontent.com/mtbassinelo-rgb/virtual-sistema/main/infra/instalar.sh -o instalar.sh
+bash instalar.sh seudominio.com
 ```
+
+O script para uma vez e mostra uma chave: cadastre-a no GitHub em
+**Settings → Deploy keys → Add deploy key** (sem marcar "Allow write access") e aperte Enter.
+Ele gera as senhas sozinho, sobe teste, produção, HTTPS e backup.
+
+> Como o repositório é privado, o primeiro comando acima não funciona sem login.
+> Nesse caso, cole o conteúdo de `infra/instalar.sh` num arquivo no servidor (`nano instalar.sh`).
 
 ## Criar os usuários
 
