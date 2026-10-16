@@ -44,7 +44,10 @@ services:
     volumes:
       - arquivos_producao:/dados
     depends_on: [db-producao]
-    networks: [interna]
+    networks:
+      interna:
+        # nome exclusivo: o Caddy também enxerga a rede do Instituto, que pode ter um serviço com o mesmo nome
+        aliases: [vc-app-producao]
 
   app-teste:
     build: ..
@@ -55,7 +58,9 @@ services:
     volumes:
       - arquivos_teste:/dados
     depends_on: [db-teste]
-    networks: [interna]
+    networks:
+      interna:
+        aliases: [vc-app-teste]
 
   # HTTPS automático para app.<dominio> (produção) e teste.<dominio>
   caddy:
