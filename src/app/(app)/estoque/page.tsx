@@ -17,9 +17,18 @@ export default async function Estoque({ searchParams }: { searchParams: Promise<
     const depositos = (await c.query(
       "select id, nome, cidade, app.pode_operar_deposito(id) as opera from app.depositos where ativo order by tipo, nome")).rows;
     const par: unknown[] = [];
-    let filtro = "";
-    if (f.q) { par.push(`%${f.q}%`); filtro = "where codigo ilike $1 or produto ilike $1"; }
+    let filtro = "where produto_id not in (select kit_id from app.kit_componentes)";
+    if (f.q) { par.push(`%${f.q}%`); filtro += " and (codigo ilike $1 or produto ilike $1)"; }
     const saldos = (await c.query(`select * from app.v_estoque ${filtro} order by produto, deposito`, par)).rows;
+    const pendencias = ehGestao(u) ? (await c.query(
+      `select e.*, p.nome as produto, d.nome as deposito, pe.numero_externo, pe.canal from app.estoque_pendencias e
+         left join app.produtos p on p.id = e.produto_id left join app.depositos d on d.id = e.deposito_id
+         left join app.pedidos pe on pe.id = e.pedido_id
+        where e.resolvida_em is null order by e.em desc limit 100`)).rows : [];
+    const kits = (await c.query(
+      `select k.id, k.codigo, k.nome, string_agg(kc.quantidade::int || '× ' || c.nome, ' + ' order by c.nome) as composicao
+         from app.produtos k join app.kit_componentes kc on kc.kit_id = k.id join app.produtos c on c.id = kc.componente_id
+        where k.tipo = 'kit' and k.ativo group by k.id order by k.nome`)).rows;
     const transferencias = (await c.query(
       `select t.*, o.nome as origem, de.nome as destino, uc.nome as criada_nome,
               app.pode_operar_deposito(t.origem_id) as opera_origem, app.pode_operar_deposito(t.destino_id) as opera_destino,
@@ -34,7 +43,7 @@ export default async function Estoque({ searchParams }: { searchParams: Promise<
         group by t.id, o.nome, de.nome, uc.nome
         order by case t.status when 'enviada' then 0 when 'rascunho' then 1 else 2 end, t.numero desc limit 50`)).rows;
     const produtos = (await c.query("select id, codigo, nome from app.produtos where ativo order by nome")).rows;
-    return { depositos, saldos, transferencias, produtos };
+    return { depositos, saldos, transferencias, produtos, pendencias, kits };
   });
 
   // Tabela: uma linha por produto, uma coluna por depósito
@@ -88,6 +97,32 @@ export default async function Estoque({ searchParams }: { searchParams: Promise<
               </tr>
             );
           })}</tbody></table></div>
+      )}
+
+      {d.kits.length > 0 && (
+        <section className="painel">
+          <h2>Kits</h2>
+          <p className="pequeno suave">Kit não tem estoque próprio: ao vender, saem os componentes. A disponibilidade é a do componente que acabar primeiro.</p>
+          <ul className="lista-simples">{d.kits.map((k) => <li key={k.id}><b>{k.nome}</b> <span className="suave">({k.codigo})</span>: {k.composicao}</li>)}</ul>
+        </section>
+      )}
+
+      {d.pendencias.length > 0 && (
+        <section className="painel" id="pendencias">
+          <h2>Pendências de estoque</h2>
+          <p className="pequeno suave">Pedidos de marketplace que não deram saída completa no sistema. O estoque oficial ainda é o do Bling: confira e ajuste.</p>
+          <div className="tabela"><table>
+            <thead><tr><th>Quando</th><th>Pedido</th><th>Problema</th><th>Produto / código</th><th>Qtd</th></tr></thead>
+            <tbody>{d.pendencias.map((e) => (
+              <tr key={e.id}>
+                <td className="num">{dataHora(e.em)}</td>
+                <td>{e.pedido_id ? <a href={`/pedidos/${e.pedido_id}`}>{e.canal} {e.numero_externo ?? ""}</a> : "—"}</td>
+                <td>{e.tipo === "sem_estoque" ? <Selo cor="erro">Sem estoque no sistema</Selo> : <Selo cor="aviso">Código sem cadastro</Selo>}</td>
+                <td>{e.produto ?? e.codigo}<div className="pequeno suave">{e.detalhe}</div></td>
+                <td className="num">{Number(e.quantidade)}</td>
+              </tr>))}
+            </tbody></table></div>
+        </section>
       )}
 
       <section className="painel" id="transferencias">

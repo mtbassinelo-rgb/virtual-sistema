@@ -191,3 +191,32 @@ export async function criarPedido(fd: FormData) {
   revalidatePath("/pedidos");
   redirect(`/pedidos/${id}?ok=${encodeURIComponent("Pedido criado.")}`);
 }
+
+export async function decidirPedidoPortal(fd: FormData) {
+  const pedido = texto(fd, "pedido_id");
+  const aprovar = texto(fd, "decisao") === "aprovar";
+  await executar(pedido, aprovar ? "Pedido aprovado e enviado para separação." : "Pedido recusado.", async (uid) => {
+    await comUsuario(uid, (c) => c.query("select app.decidir_pedido_portal($1, $2, nullif($3,''))", [pedido, aprovar, texto(fd, "motivo")]));
+  });
+}
+
+export async function conferirSeparacao(fd: FormData) {
+  const pedido = texto(fd, "pedido_id");
+  await executar(pedido, "Separação conferida e total recalculado.", async (uid) => {
+    const itens: { item_id: string; quantidade: number }[] = [];
+    for (const [k, v] of fd.entries()) {
+      if (!k.startsWith("sep_")) continue;
+      const q = Number(String(v).replace(",", "."));
+      if (!Number.isFinite(q)) throw new Error("Quantidade separada inválida.");
+      itens.push({ item_id: k.slice(4), quantidade: q });
+    }
+    await comUsuario(uid, (c) => c.query("select app.conferir_separacao($1, $2)", [pedido, JSON.stringify(itens)]));
+  });
+}
+
+export async function confirmarTotal(fd: FormData) {
+  const pedido = texto(fd, "pedido_id");
+  await executar(pedido, "Total confirmado. Envie o WhatsApp para o cliente.", async (uid) => {
+    await comUsuario(uid, (c) => c.query("select app.confirmar_total($1, $2)", [pedido, texto(fd, "conta")]));
+  });
+}

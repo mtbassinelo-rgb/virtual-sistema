@@ -49,3 +49,29 @@ select 'manual', c.id, c.vendedora_id, current_date - x.dias, 'GS', x.valor, cur
   from (values ('Salão Exemplo A', 12, 4200000), ('Salão Exemplo A', 3, 2600000),
                ('Loja Exemplo B', 5, 1500000), ('Revenda Exemplo C', 1, 900000)) as x(cliente, dias, valor)
   join app.clientes c on c.nome = x.cliente;
+
+-- Loja de CDE: estoque próprio de exemplo
+insert into app.estoque_movimentos (deposito_id, produto_id, tipo, quantidade, referencia_tipo, referencia_id, observacao)
+select d.id, p.id, 'entrada_compra', 24, 'compra', 'EXEMPLO', 'Estoque de exemplo da loja'
+  from app.depositos d, app.produtos p where d.codigo = 'loja-cde' and p.codigo in ('RHE-001','RHE-003','RHE-007');
+
+-- Kit Platinum de exemplo (shampoo + condicionador + máscara)
+insert into app.produtos (codigo, nome, fornecedor) values
+  ('PLAT-SH','Shampoo Platinum','Exemplo'), ('PLAT-CO','Condicionador Platinum','Exemplo'), ('PLAT-MA','Máscara Platinum','Exemplo')
+on conflict (codigo) do nothing;
+insert into app.produtos (codigo, nome, fornecedor, tipo) values ('KIT-PLAT','Kit Platinum','Exemplo','kit') on conflict (codigo) do nothing;
+insert into app.kit_componentes (kit_id, componente_id, quantidade)
+select k.id, c.id, 1 from app.produtos k, app.produtos c where k.codigo = 'KIT-PLAT' and c.codigo in ('PLAT-SH','PLAT-CO','PLAT-MA')
+on conflict do nothing;
+insert into app.precos (produto_id, tabela, valor, vigente_desde)
+select id, t.tabela, t.valor, date '2026-01-01' from app.produtos,
+  (values ('py_normal', 120000), ('py_vip', 110000)) as t(tabela, valor) where codigo = 'KIT-PLAT'
+on conflict do nothing;
+insert into app.estoque_movimentos (deposito_id, produto_id, tipo, quantidade, referencia_tipo, referencia_id, observacao)
+select d.id, p.id, 'entrada_compra', case p.codigo when 'PLAT-MA' then 30 else 60 end, 'compra', 'EXEMPLO', 'Estoque de exemplo'
+  from app.depositos d, app.produtos p where d.codigo = 'cd-foz' and p.codigo in ('PLAT-SH','PLAT-CO','PLAT-MA');
+
+-- Cliente de exemplo da loja de CDE
+insert into app.clientes (nome, whatsapp, cidade, categoria_preco, vendedora_id, deposito_id, observacoes)
+select 'Salão Exemplo da Loja', '595984444444', 'Ciudad del Este', 'normal', v.id, d.id, 'Cliente de exemplo'
+  from app.vendedoras v, app.depositos d where v.nome = 'Yessica' and d.codigo = 'loja-cde';

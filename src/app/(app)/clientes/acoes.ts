@@ -69,3 +69,48 @@ export async function atendimentoCliente(fd: FormData) {
   revalidatePath(`/clientes/${id}`);
   redirect(`/clientes/${id}?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Atendimento registrado.")}`);
 }
+
+export async function convidarCliente(fd: FormData) {
+  const u = await exigirUsuario();
+  const id = texto(fd, "cliente_id");
+  const { headers } = await import("next/headers");
+  const { novoToken, sha256, urlPortal } = await import("@/lib/portal");
+  let erro: string | null = null;
+  let link = "";
+  try {
+    const token = novoToken();
+    await comUsuario(u.id, (c) => c.query("select app.gerar_convite_portal($1, $2)", [id, sha256(token)]));
+    const h = await headers();
+    link = `${urlPortal(h.get("x-forwarded-host") ?? h.get("host"), h.get("x-forwarded-proto"))}/loja/entrar/${token}`;
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  if (erro) redirect(`/clientes/${id}?erro=${encodeURIComponent(erro)}`);
+  redirect(`/clientes/${id}?convite=${encodeURIComponent(link)}`);
+}
+
+export async function bloquearCliente(fd: FormData) {
+  const u = await exigirUsuario();
+  const id = texto(fd, "cliente_id");
+  let erro: string | null = null;
+  try {
+    await comUsuario(u.id, (c) => c.query("select app.bloquear_portal($1)", [id]));
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  revalidatePath(`/clientes/${id}`);
+  redirect(`/clientes/${id}?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Acesso à área do cliente bloqueado.")}`);
+}
+
+export async function depositoCliente(fd: FormData) {
+  const u = await exigirUsuario();
+  const id = texto(fd, "cliente_id");
+  let erro: string | null = null;
+  try {
+    await comUsuario(u.id, (c) => c.query("update app.clientes set deposito_id = nullif($2,'')::uuid where id = $1", [id, texto(fd, "deposito_id")]));
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  revalidatePath(`/clientes/${id}`);
+  redirect(`/clientes/${id}?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Depósito do cliente atualizado.")}`);
+}

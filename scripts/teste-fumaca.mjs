@@ -52,6 +52,29 @@ for (const [email, quem] of [["gerente@teste.local", "Gerente"], ["keila@teste.l
   if (quem === "Keila") ok(outro.status === 404, "Keila não abre pedido da Yessica");
   else ok(outro.status === 200, "Gerente abre pedido de qualquer vendedora");
 }
+for (const tela of ["/promocoes"]) {
+  const r = await abrir(tela, await sessao("gerente@teste.local"));
+  ok(r.status === 200 && !r.html.includes("Application error"), `Gerente: ${tela} abre`);
+}
+
+// Área do cliente (atacado)
+ok([302, 303, 307, 308].includes((await abrir("/loja")).status), "Área do cliente sem link manda para a tela de acesso");
+const convite = randomBytes(32).toString("base64url");
+await db.query(
+  `insert into app.portal_convites (token_hash, cliente_id, expira_em)
+   select $1, id, now() + interval '1 day' from app.clientes where nome = 'Salão Exemplo da Loja'`,
+  [createHash("sha256").update(convite).digest("hex")]);
+const entrada = await fetch(`${base}/loja/entrar/${convite}`, { redirect: "manual" });
+const cookieCliente = (entrada.headers.get("set-cookie") ?? "").split(";")[0];
+ok(entrada.status === 303 && cookieCliente.startsWith("vc_cliente="), "Link de acesso abre a sessão do cliente");
+const reuso = await fetch(`${base}/loja/entrar/${convite}`, { redirect: "manual" });
+ok((reuso.headers.get("location") ?? "").includes("motivo=link"), "Link usado de novo é recusado");
+const cat = await abrir("/loja", cookieCliente);
+ok(cat.status === 200 && cat.html.includes("Kit Platinum") && cat.html.includes("Gs "), "Catálogo do cliente abre com preços em Gs e o kit");
+ok(cat.html.includes("CD de Foz"), "Cliente da loja vê a opção de pedir do CD de Foz");
+const meus = await abrir("/loja/pedidos", cookieCliente);
+ok(meus.status === 200, "Meus pedidos abre");
+
 const lista = await abrir("/pedidos", await sessao("keila@teste.local"));
 ok(lista.html.includes("Salão Exemplo A") && !lista.html.includes("Revenda Exemplo C"), "Lista da Keila mostra só os clientes dela");
 

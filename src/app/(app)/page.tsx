@@ -42,7 +42,20 @@ export default async function Hoje() {
           from app.transferencias t join app.depositos o on o.id = t.origem_id join app.depositos d on d.id = t.destino_id
          where t.status = 'enviada' and app.pode_operar_deposito(t.destino_id)
          order by t.enviada_em`)).rows;
-    return { aConferir, metasPropostas, recusados, envioAtrasado, pagAtrasado, metasPerto, transferencias };
+    const portal = (await c.query(`
+        select id, cliente_nome, valor_total, moeda, data_pedido, vendedora_nome from app.v_pedidos
+         where status_comercial = 'aguardando_aprovacao' order by criado_em`)).rows;
+    const separar = (await c.query(`
+        select v.id, v.cliente_nome, v.data_pedido, d.nome as deposito from app.v_pedidos v
+          join app.pedidos p on p.id = v.id join app.depositos d on d.id = p.deposito_id
+         where v.status_comercial = 'em_separacao' and v.origem <> 'bling' and p.separacao_conferida_em is null
+           and (app.pode_gerir() or app.pode_operar_deposito(p.deposito_id)) order by v.data_pedido`)).rows;
+    const confirmar = (await c.query(`
+        select v.id, v.cliente_nome, v.valor_total, v.moeda from app.v_pedidos v join app.pedidos p on p.id = v.id
+         where v.status_comercial = 'em_separacao' and p.separacao_conferida_em is not null and p.total_confirmado_em is null
+         order by p.separacao_conferida_em`)).rows;
+    const pendencias = gestao ? (await c.query(`select count(*)::int n from app.estoque_pendencias where resolvida_em is null`)).rows[0].n : 0;
+    return { aConferir, metasPropostas, recusados, envioAtrasado, pagAtrasado, metasPerto, transferencias, portal, separar, confirmar, pendencias };
   });
 
   return (
@@ -78,6 +91,43 @@ export default async function Hoje() {
           <span className="valor">{d.transferencias.length}</span>
         </div>
       </div>
+
+      {(d.portal.length > 0 || d.separar.length > 0 || d.confirmar.length > 0) && (
+        <section className="painel">
+          <h2>Pedidos da área do cliente</h2>
+          <div className="duas-colunas" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+            <div>
+              <h3>1. Aprovar</h3>
+              {d.portal.length === 0 ? <p className="suave pequeno">Nada para aprovar.</p> : (
+                <ul className="lista-simples">{d.portal.map((p) => (
+                  <li key={p.id}><Link href={`/pedidos/${p.id}`}>{p.cliente_nome}</Link> · <span className="num">{dinheiro(p.valor_total, p.moeda as Moeda)}</span>
+                    {gestao && <span className="suave"> · {p.vendedora_nome}</span>}</li>))}</ul>
+              )}
+            </div>
+            <div>
+              <h3>2. Conferir separação</h3>
+              {d.separar.length === 0 ? <p className="suave pequeno">Nada para conferir.</p> : (
+                <ul className="lista-simples">{d.separar.map((p) => (
+                  <li key={p.id}><Link href={`/pedidos/${p.id}`}>{p.cliente_nome ?? "Pedido"}</Link> · {p.deposito}</li>))}</ul>
+              )}
+            </div>
+            <div>
+              <h3>3. Confirmar total e enviar conta</h3>
+              {d.confirmar.length === 0 ? <p className="suave pequeno">Nada para confirmar.</p> : (
+                <ul className="lista-simples">{d.confirmar.map((p) => (
+                  <li key={p.id}><Link href={`/pedidos/${p.id}`}>{p.cliente_nome}</Link> · <span className="num">{dinheiro(p.valor_total, p.moeda as Moeda)}</span></li>))}</ul>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {gestao && d.pendencias > 0 && (
+        <div className="aviso-caixa aviso linha entre">
+          <span>{d.pendencias} pendência(s) de estoque de pedidos de marketplace (falta de estoque ou código sem cadastro).</span>
+          <Link href="/estoque#pendencias">Ver pendências</Link>
+        </div>
+      )}
 
       {gestao && (
         <section className="painel">

@@ -8,8 +8,8 @@ import {
 } from "@/lib/formato";
 import { Avisos, Selo } from "../../avisos";
 import {
-  anexarComprovante, atualizarPedido, conferirPagamento, reconhecerBling, recusarPagamento,
-  registrarAtendimento, registrarPagamento,
+  anexarComprovante, atualizarPedido, conferirPagamento, conferirSeparacao, confirmarTotal, decidirPedidoPortal,
+  reconhecerBling, recusarPagamento, registrarAtendimento, registrarPagamento,
 } from "../acoes";
 
 export const metadata = { title: "Pedido" };
@@ -29,7 +29,14 @@ export default async function Pedido({ params, searchParams }: {
       ? (await c.query("select id, nome, whatsapp, telefone, categoria_preco, pais from app.clientes where id = $1", [p.cliente_id])).rows[0]
       : null;
     const itens = (await c.query(
-      "select codigo, descricao, quantidade, preco_unitario, desconto, total from app.pedido_itens where pedido_id = $1 order by codigo", [id])).rows;
+      `select i.id, i.codigo, i.descricao, i.quantidade, i.quantidade_pedida, i.preco_unitario, i.desconto, i.total, d.nome as origem
+         from app.pedido_itens i left join app.depositos d on d.id = i.deposito_origem_id
+        where i.pedido_id = $1 order by i.codigo, d.nome`, [id])).rows;
+    const fluxo = (await c.query(
+      `select separacao_conferida_em, total_confirmado_em, conta_pagamento, app.pode_operar_deposito(deposito_id) as opera
+         from app.pedidos where id = $1`, [id])).rows[0];
+    const transf = (await c.query(
+      "select numero, status from app.transferencias where pedido_id = $1 order by numero", [id])).rows;
     const bling = p.bling_id
       ? (await c.query("select numero, situacao_nome, total, itens, sincronizado_em, mudou_em from app.bling_pedidos where bling_id = $1", [p.bling_id])).rows[0]
       : null;
@@ -57,7 +64,7 @@ export default async function Pedido({ params, searchParams }: {
         where (a.tabela = 'pedidos' and a.registro_id = $1)
            or (a.tabela = 'pagamentos' and a.registro_id in (select id::text from app.pagamentos where pedido_id = $1::uuid))
         order by a.em desc limit 50`, [id])).rows;
-    return { p, cliente, itens, bling, pagamentos, comprovantes, atendimentos, depositos, historico };
+    return { p, cliente, itens, fluxo, transf, bling, pagamentos, comprovantes, atendimentos, depositos, historico };
   });
   if (!d) notFound();
   const { p, cliente } = d;
@@ -74,6 +81,13 @@ export default async function Pedido({ params, searchParams }: {
       : `Seu pedido${p.bling_numero ? " nº " + p.bling_numero : ""} está ${STATUS_COMERCIAL[p.status_comercial].toLowerCase()}.` +
         (p.previsao_envio ? ` Previsão de envio: ${data(p.previsao_envio)}.` : ""));
   const whats = linkWhatsApp(cliente?.whatsapp ?? cliente?.telefone, mensagemCobranca);
+  const fluxo = d.fluxo;
+  const msgTotal = fluxo?.total_confirmado_em
+    ? `Olá ${cliente?.nome ?? ""}! Aqui é a ${p.vendedora_nome}, da Virtual Cosméticos. Seu pedido foi separado e o total ficou em ` +
+      `${dinheiro(p.valor_total, moeda)}. Dados para pagamento:\n${fluxo.conta_pagamento}\nDepois é só enviar o comprovante pela área do cliente ou por aqui. Obrigada!`
+    : null;
+  const whatsTotal = msgTotal ? linkWhatsApp(cliente?.whatsapp ?? cliente?.telefone, msgTotal) : null;
+  const portal = p.origem === "portal";
   const itensBling: { codigo?: string; descricao?: string; quantidade?: number; valor?: number }[] =
     d.bling && Array.isArray(d.bling.itens) ? d.bling.itens : [];
 
@@ -100,6 +114,67 @@ export default async function Pedido({ params, searchParams }: {
       </section>
 
       <Avisos ok={avisos.ok} erro={avisos.erro} />
+
+      {escrever && p.status_comercial === "aguardando_aprovacao" && (
+        <section className="painel" style={{ borderColor: "var(--marca)" }}>
+          <h2>Pedido feito pelo cliente na área de atacado</h2>
+          <p className="suave">Confira os itens. Ao aprovar, o pedido vai para a expedição separar
+            {d.itens.some((i) => i.origem && i.origem !== d.itens[0]?.origem) ? " e a transferência do CD para a loja já fica preparada" : ""}.</p>
+          <form action={decidirPedidoPortal} className="campos">
+            <input type="hidden" name="pedido_id" value={p.id} />
+            <label>Motivo (se recusar, o cliente vê)<input name="motivo" /></label>
+            <div className="linha">
+              <button className="principal" name="decisao" value="aprovar">Aprovar e mandar separar</button>
+              <button className="perigo" name="decisao" value="recusar">Recusar</button>
+            </div>
+          </form>
+        </section>
+      )}
+
+      {p.status_comercial === "em_separacao" && p.origem !== "bling" && !fluxo?.separacao_conferida_em && (gestao || fluxo?.opera) && (
+        <section className="painel" style={{ borderColor: "var(--info)" }}>
+          <h2>Conferir separação</h2>
+          <p className="suave pequeno">Informe quanto foi separado de cada item. O total do pedido é recalculado.</p>
+          <form action={conferirSeparacao} className="campos">
+            <input type="hidden" name="pedido_id" value={p.id} />
+            {d.itens.map((i) => (
+              <label key={i.id}>{i.descricao} (pedido {Number(i.quantidade_pedida)})
+                <input name={`sep_${i.id}`} inputMode="decimal" defaultValue={Number(i.quantidade)} />
+              </label>
+            ))}
+            <button className="principal">Separação conferida</button>
+          </form>
+        </section>
+      )}
+      {p.status_comercial === "em_separacao" && p.origem !== "bling" && !fluxo?.separacao_conferida_em && !(gestao || fluxo?.opera) && (
+        <div className="aviso-caixa">Aguardando a expedição conferir a separação.</div>
+      )}
+
+      {escrever && p.status_comercial === "em_separacao" && (fluxo?.separacao_conferida_em || p.origem === "bling") && !fluxo?.total_confirmado_em && (
+        <section className="painel" style={{ borderColor: "var(--marca)" }}>
+          <h2>Confirmar total para o cliente</h2>
+          <p>Total separado: <b className="num">{dinheiro(p.valor_total, moeda)}</b></p>
+          <form action={confirmarTotal} className="campos">
+            <input type="hidden" name="pedido_id" value={p.id} />
+            <label className="largo">Dados para pagamento (banco, conta, titular)
+              <textarea name="conta" required placeholder="Ex.: Banco Continental · Cuenta 0000000 · Virtual Cosméticos" />
+            </label>
+            <button className="principal">Confirmar total</button>
+          </form>
+        </section>
+      )}
+      {fluxo?.total_confirmado_em && Number(p.saldo) > 0 && (
+        <div className="aviso-caixa linha entre">
+          <span>Total confirmado ao cliente em {dataHora(fluxo.total_confirmado_em)}.</span>
+          {whatsTotal && <a className="botao whatsapp" href={whatsTotal} target="_blank" rel="noopener noreferrer">Enviar total e conta pelo WhatsApp</a>}
+        </div>
+      )}
+      {d.transf.length > 0 && (
+        <div className="aviso-caixa">
+          Transferência ligada a este pedido: {d.transf.map((t) => `nº ${t.numero} (${t.status})`).join(", ")}. <Link href="/estoque#transferencias">Ver no estoque</Link>
+        </div>
+      )}
+      {portal && <p className="pequeno suave">Pedido feito pelo cliente na área de atacado.</p>}
 
       {p.bling_mudou && (
         <div className="aviso-caixa aviso linha entre">
@@ -129,7 +204,8 @@ export default async function Pedido({ params, searchParams }: {
               <div className="tabela"><table>
                 <thead><tr><th>Código</th><th>Produto</th><th>Qtd</th><th>Preço</th><th>Total</th></tr></thead>
                 <tbody>{d.itens.map((i, k) => (
-                  <tr key={k}><td className="num">{i.codigo}</td><td>{i.descricao}</td><td className="num">{Number(i.quantidade)}</td>
+                  <tr key={k}><td className="num">{i.codigo}</td><td>{i.descricao}{i.origem && <div className="pequeno suave">Sai de: {i.origem}</div>}</td>
+                    <td className="num">{Number(i.quantidade)}{Number(i.quantidade_pedida) !== Number(i.quantidade) && <div className="pequeno suave">pedido: {Number(i.quantidade_pedida)}</div>}</td>
                     <td className="num">{dinheiro(i.preco_unitario, moeda)}</td><td className="num">{dinheiro(i.total, moeda)}</td></tr>))}
                 </tbody></table></div>
             ) : itensBling.length > 0 ? (

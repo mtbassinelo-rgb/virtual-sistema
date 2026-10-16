@@ -1,0 +1,31 @@
+/* Área do cliente: mais leve que o sistema interno, pensada para o celular */
+.loja { min-height: 100vh; }
+.loja-in { max-width: 1080px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+.loja-topo { background: var(--superficie); border-bottom: 1px solid var(--linha); position: sticky; top: 0; z-index: 5; }
+.loja-topo .loja-in { display: flex; gap: 16px; align-items: center; justify-content: space-between; padding-block: 12px; flex-wrap: wrap; }
+.loja-marca { font-weight: 700; font-size: 1.05rem; color: var(--texto); text-decoration: none; }
+.loja-marca small { display: block; font-weight: 400; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--marca); }
+.loja-menu { display: flex; gap: 4px; }
+.loja-menu a { padding: 6px 12px; border-radius: 8px; color: var(--suave); text-decoration: none; font-weight: 500; }
+.loja-menu a:hover { background: var(--afundado); color: var(--texto); }
+.loja-main { padding-block: 20px 120px; display: flex; flex-direction: column; gap: 18px; }
+.loja-rodape { padding-block: 16px 32px; color: var(--suave); font-size: .82rem; }
+
+.vitrine { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.produto { background: var(--superficie); border: 1px solid var(--linha); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.produto.promocao { border-color: var(--marca); box-shadow: inset 0 3px 0 var(--marca); }
+.produto.indisponivel { opacity: .55; }
+.produto .nome { font-weight: 600; line-height: 1.3; }
+.produto .preco { font-size: 1.2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.produto .riscado { text-decoration: line-through; color: var(--suave); font-size: .85rem; margin-left: 6px; font-weight: 400; }
+.produto .qtd { display: flex; gap: 8px; align-items: center; margin-top: auto; }
+.produto .qtd input { max-width: 96px; }
+
+.grupo-titulo { display: flex; align-items: baseline; gap: 10px; }
+.grupo-titulo span { color: var(--suave); font-size: .82rem; }
+
+.barra-pedido { position: fixed; left: 0; right: 0; bottom: 0; background: var(--superficie); border-top: 1px solid var(--linha); z-index: 6;
+  padding-bottom: env(safe-area-inset-bottom); }
+.barra-pedido .loja-in { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding-block: 12px; flex-wrap: wrap; }
+
+.meta-cliente { background: var(--marca-suave); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
