@@ -75,11 +75,11 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
   const paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
   const pagina = Math.min(paginas, Math.max(1, Number(f.pagina) || 1));
   const lista = todos.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA);
-  const vista = f.vista === "grade" ? "grade" : "lista";
+  const vista = f.vista === "lista" ? "lista" : "grade";
   const filtrando = Boolean(q || linha || marca || soPromo || soNovidade);
   const url = (mud: Record<string, string | number | null>) => {
     const u = new URLSearchParams();
-    const v = { q: q || null, linha, marca, promocao: soPromo ? "1" : null, novidade: soNovidade ? "1" : null, vista: vista === "grade" ? "grade" : null, pagina: null as string | number | null, ...mud };
+    const v = { q: q || null, linha, marca, promocao: soPromo ? "1" : null, novidade: soNovidade ? "1" : null, vista: vista === "lista" ? "lista" : null, pagina: null as string | number | null, ...mud };
     for (const [k, x] of Object.entries(v)) if (x !== null && x !== "" && !(k === "pagina" && x === 1)) u.set(k, String(x));
     const s = u.toString();
     return `/loja${s ? "?" + s : ""}#catalogo`;
@@ -208,8 +208,8 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
           <span className="contagem">{n(total)}</span>
         </div>
         <div className="vistas" role="group" aria-label={t.catalogo}>
-          <Link href={url({ vista: null })} className={vista === "lista" ? "ativa" : ""} aria-current={vista === "lista" ? "true" : undefined}>{t.lista}</Link>
-          <Link href={url({ vista: "grade" })} className={vista === "grade" ? "ativa" : ""} aria-current={vista === "grade" ? "true" : undefined}>{t.grade}</Link>
+          <Link href={url({ vista: null })} className={vista === "grade" ? "ativa" : ""} aria-current={vista === "grade" ? "true" : undefined}>{t.grade}</Link>
+          <Link href={url({ vista: "lista" })} className={vista === "lista" ? "ativa" : ""} aria-current={vista === "lista" ? "true" : undefined}>{t.lista}</Link>
         </div>
         <nav className="linhas" aria-label={t.catalogo}>
           <Link href={url({ linha: null })} className={!linha ? "ativa" : ""}>{t.tudo}</Link>
@@ -230,7 +230,7 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
           <div className="vazio-busca"><p>{soPromo ? t.semPromocao : t.semResultado(q)}</p></div>
         ) : (
           vista === "grade"
-            ? <div className="grade">{lista.map(cartao)}</div>
+            ? <div className="grade compacta">{lista.map(cartao)}</div>
             : <div className="catalogo-lista">{lista.map((p) => <LinhaCatalogo key={p.produto_id} p={p} moeda={moeda} cliente={Boolean(cliente)} t={t} />)}</div>
         )}
 

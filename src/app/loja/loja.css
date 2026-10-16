@@ -102,6 +102,20 @@
 .limpar { margin: -6px 0 14px; }
 .grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 16px; }
 @media (max-width: 520px) { .grade { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } }
+/* Catálogo em grade compacta: cartões médios/pequenos, mais produtos por tela */
+.grade.compacta { grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 12px; }
+.compacta .rotulo { aspect-ratio: 1 / 1; padding: 12px; gap: 4px; }
+.compacta .rotulo-nome { font-size: 1rem; }
+.compacta .rotulo-marca { font-size: .7rem; }
+.compacta .etiqueta-promo, .compacta .etiqueta-kit { top: 8px; left: 8px; font-size: .72rem; padding: 2px 8px; }
+.compacta .cartao-corpo { padding: 10px 11px 11px; gap: 4px; }
+.compacta .cartao-corpo h3 { font-size: .84rem; -webkit-line-clamp: 2; }
+.compacta .preco { font-size: 1rem; }
+.compacta .preco-consulta, .compacta .estoque { font-size: .74rem; }
+.compacta .adicionar { padding: 7px 10px; font-size: .85rem; }
+.compacta .passo { grid-template-columns: 32px 1fr 32px; }
+.compacta .passo button { height: 32px; }
+@media (max-width: 520px) { .grade.compacta { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } .compacta .rotulo-nome { font-size: .9rem; } }
 
 .cartao { background: var(--papel); border-radius: var(--raio-g); overflow: hidden; display: flex; flex-direction: column; border: 1px solid var(--linha-l); min-width: 0; }
 .rotulo { position: relative; aspect-ratio: 4 / 3; display: flex; flex-direction: column; justify-content: flex-end; gap: 6px; padding: 16px; overflow: hidden; }
