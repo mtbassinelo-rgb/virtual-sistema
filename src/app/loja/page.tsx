@@ -172,8 +172,8 @@ function Cartao({ p, moeda, cliente }: { p: Produto; moeda: Moeda; cliente: bool
       <div className="rotulo" style={{ background: cor.fundo, color: cor.tinta }}>
         {p.foto ? <img src={p.foto} alt="" loading="lazy" /> : (
           <>
-            {p.marcaNome && <span className="rotulo-marca">{p.marcaNome}</span>}
-            <span className="rotulo-nome">{nomeCurto(p.nome, p.marcaNome)}</span>
+            <span className="rotulo-nome">{p.marcaNome ?? LINHAS.find((l) => l.chave === p.linha)?.nome}</span>
+            <span className="rotulo-marca">{p.marcaNome ? LINHAS.find((l) => l.chave === p.linha)?.nome : nomeCurto(p.nome, null).split(" ").slice(0, 3).join(" ")}</span>
           </>
         )}
         {pr?.desconto_pct && <span className="etiqueta-promo">−{Number(pr.desconto_pct)}%</span>}

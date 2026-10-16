@@ -6,6 +6,11 @@
   --fundo: #f7f4f9; --papel: #ffffff; --linha-l: #e6dcec; --apagado: #6e5a7a;
   --titulo: "Poppins", "Figtree", system-ui, sans-serif; --texto-f: "Figtree", system-ui, sans-serif;
   --raio-g: 22px; --raio-p: 10px;
+  /* o site é sempre claro: as variáveis do sistema interno também ficam no tema claro aqui dentro */
+  --bg: #f7f4f9; --superficie: #ffffff; --afundado: #f1ecf4; --linha: #e6dcec; --texto: #2a0e36; --suave: #6e5a7a;
+  --marca: #822aa1; --marca-texto: #ffffff; --marca-suave: #f1e6f6;
+  --ok: #1f7a5a; --ok-suave: #e1f2ea; --aviso: #9a5b00; --aviso-suave: #fbefd9;
+  --erro: #b0303a; --erro-suave: #f8e1e3; --info: #2f5f8f; --info-suave: #e2ecf6;
   color-scheme: light;
   background: var(--fundo); color: var(--roxo-tinta); font-family: var(--texto-f); font-size: 15px; line-height: 1.55;
   min-height: 100vh; display: flex; flex-direction: column;
@@ -99,17 +104,17 @@
 @media (max-width: 520px) { .grade { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } }
 
 .cartao { background: var(--papel); border-radius: var(--raio-g); overflow: hidden; display: flex; flex-direction: column; border: 1px solid var(--linha-l); min-width: 0; }
-.rotulo { position: relative; aspect-ratio: 1 / 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 6px; padding: 16px; overflow: hidden; }
+.rotulo { position: relative; aspect-ratio: 4 / 3; display: flex; flex-direction: column; justify-content: flex-end; gap: 6px; padding: 16px; overflow: hidden; }
 .rotulo::before { content: ""; position: absolute; right: -30%; top: -30%; width: 80%; aspect-ratio: 1; border-radius: 50%; background: rgba(255,255,255,.14); }
 .rotulo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #fff; }
 .rotulo-marca { position: relative; font-family: var(--titulo); font-weight: 600; font-size: .78rem; opacity: .85; }
-.rotulo-nome { position: relative; font-family: var(--titulo); font-weight: 700; font-size: clamp(.95rem, 1.6vw, 1.12rem); line-height: 1.18;
-  display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; text-transform: none; }
+.rotulo-nome { position: relative; font-family: var(--titulo); font-weight: 700; font-size: clamp(1.15rem, 2.2vw, 1.5rem); line-height: 1.1;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .etiqueta-promo, .etiqueta-kit { position: absolute; top: 12px; left: 12px; border-radius: 999px; padding: 3px 10px; font-weight: 700; font-size: .8rem; font-family: var(--titulo); }
 .etiqueta-promo { background: var(--verde); color: var(--verde-tinta); }
 .etiqueta-kit { background: rgba(255,255,255,.9); color: var(--roxo-tinta); }
 .cartao-corpo { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
-.cartao-corpo h3 { font-family: var(--texto-f); font-size: .9rem; font-weight: 500; line-height: 1.35; color: var(--roxo-tinta);
+.cartao-corpo h3 { font-family: var(--texto-f); font-size: .92rem; font-weight: 600; line-height: 1.35; color: var(--roxo-tinta);
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .preco { font-family: var(--titulo); font-weight: 700; font-size: 1.15rem; font-variant-numeric: tabular-nums; }
 .preco s { font-family: var(--texto-f); font-weight: 400; font-size: .82rem; color: var(--apagado); margin-left: 6px; }
@@ -163,8 +168,10 @@
 .g-nome { font-size: .9rem; line-height: 1.35; }
 .g-preco { font-weight: 700; font-size: .9rem; margin-top: 2px; }
 .gaveta-envio { padding: 16px 20px 24px; display: flex; flex-direction: column; gap: 12px; }
-.gaveta-envio label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; font-size: .88rem; }
-.gaveta-envio input:not([type=radio]) { font: inherit; padding: 10px 12px; border-radius: var(--raio-p); border: 1.5px solid var(--linha-l); }
+.gaveta-envio label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; font-size: .88rem; color: var(--roxo-tinta); }
+.gaveta-envio input:not([type=radio]) { font: inherit; padding: 10px 12px; border-radius: var(--raio-p); border: 1.5px solid var(--linha-l); background: #fff; color: var(--roxo-tinta); }
+.g-pais label { color: var(--roxo-tinta); }
+.g-pais input { accent-color: var(--roxo); }
 .gaveta-envio input:focus { border-color: var(--roxo); outline: none; }
 .g-pais { border: 0; padding: 0; margin: 0; display: flex; gap: 16px; flex-wrap: wrap; }
 .g-pais legend { font-weight: 600; font-size: .88rem; margin-bottom: 4px; }
