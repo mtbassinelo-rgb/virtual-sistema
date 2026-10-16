@@ -25,3 +25,6 @@ teste.{$DOMINIO} {
 		redir https://app.{$DOMINIO}{uri}
 	}
 }
+
+# Outros sistemas na mesma VPS (ex.: Instituto Supremo). Cada um grava seu arquivo em /opt/caddy-extra.
+import /etc/caddy/extra/*.caddy

@@ -9,6 +9,9 @@ alvo="${1:?Informe: teste ou producao}"
 set -a; . ./.env; set +a
 git -C .. pull --ff-only
 senha_var="DB_$(echo "$alvo" | tr a-z A-Z)_SENHA"; app_var="APP_$(echo "$alvo" | tr a-z A-Z)_SENHA"
+# rede e pasta compartilhadas com o Instituto Supremo (o Caddy atende os dois sistemas)
+docker network create supremo-web >/dev/null 2>&1 || true
+mkdir -p /opt/caddy-extra
 docker compose --env-file .env up -d "db-$alvo"
 # espera o banco aceitar conexões (na primeira vez ele leva alguns segundos para iniciar)
 for i in $(seq 1 60); do

@@ -67,7 +67,8 @@ services:
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_dados:/data
-    networks: [interna]
+      - /opt/caddy-extra:/etc/caddy/extra:ro   # sites de outros sistemas da VPS (Instituto Supremo)
+    networks: [interna, supremo]
 
   # Backup diário do banco de produção (guarda 30 dias no servidor;
   # a cópia para fora do servidor é configurada em backup.sh)
@@ -95,3 +96,7 @@ volumes:
 
 networks:
   interna:
+  # Rede compartilhada com o sistema do Instituto Supremo (só o Caddy participa)
+  supremo:
+    external: true
+    name: supremo-web
