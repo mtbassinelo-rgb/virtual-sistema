@@ -36,6 +36,7 @@ export async function salvarProduto(fd: FormData) {
         numero(fd, "custo"), fd.get("ativo") === "on"]);
       const pid = String(r.rows[0].id);
       await c.query("select app.definir_destaque($1, $2)", [pid, fd.get("destaque") === "on"]);
+      await c.query("select app.definir_novidade($1, $2)", [pid, fd.get("novidade") === "on"]);
       const cod = (await c.query("select codigo from app.produtos where id = $1", [pid])).rows[0].codigo;
       const precos = TABELAS.map((t) => ({ codigo: cod, tabela: t, valor: numero(fd, t) })).filter((p) => p.valor != null);
       if (precos.length) await c.query("select app.importar_precos($1::jsonb)", [JSON.stringify(precos)]);

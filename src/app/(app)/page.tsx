@@ -61,7 +61,8 @@ export default async function Hoje() {
          where s.atendido_em is null
            and (app.pode_gerir() or s.pais = (select pais from app.vendedoras where id = app.minha_vendedora()))
          order by s.criado_em desc limit 30`)).rows;
-    return { site, aConferir, metasPropostas, recusados, envioAtrasado, pagAtrasado, metasPerto, transferencias, portal, separar, confirmar, pendencias };
+    const cadastros = Number((await c.query("select count(*) n from app.cadastros_site where atendido_em is null")).rows[0].n);
+    return { cadastros, site, aConferir, metasPropostas, recusados, envioAtrasado, pagAtrasado, metasPerto, transferencias, portal, separar, confirmar, pendencias };
   });
 
   return (
@@ -97,6 +98,12 @@ export default async function Hoje() {
           <span className="valor">{d.transferencias.length}</span>
         </div>
       </div>
+
+      {d.cadastros > 0 && (
+        <a href="/site#cadastros" className="aviso-caixa aviso" style={{ textDecoration: "none", color: "inherit" }}>
+          <b>{d.cadastros} {d.cadastros === 1 ? "novo cadastro" : "novos cadastros"} pelo site</b> (Quero ser cliente) aguardando contato.
+        </a>
+      )}
 
       {d.site.length > 0 && (
         <section className="painel">

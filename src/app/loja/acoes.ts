@@ -7,6 +7,8 @@ import { redirect } from "next/navigation";
 import { pool, mensagemErro } from "@/lib/db";
 import { clienteAtual, exigirCliente, sha256, tokenCliente } from "@/lib/portal";
 import { linkWhatsApp, numero, texto } from "@/lib/formato";
+import { TEXTOS, idiomaAtual } from "@/lib/idioma";
+import { avisarEquipe } from "@/lib/email";
 import { pastaArquivos } from "@/lib/arquivos";
 
 const TIPOS: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "application/pdf": "pdf" };
@@ -96,12 +98,15 @@ export async function enviarCarrinho(_: RespostaCarrinho, fd: FormData): Promise
     }
   }
 
-  const nome = texto(fd, "nome"), zap = texto(fd, "whatsapp"), pais = texto(fd, "pais") === "PY" ? "PY" : "BR", cidade = texto(fd, "cidade");
+  // Quem navega em espanhol é atendido pelo WhatsApp de vendas em guaranis; em português, pelo principal
+  const idioma = await idiomaAtual();
+  const nome = texto(fd, "nome"), zap = texto(fd, "whatsapp"), pais = idioma === "es" ? "PY" : "BR", cidade = texto(fd, "cidade");
   try {
     const r = await pool.query("select app.registrar_pedido_site($1, $2, $3, $4, $5, $6) as numero",
       [nome, zap, pais, cidade, JSON.stringify(itens), obs]);
-    const msg = `Olá! Sou ${nome}${cidade ? ` (${cidade})` : ""}. Quero fazer este pedido pelo site:\n${await listaTexto(itens)}` +
-      `${obs ? "\nObs.: " + obs : ""}\nPode me passar os preços de atacado?`;
+    const lista = await listaTexto(itens);
+    const msg = TEXTOS[idioma].msgVisitante(nome, cidade, lista, obs);
+    await avisarEquipe(`Pedido pelo site: ${nome}`, `Pedido de visitante pelo site\n\nNome: ${nome}\nWhatsApp: ${zap}\nCidade: ${cidade}\n\n${lista}${obs ? "\n\nObs.: " + obs : ""}`);
     const url = linkWhatsApp(String(r.rows[0].numero), msg);
     return url ? { url } : { erro: "WhatsApp da empresa não configurado." };
   } catch (e) {

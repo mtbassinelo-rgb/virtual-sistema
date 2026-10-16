@@ -2,55 +2,56 @@ import Link from "next/link";
 import { clienteAtual } from "@/lib/portal";
 import { pool } from "@/lib/db";
 import { linkWhatsApp, telefone } from "@/lib/formato";
+import { TEXTOS, idiomaAtual, textosCarrinho } from "@/lib/idioma";
 import { BotaoCarrinho, Carrinho } from "./carrinho";
 import "./loja.css";
 
 export const metadata = {
-  title: { default: "Virtual Cosméticos · Atacado de cosméticos", template: "%s · Virtual Cosméticos" },
-  description: "Atacado de cosméticos para salões e revendas no Brasil e no Paraguai. Matizadores, kits capilares, corpo e banho, maquiagem e unhas.",
+  title: { default: "Virtual Cosméticos · Distribuidora direto de fábrica em Foz do Iguaçu", template: "%s · Virtual Cosméticos" },
+  description: "Distribuidora de cosméticos direto de fábrica em Foz do Iguaçu. Atacado para salões, perfumarias e revendedores: matizadores, kits capilares, corpo e banho, maquiagem e unhas.",
   robots: { index: true, follow: true },
 };
 
 export default async function LayoutLoja({ children }: { children: React.ReactNode }) {
   const c = await clienteAtual();
-  const contatos = (await pool.query("select app.whatsapp_empresa('BRL') as br, app.whatsapp_empresa('GS') as py")).rows[0] ?? {};
-  const zapBr = linkWhatsApp(contatos.br, "Olá! Quero comprar no atacado da Virtual Cosméticos.");
-  const zapPy = linkWhatsApp(contatos.py, "¡Hola! Quiero comprar al por mayor en Virtual Cosméticos.");
+  const idioma = await idiomaAtual();
+  const t = TEXTOS[idioma];
+  // Português: WhatsApp principal. Espanhol (clientes em guaranis): WhatsApp de vendas em Gs.
+  const numero = c?.vendedora_whatsapp
+    ?? String((await pool.query("select app.whatsapp_empresa($1) as w", [idioma === "es" ? "GS" : "BRL"])).rows[0]?.w ?? "");
+  const zap = linkWhatsApp(numero, t.zapMsg);
+  const linhas = ["kits", "matizadores", "cabelo", "corpo", "rosto", "maquiagem", "unhas"];
 
   return (
-    <div className="loja">
+    <div className="loja" lang={idioma === "es" ? "es" : "pt-BR"}>
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
       <link rel="stylesheet" precedence="default"
             href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Figtree:wght@400;500;600;700&display=swap" />
-      <Carrinho cliente={c ? { nome: c.nome, vendedora: c.vendedora, moeda: c.moeda } : null}>
+      <Carrinho cliente={c ? { nome: c.nome, vendedora: c.vendedora, moeda: c.moeda } : null} t={textosCarrinho(t, c)}>
         <header className="topo">
           <div className="in topo-in">
-            <Link href="/loja" className="marca" aria-label="Virtual Cosméticos, início">
+            <Link href="/loja" className="marca" aria-label="Virtual Cosméticos">
               <img src="/marca/icone.png" width={42} height={40} alt="" />
               <span className="marca-txt"><b>Virtual</b>Cosméticos</span>
             </Link>
             <form action="/loja" className="busca" role="search">
-              <input name="q" type="search" placeholder="Buscar shampoo, matizador, kit…" aria-label="Buscar produtos" />
+              <input name="q" type="search" placeholder={t.buscar} aria-label={t.buscar} />
             </form>
-            <nav className="nav" aria-label="Navegação">
-              {c ? <Link href="/loja/pedidos">Meus pedidos</Link> : <Link href="/loja/acesso">Já sou cliente</Link>}
+            <nav className="nav" aria-label="Menu">
+              <a className="idioma" href={`/loja/idioma?l=${t.idiomaCodigo}`} hrefLang={t.idiomaCodigo} lang={t.idiomaCodigo}>{t.idioma}</a>
+              {c ? <Link href="/loja/pedidos">{t.meusPedidos}</Link> : <Link href="/loja/cadastro">{t.querSerCliente}</Link>}
               <BotaoCarrinho />
             </nav>
           </div>
         </header>
-        <nav className="subnav" aria-label="Seções do catálogo">
+        <nav className="subnav" aria-label={t.catalogo}>
           <div className="in">
-            <Link href="/loja?promocao=1#catalogo" className="promo">Promoções</Link>
-            <Link href="/loja#mais-vendidos">Mais vendidos</Link>
-            <Link href="/loja/marcas">Marcas</Link>
-            <Link href="/loja?linha=kits#catalogo">Kits</Link>
-            <Link href="/loja?linha=matizadores#catalogo">Matizadores</Link>
-            <Link href="/loja?linha=cabelo#catalogo">Cabelo</Link>
-            <Link href="/loja?linha=corpo#catalogo">Corpo e banho</Link>
-            <Link href="/loja?linha=rosto#catalogo">Rosto</Link>
-            <Link href="/loja?linha=maquiagem#catalogo">Maquiagem</Link>
-            <Link href="/loja?linha=unhas#catalogo">Unhas e cílios</Link>
+            <Link href="/loja?promocao=1#catalogo" className="promo">{t.promocoes}</Link>
+            <Link href="/loja?novidade=1#catalogo">{t.novidades}</Link>
+            <Link href="/loja#mais-vendidos">{t.maisVendidos}</Link>
+            <Link href="/loja/marcas">{t.marcas}</Link>
+            {linhas.map((l) => <Link key={l} href={`/loja?linha=${l}#catalogo`}>{t.linhas[l]}</Link>)}
           </div>
         </nav>
 
@@ -60,27 +61,26 @@ export default async function LayoutLoja({ children }: { children: React.ReactNo
           <div className="in rodape-in">
             <div>
               <img className="rodape-logo" src="/marca/logo.png" width={202} height={116} alt="Virtual Cosméticos" />
-              <p>Distribuidora de cosméticos no atacado. Centro de distribuição em Foz do Iguaçu e loja em Ciudad del Este.</p>
+              <p>{t.rodapeTexto}</p>
             </div>
             <div>
-              <h3>Brasil</h3>
-              {zapBr && <a href={zapBr} target="_blank" rel="noopener noreferrer">WhatsApp {telefone(contatos.br)}</a>}
-              <p>Pedidos em reais, envio a partir de Foz do Iguaçu.</p>
+              <h3>{t.atendimento}</h3>
+              {zap && <a href={zap} target="_blank" rel="noopener noreferrer">WhatsApp {telefone(numero)}</a>}
+              <p>{t.rodapeZap}</p>
             </div>
             <div>
-              <h3>Paraguay</h3>
-              {zapPy && <a href={zapPy} target="_blank" rel="noopener noreferrer">WhatsApp {telefone(contatos.py)}</a>}
-              <p>Pedidos en guaraníes, retiro o entrega en Ciudad del Este.</p>
-            </div>
-            <div>
-              <h3>{c ? c.nome : "Clientes"}</h3>
+              <h3>{c ? c.nome : t.clientes}</h3>
               {c ? (
                 <>
-                  <p>Atendimento: {c.vendedora}</p>
-                  <Link href="/loja/sair">Sair da área do cliente</Link>
+                  <p>{t.atendimentoDe(c.vendedora)}</p>
+                  <Link href="/loja/sair">{t.sair}</Link>
                 </>
               ) : (
-                <p>Clientes cadastrados recebem da vendedora um link de acesso com os preços de atacado.</p>
+                <>
+                  <p>{t.rodapeClientes}</p>
+                  <Link href="/loja/cadastro">{t.querSerCliente}</Link>{" · "}
+                  <Link href="/loja/acesso">{t.jaSouCliente}</Link>
+                </>
               )}
             </div>
           </div>

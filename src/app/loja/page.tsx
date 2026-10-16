@@ -4,10 +4,11 @@ import { clienteAtual, sha256, tokenCliente } from "@/lib/portal";
 import { dinheiro, data, type Moeda } from "@/lib/formato";
 import { CARTELA, LINHAS, corMarca, corRotulo, interno, linhaDe, marcaDe, nomeCurto } from "@/lib/vitrine";
 import { Quantidade } from "./carrinho";
+import { TEXTOS, idiomaAtual, type Textos } from "@/lib/idioma";
 
 export const metadata = { title: { absolute: "Virtual Cosméticos · Atacado de cosméticos para salões e revendas" } };
 
-type Publico = { produto_id: string; codigo: string; nome: string; marca: string | null; tipo: string; foto: string | null; tem_estoque: boolean };
+type Publico = { produto_id: string; codigo: string; nome: string; marca: string | null; tipo: string; foto: string | null; tem_estoque: boolean; novidade: boolean };
 type Preco = {
   produto_id: string; preco: string; preco_tabela: string; desconto_pct: string | null; limite_qtd: string | null;
   disponibilidade: "disponivel" | "ultimas" | "indisponivel"; disponivel_abastecedor: boolean; prazo_abastecimento: string | null;
@@ -19,9 +20,13 @@ type Produto = Publico & { linha: string; marcaNome: string | null; p?: Preco; x
 const POR_PAGINA = 48;
 const sem = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
-export default async function Vitrine({ searchParams }: { searchParams: Promise<{ q?: string; linha?: string; marca?: string; promocao?: string; pagina?: string; erro?: string }> }) {
+export default async function Vitrine({ searchParams }: { searchParams: Promise<{ q?: string; linha?: string; marca?: string; promocao?: string; novidade?: string; pagina?: string; erro?: string }> }) {
   const f = await searchParams;
   const cliente = await clienteAtual();
+  const idioma = await idiomaAtual();
+  const t = TEXTOS[idioma];
+  const banners = (await pool.query("select * from app.banners_ativos($1)", [idioma])).rows as
+    { id: string; titulo: string; subtitulo: string | null; imagem: string | null; link: string | null }[];
   const token = cliente ? await tokenCliente() : null;
 
   const publicos = (await pool.query("select * from app.vitrine_publica()")).rows as Publico[];
@@ -52,9 +57,12 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
   const linha = LINHAS.find((l) => l.chave === f.linha)?.chave ?? null;
   const marca = f.marca && marcas.has(f.marca) ? f.marca : null;
   const soPromo = f.promocao === "1";
+  const soNovidade = f.novidade === "1";
+  const novidades = todos.filter((p) => p.novidade);
   if (linha) todos = todos.filter((p) => p.linha === linha);
   if (marca) todos = todos.filter((p) => p.marcaNome === marca);
   if (soPromo) todos = todos.filter((p) => pct(p) > 0);
+  if (soNovidade) todos = todos.filter((p) => p.novidade);
   if (q) {
     const termos = sem(q).split(/\s+/).filter(Boolean);
     todos = todos.filter((p) => { const t = sem(`${p.nome} ${p.marcaNome ?? ""} ${p.codigo}`); return termos.every((x) => t.includes(x)); });
@@ -67,37 +75,62 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
   const paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
   const pagina = Math.min(paginas, Math.max(1, Number(f.pagina) || 1));
   const lista = todos.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA);
-  const filtrando = Boolean(q || linha || marca || soPromo);
+  const filtrando = Boolean(q || linha || marca || soPromo || soNovidade);
   const url = (mud: Record<string, string | number | null>) => {
     const u = new URLSearchParams();
-    const v = { q: q || null, linha, marca, promocao: soPromo ? "1" : null, pagina: null as string | number | null, ...mud };
+    const v = { q: q || null, linha, marca, promocao: soPromo ? "1" : null, novidade: soNovidade ? "1" : null, pagina: null as string | number | null, ...mud };
     for (const [k, x] of Object.entries(v)) if (x !== null && x !== "" && !(k === "pagina" && x === 1)) u.set(k, String(x));
     const s = u.toString();
     return `/loja${s ? "?" + s : ""}#catalogo`;
   };
   const kits = !filtrando ? todos.filter((p) => p.linha === "kits").slice(0, 8) : [];
 
+  const n = (x: number) => `${x.toLocaleString(idioma === "es" ? "es-PY" : "pt-BR")} ${x === 1 ? t.produto : t.produtos}`;
+  const cartao = (p: Produto) => <Cartao key={p.produto_id} p={p} moeda={moeda} cliente={Boolean(cliente)} t={t} />;
+  const titulo = marca ?? (soPromo ? t.promocoes : soNovidade ? t.novidades : linha ? t.linhas[linha] : q ? t.resultados(q) : t.catalogo);
+
   return (
     <>
+      {!filtrando && banners.length > 0 && (
+        <section className="banners" aria-label={t.destaques}>
+          <div className="banners-trilho">
+            {banners.map((b) => {
+              const conteudo = (
+                <>
+                  {b.imagem && <img src={b.imagem} alt="" />}
+                  <div className="banner-texto">
+                    <h2>{b.titulo}</h2>
+                    {b.subtitulo && <p>{b.subtitulo}</p>}
+                  </div>
+                </>
+              );
+              return b.link
+                ? <a key={b.id} href={b.link} className={`banner ${b.imagem ? "com-imagem" : ""}`}>{conteudo}</a>
+                : <div key={b.id} className={`banner ${b.imagem ? "com-imagem" : ""}`}>{conteudo}</div>;
+            })}
+          </div>
+        </section>
+      )}
+
       {!filtrando && !cliente && (
         <section className="abertura">
           <div className="in abertura-in">
             <div className="abertura-texto">
-              <h1>Cosméticos no atacado para quem cuida de cabelo, pele e unhas.</h1>
-              <p>Salões, perfumarias e revendedoras do Brasil e do Paraguai compram aqui direto do nosso centro de distribuição em Foz do Iguaçu e da loja em Ciudad del Este.</p>
+              <h1>{t.heroTitulo}</h1>
+              <p>{t.heroTexto}</p>
               <div className="abertura-acoes">
-                <a className="botao-cheio" href="#catalogo">Ver os {publicos.length.toLocaleString("pt-BR")} produtos</a>
-                <Link className="botao-linha" href="/loja/acesso">Já sou cliente</Link>
+                <a className="botao-cheio" href="#catalogo">{t.verProdutos(publicos.length.toLocaleString(idioma === "es" ? "es-PY" : "pt-BR"))}</a>
+                <Link className="botao-linha" href="/loja/cadastro">{t.querSerCliente}</Link>
               </div>
             </div>
-            <div className="cartela" aria-label="Cartela de matizadores">
+            <div className="cartela" aria-label={t.cartela}>
               {CARTELA.map((c, i) => (
                 <Link key={c.nome} href={`/loja?q=${encodeURIComponent(c.busca)}#catalogo`} className="mecha"
                       style={{ background: c.fundo, color: c.tinta, ["--i" as string]: i }}>
                   <span>{c.nome}</span>
                 </Link>
               ))}
-              <p className="cartela-legenda">Matizadores em todos os tons. Toque numa mecha para ver os produtos.</p>
+              <p className="cartela-legenda">{t.cartelaLegenda}</p>
             </div>
           </div>
         </section>
@@ -105,8 +138,8 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
 
       {cliente && !filtrando && (
         <section className="in boas-vindas">
-          <h1>Olá, {cliente.nome}.</h1>
-          <p>Preços {cliente.categoria === "vip" ? "VIP " : ""}em {moeda === "GS" ? "guaranis" : "reais"}. Monte o pedido: {cliente.vendedora} confere o estoque, confirma o total e envia os dados para pagamento.</p>
+          <h1>{t.ola(cliente.nome)}</h1>
+          <p>{t.precosCliente(cliente.categoria === "vip", moeda === "GS", cliente.vendedora)}</p>
           {meta && (
             <div className="meta">
               <b>
@@ -123,32 +156,42 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
       {!filtrando && emPromocao.length > 0 && (
         <section className="in faixa" id="promocoes">
           <div className="faixa-titulo">
-            <h2>Promoções</h2>
-            <Link href={url({ promocao: "1", linha: null, marca: null, q: null })}>Ver todas as promoções</Link>
+            <h2>{t.promocoes}</h2>
+            <Link href={url({ promocao: "1", linha: null, marca: null, q: null })}>{t.verTodasPromocoes}</Link>
           </div>
-          <div className="trilho">{emPromocao.slice(0, 12).map((p) => <Cartao key={p.produto_id} p={p} moeda={moeda} cliente={Boolean(cliente)} />)}</div>
+          <div className="trilho">{emPromocao.slice(0, 12).map(cartao)}</div>
+        </section>
+      )}
+
+      {!filtrando && novidades.length > 0 && (
+        <section className="in faixa" id="novidades">
+          <div className="faixa-titulo">
+            <h2>{t.novidades}</h2>
+            <Link href={url({ novidade: "1", linha: null, marca: null, q: null })}>{t.verTodas}</Link>
+          </div>
+          <div className="trilho">{novidades.slice(0, 12).map(cartao)}</div>
         </section>
       )}
 
       {!filtrando && destaques.length > 0 && (
         <section className="in faixa" id="mais-vendidos">
-          <div className="faixa-titulo"><h2>{vendidos.length > 0 ? "Mais vendidos" : "Destaques"}</h2></div>
-          <div className="trilho">{destaques.map((p) => <Cartao key={p.produto_id} p={p} moeda={moeda} cliente={Boolean(cliente)} />)}</div>
+          <div className="faixa-titulo"><h2>{vendidos.length > 0 ? t.maisVendidos : t.destaques}</h2></div>
+          <div className="trilho">{destaques.map(cartao)}</div>
         </section>
       )}
 
       {!filtrando && listaMarcas.length > 0 && (
         <section className="in faixa" id="marcas">
           <div className="faixa-titulo">
-            <h2>Marcas</h2>
-            <Link href="/loja/marcas">Ver todas as marcas</Link>
+            <h2>{t.marcas}</h2>
+            <Link href="/loja/marcas">{t.verTodasMarcas}</Link>
           </div>
           <div className="marcas">
-            {listaMarcas.slice(0, 12).map(([m, n]) => {
+            {listaMarcas.slice(0, 12).map(([m, qtd]) => {
               const c = corMarca(m);
               return (
                 <Link key={m} href={url({ marca: m, linha: null, q: null, promocao: null })} className="marca-bloco" style={{ background: c.fundo, color: c.tinta }}>
-                  <b>{m}</b><span>{n} {n === 1 ? "produto" : "produtos"}</span>
+                  <b>{m}</b><span>{n(qtd)}</span>
                 </Link>
               );
             })}
@@ -159,82 +202,77 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
       {kits.length > 0 && (
         <section className="in faixa">
           <div className="faixa-titulo">
-            <h2>Kits completos</h2>
-            <Link href={url({ linha: "kits", q: null })}>Ver todos os kits</Link>
+            <h2>{t.kitsCompletos}</h2>
+            <Link href={url({ linha: "kits", q: null })}>{t.verTodosKits}</Link>
           </div>
-          <div className="trilho">{kits.map((p) => <Cartao key={p.produto_id} p={p} moeda={moeda} cliente={Boolean(cliente)} />)}</div>
+          <div className="trilho">{kits.map(cartao)}</div>
         </section>
       )}
 
       <section className="in catalogo" id="catalogo">
         <div className="catalogo-topo">
-          <h2>{marca ?? (soPromo ? "Promoções" : linha ? LINHAS.find((l) => l.chave === linha)!.nome : q ? `Resultados para “${q}”` : "Catálogo")}</h2>
-          <span className="contagem">{total.toLocaleString("pt-BR")} {total === 1 ? "produto" : "produtos"}</span>
+          <h2>{titulo}</h2>
+          <span className="contagem">{n(total)}</span>
         </div>
-        <nav className="linhas" aria-label="Linhas de produto">
-          <Link href={url({ linha: null })} className={!linha ? "ativa" : ""}>Tudo</Link>
+        <nav className="linhas" aria-label={t.catalogo}>
+          <Link href={url({ linha: null })} className={!linha ? "ativa" : ""}>{t.tudo}</Link>
           {LINHAS.filter((l) => contagem.get(l.chave)).map((l) => (
-            <Link key={l.chave} href={url({ linha: l.chave })} className={linha === l.chave ? "ativa" : ""}>{l.nome}</Link>
+            <Link key={l.chave} href={url({ linha: l.chave })} className={linha === l.chave ? "ativa" : ""}>{t.linhas[l.chave] ?? l.nome}</Link>
           ))}
         </nav>
         {f.erro && <div className="aviso-erro" role="alert">{f.erro}</div>}
-        {(q || marca || soPromo) && (
+        {(q || marca || soPromo || soNovidade) && (
           <p className="limpar">
-            {q && <Link href={url({ q: null })}>Limpar a busca</Link>}
-            {marca && <Link href={url({ marca: null })}>Todas as marcas</Link>}
-            {soPromo && <Link href={url({ promocao: null })}>Todos os produtos</Link>}
+            {q && <Link href={url({ q: null })}>{t.limparBusca}</Link>}
+            {marca && <Link href={url({ marca: null })}>{t.todasMarcas}</Link>}
+            {(soPromo || soNovidade) && <Link href={url({ promocao: null, novidade: null })}>{t.todosProdutos}</Link>}
           </p>
         )}
 
         {lista.length === 0 ? (
-          <div className="vazio-busca">
-            <p>{soPromo ? "Nenhuma promoção agora. Volte em breve ou peça no WhatsApp." : `Nenhum produto${q ? ` com “${q}”` : " aqui"}. Tente outra palavra, como “shampoo” ou “kit”, ou peça no WhatsApp.`}</p>
-          </div>
+          <div className="vazio-busca"><p>{soPromo ? t.semPromocao : t.semResultado(q)}</p></div>
         ) : (
-          <div className="grade">{lista.map((p) => <Cartao key={p.produto_id} p={p} moeda={moeda} cliente={Boolean(cliente)} />)}</div>
+          <div className="grade">{lista.map(cartao)}</div>
         )}
 
         {paginas > 1 && (
-          <nav className="paginas" aria-label="Páginas">
-            {pagina > 1 && <Link href={url({ pagina: pagina - 1 })}>Anterior</Link>}
-            <span>Página {pagina} de {paginas}</span>
-            {pagina < paginas && <Link href={url({ pagina: pagina + 1 })}>Próxima</Link>}
+          <nav className="paginas" aria-label={t.catalogo}>
+            {pagina > 1 && <Link href={url({ pagina: pagina - 1 })}>{t.anterior}</Link>}
+            <span>{t.pagina(pagina, paginas)}</span>
+            {pagina < paginas && <Link href={url({ pagina: pagina + 1 })}>{t.proxima}</Link>}
           </nav>
         )}
       </section>
 
       {!cliente && (
         <section className="in como">
-          <h2>Como comprar</h2>
-          <ol>
-            <li><b>Monte o pedido</b><span>Escolha os produtos e as quantidades aqui no site.</span></li>
-            <li><b>Envie pelo WhatsApp</b><span>O pedido chega para a vendedora do Brasil ou do Paraguai, conforme onde você compra.</span></li>
-            <li><b>Receba o total</b><span>A vendedora confere o estoque e manda o valor de atacado e os dados para pagamento.</span></li>
-            <li><b>Retire ou receba</b><span>Envio a partir de Foz do Iguaçu ou entrega em Ciudad del Este.</span></li>
-          </ol>
+          <h2>{t.comoComprar}</h2>
+          <ol>{t.passos.map(([a, b]) => <li key={a}><b>{a}</b><span>{b}</span></li>)}</ol>
         </section>
       )}
     </>
   );
 }
 
-function Cartao({ p, moeda, cliente }: { p: Produto; moeda: Moeda; cliente: boolean }) {
+function Cartao({ p, moeda, cliente, t }: { p: Produto; moeda: Moeda; cliente: boolean; t: Textos }) {
   const cor = corRotulo(p.nome, p.linha);
   const pr = p.p;
   const semEstoque = pr ? pr.disponibilidade === "indisponivel" && !pr.disponivel_abastecedor : false;
   const item = { id: p.produto_id, nome: p.nome, marca: p.marcaNome, preco: pr ? Number(pr.preco) : null, limite: pr?.limite_qtd ? Number(pr.limite_qtd) : null };
+  const promo = pr?.desconto_pct ?? p.x?.promo_pct;
   return (
     <article className="cartao">
       <div className="rotulo" style={{ background: cor.fundo, color: cor.tinta }}>
         {p.foto ? <img src={p.foto} alt="" loading="lazy" /> : (
           <>
-            <span className="rotulo-nome">{p.marcaNome ?? LINHAS.find((l) => l.chave === p.linha)?.nome}</span>
-            <span className="rotulo-marca">{p.marcaNome ? LINHAS.find((l) => l.chave === p.linha)?.nome : nomeCurto(p.nome, null).split(" ").slice(0, 3).join(" ")}</span>
+            <span className="rotulo-nome">{p.marcaNome ?? t.linhas[p.linha]}</span>
+            <span className="rotulo-marca">{p.marcaNome ? t.linhas[p.linha] : nomeCurto(p.nome, null).split(" ").slice(0, 3).join(" ")}</span>
           </>
         )}
-        {(pr?.desconto_pct || p.x?.promo_pct) && <span className="etiqueta-promo">−{Number(pr?.desconto_pct ?? p.x?.promo_pct)}%</span>}
-        {p.linha === "kits" && !(pr?.desconto_pct || p.x?.promo_pct) && <span className="etiqueta-kit">Kit</span>}
-        {Number(p.x?.vendidos_90d ?? 0) > 0 && <span className="etiqueta-vendido">Mais vendido</span>}
+        {promo && <span className="etiqueta-promo">−{Number(promo)}%</span>}
+        {!promo && p.novidade && <span className="etiqueta-promo">{t.novo}</span>}
+        {p.linha === "kits" && !promo && !p.novidade && <span className="etiqueta-kit">{t.kit}</span>}
+        {Number(p.x?.vendidos_90d ?? 0) > 0 && <span className="etiqueta-vendido">{t.maisVendido}</span>}
       </div>
       <div className="cartao-corpo">
         <h3>{p.nome}</h3>
@@ -244,18 +282,18 @@ function Cartao({ p, moeda, cliente }: { p: Produto; moeda: Moeda; cliente: bool
               {dinheiro(pr.preco, moeda)}
               {pr.desconto_pct && <s>{dinheiro(pr.preco_tabela, moeda)}</s>}
             </div>
-          ) : <div className="preco-consulta">Preço com a vendedora</div>
+          ) : <div className="preco-consulta">{t.precoVendedora}</div>
         ) : null}
         {pr && (
           <div className="estoque">
-            {pr.disponibilidade === "disponivel" && "Em estoque"}
-            {pr.disponibilidade === "ultimas" && "Últimas unidades"}
-            {pr.disponibilidade === "indisponivel" && pr.disponivel_abastecedor && `Vem do CD de Foz (${pr.prazo_abastecimento ?? "alguns dias"})`}
-            {semEstoque && "Sem estoque agora: a vendedora confirma o prazo"}
+            {pr.disponibilidade === "disponivel" && t.emEstoque}
+            {pr.disponibilidade === "ultimas" && t.ultimas}
+            {pr.disponibilidade === "indisponivel" && pr.disponivel_abastecedor && t.encomenda(pr.prazo_abastecimento)}
+            {semEstoque && t.semEstoque}
           </div>
         )}
-        {pr?.ultima_compra && <div className="estoque">Você comprou em {data(pr.ultima_compra)}</div>}
-        <Quantidade item={item} rotulo={cliente ? "Adicionar ao pedido" : "Adicionar"} />
+        {pr?.ultima_compra && <div className="estoque">{t.comprouEm(data(pr.ultima_compra))}</div>}
+        <Quantidade item={item} rotulo={cliente ? t.adicionarPedido : t.adicionar} />
       </div>
     </article>
   );

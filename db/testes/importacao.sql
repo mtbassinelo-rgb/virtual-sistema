@@ -145,4 +145,29 @@ select teste.ok((select destaque from app.vitrine_extras() where produto_id = :'
 select teste.como(:'KEILA');
 select teste.falha(format($$select app.definir_destaque(%L, false)$$, :'novo'), 'Só gerente ou dono', 'Vendedora não escolhe destaque');
 reset role;
+
+\echo '== Banners e novidades =='
+set role vc_app;
+select teste.como(:'GERENTE');
+insert into app.banners (titulo, link, idioma, ordem) values ('Semana dos kits', '/loja?linha=kits', 'todos', 1), ('Solo español', '/loja', 'es', 2), ('Vencido', '/loja', 'todos', 3);
+update app.banners set fim = current_date - 1 where titulo = 'Vencido';
+select teste.falha($$insert into app.banners (titulo, link) values ('x', 'javascript:alert(1)')$$, null, 'Link de banner só para o próprio site ou https');
+select app.definir_novidade(:'novo', true);
+select teste.como('');
+select teste.ok((select count(*) from app.banners_ativos('pt')) = 1 and (select count(*) from app.banners_ativos('es')) = 2, 'Banners por idioma e período');
+select teste.ok((select novidade from app.vitrine_publica() where produto_id = :'novo'), 'Novidade aparece na vitrine');
+select teste.como(:'KEILA');
+select teste.falha($$insert into app.banners (titulo) values ('x')$$, null, 'Vendedora não cria banner');
+reset role;
+
+\echo '== Quero ser cliente =='
+set role vc_app;
+select teste.como('');
+select teste.ok(app.registrar_cadastro_site('Salão Bella', 'Ana', '+55 45 98888-7777', 'ana@bella.com', 'Foz', 'salao', null, 'quero tabela', 'pt') = '5545999972092',
+  'Cadastro em português vai para o WhatsApp principal');
+select teste.falha($$select app.registrar_cadastro_site('Salão Bella', 'Ana', '5545988887777', null, null, null, null, null, 'pt')$$, 'hoje', 'Mesmo WhatsApp no mesmo dia é recusado');
+select teste.falha($$select app.registrar_cadastro_site('X Shop', null, '5545911112222', 'nao-e-email', null, null, null, null, 'es')$$, 'E-mail inválido', 'E-mail inválido é recusado');
+select teste.ok((select count(*) from app.cadastros_site) = 0, 'Visitante não lê os cadastros');
+reset role;
+select teste.ok((select tipo from app.cadastros_site where nome = 'Salão Bella') = 'salao', 'Cadastro guardado para a equipe');
 \echo 'Testes de importação passaram.'

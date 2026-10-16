@@ -2,11 +2,13 @@
 
 import { createContext, useActionState, useContext, useEffect, useMemo, useState } from "react";
 import { enviarCarrinho, type RespostaCarrinho } from "./acoes";
+import type { TextosCarrinho } from "@/lib/idioma";
 
 export type ItemCarrinho = { id: string; nome: string; marca: string | null; preco: number | null; qtd: number; limite?: number | null };
 export type ClienteCarrinho = { nome: string; vendedora: string; moeda: "GS" | "BRL" } | null;
 
 type Ctx = {
+  t: TextosCarrinho;
   itens: ItemCarrinho[];
   aberto: boolean;
   abrir: (v: boolean) => void;
@@ -26,7 +28,7 @@ function ler(): ItemCarrinho[] {
   }
 }
 
-export function Carrinho({ children, cliente }: { children: React.ReactNode; cliente: ClienteCarrinho }) {
+export function Carrinho({ children, cliente, t }: { children: React.ReactNode; cliente: ClienteCarrinho; t: TextosCarrinho }) {
   const [itens, setItens] = useState<ItemCarrinho[]>([]);
   const [aberto, abrir] = useState(false);
   useEffect(() => setItens(ler()), []);
@@ -41,7 +43,7 @@ export function Carrinho({ children, cliente }: { children: React.ReactNode; cli
   }, [aberto]);
 
   const valor = useMemo<Ctx>(() => ({
-    itens, aberto, abrir,
+    t, itens, aberto, abrir,
     definir: (item, qtd) => setItens((atual) => {
       const q = Math.max(0, Math.min(Math.floor(qtd), item.limite ?? 9999));
       const resto = atual.filter((i) => i.id !== item.id);
@@ -50,7 +52,7 @@ export function Carrinho({ children, cliente }: { children: React.ReactNode; cli
       return existente ? atual.map((i) => (i.id === item.id ? { ...i, ...item, qtd: q } : i)) : [...atual, { ...item, qtd: q }];
     }),
     limpar: () => setItens([]),
-  }), [itens, aberto]);
+  }), [itens, aberto, t]);
 
   return (
     <Contexto.Provider value={valor}>
@@ -67,29 +69,29 @@ function useCarrinho() {
 }
 
 export function BotaoCarrinho() {
-  const { itens, abrir } = useCarrinho();
+  const { itens, abrir, t } = useCarrinho();
   const n = itens.reduce((s, i) => s + i.qtd, 0);
   return (
-    <button type="button" className="sacola" onClick={() => abrir(true)} aria-label={`Abrir pedido (${n} itens)`}>
+    <button type="button" className="sacola" onClick={() => abrir(true)} aria-label={t.abrirPedido.replace("9999", String(n))}>
       <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 8h12l-1 12H7L6 8Zm3 0V6a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /></svg>
-      <span>Pedido</span>
+      <span>{t.pedido}</span>
       {n > 0 && <b className="sacola-n">{n}</b>}
     </button>
   );
 }
 
 export function Quantidade({ item, rotulo }: { item: Omit<ItemCarrinho, "qtd">; rotulo?: string }) {
-  const { itens, definir } = useCarrinho();
+  const { itens, definir, t } = useCarrinho();
   const qtd = itens.find((i) => i.id === item.id)?.qtd ?? 0;
   if (qtd === 0) {
-    return <button type="button" className="adicionar" onClick={() => definir(item, 1)}>{rotulo ?? "Adicionar"}</button>;
+    return <button type="button" className="adicionar" onClick={() => definir(item, 1)}>{rotulo ?? t.adicionar}</button>;
   }
   return (
-    <div className="passo" role="group" aria-label={`Quantidade de ${item.nome}`}>
-      <button type="button" onClick={() => definir(item, qtd - 1)} aria-label="Diminuir">−</button>
-      <input inputMode="numeric" value={qtd} aria-label="Quantidade"
+    <div className="passo" role="group" aria-label={`${t.quantidade}: ${item.nome}`}>
+      <button type="button" onClick={() => definir(item, qtd - 1)} aria-label={t.diminuir}>−</button>
+      <input inputMode="numeric" value={qtd} aria-label={t.quantidade}
              onChange={(e) => definir(item, Number(e.target.value.replace(/\D/g, "")) || 0)} />
-      <button type="button" onClick={() => definir(item, qtd + 1)} aria-label="Aumentar" disabled={item.limite != null && qtd >= item.limite}>+</button>
+      <button type="button" onClick={() => definir(item, qtd + 1)} aria-label={t.aumentar} disabled={item.limite != null && qtd >= item.limite}>+</button>
     </div>
   );
 }
@@ -98,7 +100,7 @@ const fmt = (v: number, moeda: "GS" | "BRL") =>
   moeda === "GS" ? `Gs ${Math.round(v).toLocaleString("es-PY")}` : v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 function Gaveta({ cliente }: { cliente: ClienteCarrinho }) {
-  const { itens, aberto, abrir, definir, limpar } = useCarrinho();
+  const { itens, aberto, abrir, definir, limpar, t } = useCarrinho();
   const [estado, acao, enviando] = useActionState<RespostaCarrinho, FormData>(enviarCarrinho, {});
   useEffect(() => {
     if (estado.url) {
@@ -115,14 +117,14 @@ function Gaveta({ cliente }: { cliente: ClienteCarrinho }) {
   return (
     <div className={`gaveta ${aberto ? "aberta" : ""}`} aria-hidden={!aberto}>
       <div className="gaveta-fundo" onClick={() => abrir(false)} />
-      <aside className="gaveta-painel" role="dialog" aria-modal="true" aria-label="Seu pedido">
+      <aside className="gaveta-painel" role="dialog" aria-modal="true" aria-label={t.seuPedido}>
         <header className="gaveta-topo">
-          <h2>Seu pedido</h2>
-          <button type="button" className="fechar" onClick={() => abrir(false)} aria-label="Fechar">×</button>
+          <h2>{t.seuPedido}</h2>
+          <button type="button" className="fechar" onClick={() => abrir(false)} aria-label={t.fechar}>×</button>
         </header>
 
         {itens.length === 0 ? (
-          <p className="gaveta-vazia">Escolha os produtos e as quantidades no catálogo. Eles aparecem aqui.</p>
+          <p className="gaveta-vazia">{t.vazio}</p>
         ) : (
           <>
             <ul className="gaveta-lista">
@@ -130,13 +132,13 @@ function Gaveta({ cliente }: { cliente: ClienteCarrinho }) {
                 <li key={i.id}>
                   <div>
                     <div className="g-nome">{i.nome}</div>
-                    {cliente && <div className="g-preco">{i.preco != null ? fmt(i.preco * i.qtd, cliente.moeda) : "Preço a confirmar"}</div>}
+                    {cliente && <div className="g-preco">{i.preco != null ? fmt(i.preco * i.qtd, cliente.moeda) : t.precoConfirmar}</div>}
                   </div>
                   <div className="passo">
-                    <button type="button" onClick={() => definir(i, i.qtd - 1)} aria-label={`Diminuir ${i.nome}`}>−</button>
-                    <input inputMode="numeric" value={i.qtd} aria-label={`Quantidade de ${i.nome}`}
+                    <button type="button" onClick={() => definir(i, i.qtd - 1)} aria-label={`${t.diminuir}: ${i.nome}`}>−</button>
+                    <input inputMode="numeric" value={i.qtd} aria-label={`${t.quantidade}: ${i.nome}`}
                            onChange={(e) => definir(i, Number(e.target.value.replace(/\D/g, "")) || 0)} />
-                    <button type="button" onClick={() => definir(i, i.qtd + 1)} aria-label={`Aumentar ${i.nome}`}>+</button>
+                    <button type="button" onClick={() => definir(i, i.qtd + 1)} aria-label={`${t.aumentar}: ${i.nome}`}>+</button>
                   </div>
                 </li>
               ))}
@@ -146,31 +148,26 @@ function Gaveta({ cliente }: { cliente: ClienteCarrinho }) {
               <input type="hidden" name="itens" value={payload} />
               {cliente ? (
                 <>
-                  <div className="g-total"><span>Total</span><b>{fmt(total, cliente.moeda)}</b></div>
-                  {semPreco > 0 && <p className="g-nota">{semPreco} produto(s) sem preço na sua tabela: a vendedora confirma o valor.</p>}
-                  <label>Observação<input name="observacao" placeholder="Ex.: entregar na sexta" maxLength={500} /></label>
-                  <p className="g-nota">{cliente.vendedora} confere o estoque, confirma o total e manda os dados para pagamento.</p>
+                  <div className="g-total"><span>{t.total}</span><b>{fmt(total, cliente.moeda)}</b></div>
+                  {semPreco > 0 && <p className="g-nota">{t.semPrecoTabela.replace("9999", String(semPreco))}</p>}
+                  <label>{t.observacao}<input name="observacao" placeholder={t.obsExemplo} maxLength={500} /></label>
+                  <p className="g-nota">{t.confere}</p>
                 </>
               ) : (
                 <>
-                  <p className="g-nota">Ainda não é cliente? Mande o pedido e uma vendedora responde no WhatsApp com os preços de atacado.</p>
-                  <label>Seu nome ou do salão<input name="nome" required maxLength={120} autoComplete="name" /></label>
-                  <label>WhatsApp com DDD<input name="whatsapp" required inputMode="tel" autoComplete="tel" placeholder="+55 45 99999-0000" /></label>
-                  <fieldset className="g-pais">
-                    <legend>Onde você compra</legend>
-                    <label><input type="radio" name="pais" value="BR" defaultChecked /> Brasil (R$)</label>
-                    <label><input type="radio" name="pais" value="PY" /> Paraguai (Gs)</label>
-                  </fieldset>
-                  <label>Cidade<input name="cidade" maxLength={120} autoComplete="address-level2" /></label>
-                  <label>Observação<input name="observacao" maxLength={500} /></label>
+                  <p className="g-nota">{t.naoCliente}</p>
+                  <label>{t.seuNome}<input name="nome" required maxLength={120} autoComplete="name" /></label>
+                  <label>{t.whatsapp}<input name="whatsapp" required inputMode="tel" autoComplete="tel" /></label>
+                  <label>{t.cidade}<input name="cidade" maxLength={120} autoComplete="address-level2" /></label>
+                  <label>{t.observacao}<input name="observacao" maxLength={500} /></label>
                 </>
               )}
               {estado.erro && <div className="g-erro" role="alert">{estado.erro}</div>}
               {estado.alternativa && (
-                <a className="g-zap" href={estado.alternativa} target="_blank" rel="noopener noreferrer">Mandar este pedido pelo WhatsApp</a>
+                <a className="g-zap" href={estado.alternativa} target="_blank" rel="noopener noreferrer">{t.mandarZap}</a>
               )}
               <button className="enviar" disabled={enviando}>
-                {enviando ? "Enviando…" : cliente ? `Enviar pedido para ${cliente.vendedora}` : "Enviar pedido pelo WhatsApp"}
+                {enviando ? t.enviando : cliente ? t.enviarPara : t.enviarZap}
               </button>
             </form>
           </>

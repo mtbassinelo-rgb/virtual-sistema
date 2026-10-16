@@ -52,7 +52,7 @@ for (const [email, quem] of [["gerente@teste.local", "Gerente"], ["keila@teste.l
   if (quem === "Keila") ok(outro.status === 404, "Keila não abre pedido da Yessica");
   else ok(outro.status === 200, "Gerente abre pedido de qualquer vendedora");
 }
-for (const tela of ["/promocoes", "/estoque/importar", "/estoque/precos", "/produtos", "/produtos/novo", "/produtos?filtro=sem-foto"]) {
+for (const tela of ["/promocoes", "/estoque/importar", "/estoque/precos", "/produtos", "/produtos/novo", "/produtos?filtro=sem-foto", "/site"]) {
   const r = await abrir(tela, await sessao("gerente@teste.local"));
   ok(r.status === 200 && !r.html.includes("Application error"), `Gerente: ${tela} abre`);
 }
@@ -72,6 +72,11 @@ ok(vitrine.status === 200 && vitrine.html.includes("Cartela de matizadores") && 
 ok((await abrir("/loja?linha=kits")).status === 200 && (await abrir("/loja?q=shampoo")).status === 200, "Filtro por linha e busca funcionam");
 ok((await abrir("/loja/marcas")).status === 200 && (await abrir("/loja?promocao=1")).status === 200 && (await abrir("/loja?marca=Soul")).status === 200,
   "Marcas, promoções e filtro por marca abrem");
+ok((await abrir("/loja/cadastro")).html.includes("Quero ser cliente"), "Cadastro de novo cliente abre");
+const es = await fetch(base + "/loja", { headers: { cookie: "vc_idioma=es" } });
+const htmlEs = await es.text();
+ok(htmlEs.includes("Distribuidora de cosméticos directo de fábrica") && !htmlEs.includes("Paraguai"), "Site em espanhol e sem citar Paraguai");
+ok(!vitrine.html.includes("Ciudad del Este") && !vitrine.html.includes("Paraguai"), "Site em português sem citar CDE/Paraguai");
 ok([302, 303, 307, 308].includes((await abrir("/loja/pedidos")).status), "Meus pedidos sem link manda para a tela de acesso");
 ok((await fetch(base + "/marca/icone.png")).status === 200, "Logo é servido");
 ok((await fetch(base + "/fotos/..%2Fetc%2Fpasswd")).status === 404, "Rota de fotos não aceita caminho estranho");

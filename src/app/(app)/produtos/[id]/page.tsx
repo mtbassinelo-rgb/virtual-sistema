@@ -78,6 +78,9 @@ export default async function Produto({ params, searchParams }: {
             <label style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <input type="checkbox" name="destaque" defaultChecked={p ? p.destaque : false} disabled={!pode} style={{ width: "auto" }} /> Destaque no site
             </label>
+            <label style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <input type="checkbox" name="novidade" defaultChecked={p ? p.novidade : false} disabled={!pode} style={{ width: "auto" }} /> Novidade no site
+            </label>
           </div>
           <h2 style={{ marginTop: 8 }}>Preços</h2>
           <p className="pequeno suave">O preço novo vale a partir de hoje; o anterior fica no histórico. Gs é arredondado para múltiplos de 500. Deixar em branco não altera.</p>
