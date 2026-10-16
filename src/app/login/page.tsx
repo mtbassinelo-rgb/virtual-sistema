@@ -10,9 +10,9 @@ async function acaoEntrar(fd: FormData) {
   redirect("/");
 }
 
-export default async function Login({ searchParams }: { searchParams: Promise<{ erro?: string }> }) {
+export default async function Login({ searchParams }: { searchParams: Promise<{ erro?: string; ok?: string }> }) {
   if (await usuarioAtual()) redirect("/");
-  const { erro } = await searchParams;
+  const { erro, ok } = await searchParams;
   return (
     <div className="entrada">
       <div className="painel">
@@ -21,6 +21,7 @@ export default async function Login({ searchParams }: { searchParams: Promise<{ 
           <div className="suave pequeno">Sistema comercial · acesso da equipe</div>
         </div>
         {erro && <div className="aviso-caixa erro">{erro}</div>}
+        {ok && <div className="aviso-caixa ok">{ok}</div>}
         <form action={acaoEntrar} className="campos" style={{ gridTemplateColumns: "1fr" }}>
           <label>
             E-mail

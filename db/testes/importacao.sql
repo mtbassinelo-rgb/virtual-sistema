@@ -71,5 +71,32 @@ select teste.ok((select count(*) from app.estoque_movimentos where produto_id = 
   'Reimportar não lança estoque no kit');
 select teste.como(:'KEILA');
 select teste.falha(format($$select app.definir_kit(%L, '[]'::jsonb)$$, :'kkit'), 'Só gerente ou dono', 'Vendedora não monta kit');
+
+\echo '== Preços em lote =='
+select teste.como(:'GERENTE');
+select (app.importar_precos('[{"codigo":"IMP-001","tabela":"py_normal","valor":20100},{"codigo":"IMP-001","tabela":"br_vip","valor":35.5},{"codigo":"NAO-EXISTE","tabela":"py_vip","valor":1000},{"codigo":"IMP-002","tabela":"py_vip","valor":""}]'::jsonb))::text as rp \gset
+select teste.ok((:'rp'::jsonb->>'alterados')::int = 2 and :'rp'::jsonb->'codigos_desconhecidos' = '["NAO-EXISTE"]'::jsonb,
+  'Preços gravados; código desconhecido é avisado; célula vazia é ignorada');
+select teste.ok((select valor from app.precos pr join app.produtos p on p.id = pr.produto_id where p.codigo = 'IMP-001' and tabela = 'py_normal') = 20000,
+  'Preço em Gs é arredondado para múltiplo de 500');
+select teste.ok((app.importar_precos('[{"codigo":"IMP-001","tabela":"py_normal","valor":20000}]'::jsonb)->>'alterados')::int = 0, 'Preço igual não gera histórico novo');
+select teste.falha($$select app.importar_precos('[{"codigo":"IMP-001","tabela":"xx","valor":1}]'::jsonb)$$, 'desconhecida', 'Tabela inexistente é recusada');
+select teste.como(:'KEILA');
+select teste.falha($$select app.importar_precos('[]'::jsonb)$$, 'Só gerente ou dono', 'Vendedora não altera preços');
+
+\echo '== Primeiro acesso por link =='
 reset role;
+insert into app.usuario_convites (token_hash, usuario_id, expira_em) values
+  ('hash-valido', '00000000-0000-0000-0000-000000000003', now() + interval '1 day'),
+  ('hash-vencido', '00000000-0000-0000-0000-000000000003', now() - interval '1 minute');
+set role vc_app;
+select teste.como('');
+select teste.ok((select email from app.convite_usuario('hash-valido')) = 'keila@t', 'Link válido mostra de quem é');
+select teste.ok(not exists (select 1 from app.convite_usuario('hash-vencido')), 'Link vencido não vale');
+select teste.falha($$select app.usar_convite_usuario('hash-valido', 'curta')$$, 'Senha inválida', 'Hash de senha inválido é recusado');
+select teste.ok(app.usar_convite_usuario('hash-valido', '$argon2id$v=19$m=19456,t=2,p=1$xxxxxxxxxxxxxxxx') = 'keila@t', 'Link define a senha');
+select teste.falha($$select app.usar_convite_usuario('hash-valido', '$argon2id$v=19$m=19456,t=2,p=1$yyyyyyyyyyyyyyyy')$$, 'já foi usado', 'Link não vale duas vezes');
+select teste.falha($$select * from app.usuario_convites$$, 'permission denied', 'Aplicação não lê a tabela de convites');
+reset role;
+select teste.ok((select senha_hash from app.usuarios where id = '00000000-0000-0000-0000-000000000003') like '$argon2id$%xxxx', 'Senha gravada');
 \echo 'Testes de importação passaram.'

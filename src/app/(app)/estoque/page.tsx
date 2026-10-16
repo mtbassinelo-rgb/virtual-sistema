@@ -69,7 +69,12 @@ export default async function Estoque({ searchParams }: { searchParams: Promise<
       </datalist>
       <section className="linha entre">
         <h1>Estoque</h1>
-        {ehGestao(u) && <a className="botao" href="/estoque/importar">Importar produtos do Bling</a>}
+        {ehGestao(u) && (
+          <div className="linha">
+            <a className="botao" href="/estoque/precos">Tabela de preços</a>
+            <a className="botao" href="/estoque/importar">Importar produtos do Bling</a>
+          </div>
+        )}
       </section>
       <section>
         <div className="suave pequeno">

@@ -52,13 +52,19 @@ for (const [email, quem] of [["gerente@teste.local", "Gerente"], ["keila@teste.l
   if (quem === "Keila") ok(outro.status === 404, "Keila não abre pedido da Yessica");
   else ok(outro.status === 200, "Gerente abre pedido de qualquer vendedora");
 }
-for (const tela of ["/promocoes", "/estoque/importar"]) {
+for (const tela of ["/promocoes", "/estoque/importar", "/estoque/precos"]) {
   const r = await abrir(tela, await sessao("gerente@teste.local"));
   ok(r.status === 200 && !r.html.includes("Application error"), `Gerente: ${tela} abre`);
 }
 
 const impKeila = await abrir("/estoque/importar", await sessao("keila@teste.local"));
 ok(impKeila.status === 200 && impKeila.html.includes("Só gerente ou dono"), "Vendedora não importa produtos");
+
+const modelo = await fetch(base + "/estoque/precos/modelo", { headers: { cookie: await sessao("gerente@teste.local") } });
+ok(modelo.status === 200 && (await modelo.text()).includes("PY Normal (Gs)"), "Gerente baixa a planilha de preços");
+ok((await fetch(base + "/estoque/precos/modelo", { headers: { cookie: await sessao("keila@teste.local") } })).status === 403,
+  "Vendedora não baixa a planilha de preços");
+ok((await abrir("/primeiro-acesso/token-invalido")).html.includes("já foi usado ou expirou"), "Link de primeiro acesso inválido é recusado");
 
 // Área do cliente (atacado)
 ok([302, 303, 307, 308].includes((await abrir("/loja")).status), "Área do cliente sem link manda para a tela de acesso");

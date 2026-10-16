@@ -24,27 +24,31 @@ Ele gera as senhas sozinho, sobe teste, produção, HTTPS e backup.
 > Como o repositório é privado, o primeiro comando acima não funciona sem login.
 > Nesse caso, cole o conteúdo de `infra/instalar.sh` num arquivo no servidor (`nano instalar.sh`).
 
-## Criar os usuários
+## Dar acesso à equipe (link de primeiro acesso)
 
-Rode uma vez para cada pessoa (a senha é pedida na tela e não aparece):
+Cada pessoa recebe um link de uso único (vale 48 h) e cria a própria senha.
+Ninguém, nem quem gera o link, conhece a senha de outra pessoa.
 
 ```bash
 cd /opt/virtual/infra && set -a && . ./.env && set +a
-usuario() {
-  docker compose --env-file .env run --rm -e DATABASE_URL_ADMIN="postgresql://virtual_admin:${DB_PRODUCAO_SENHA}@db-producao/virtual" \
-    app-producao node scripts/criar-usuario.mjs "$@"
+convidar() {
+  docker compose --env-file .env run --rm -e APP_URL="https://app.${DOMINIO}" \
+    -e DATABASE_URL_ADMIN="postgresql://virtual_admin:${DB_PRODUCAO_SENHA}@db-producao/virtual" \
+    app-producao node scripts/convidar-usuario.mjs "$@"
 }
-usuario seu@email.com "Seu Nome" dono
-usuario gerente@email.com "Nome do Gerente" gerente
+convidar seu@email.com "Seu Nome" dono
+convidar gerente@email.com "Nome do Gerente" gerente
 ```
 
-Para vendedoras, cadastre a vendedora primeiro (nome, país e moeda) e depois o usuário:
+Para vendedoras, cadastre a vendedora primeiro (nome, país e moeda) e depois gere o link:
 
 ```bash
 docker compose --env-file .env exec -T db-producao psql -U virtual_admin -d virtual -c \
   "insert into app.vendedoras (nome, pais, moeda, whatsapp) values ('Keila','PY','GS','5959...')"
-usuario keila@email.com "Keila" vendedora Keila
+convidar keila@email.com "Keila" vendedora Keila
 ```
+
+Esqueceu a senha? Gere um link novo para a mesma pessoa: a senha antiga vale até ela criar a nova.
 
 ## Atualizar
 
