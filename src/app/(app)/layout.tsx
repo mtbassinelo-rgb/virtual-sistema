@@ -24,6 +24,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
             <Link href="/pedidos">Pedidos</Link>
             <Link href="/clientes">Clientes</Link>
             <Link href="/metas">Metas</Link>
+            <Link href="/produtos">Produtos</Link>
             <Link href="/estoque">Estoque</Link>
             <Link href="/promocoes">Promoções</Link>
           </nav>

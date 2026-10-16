@@ -118,4 +118,19 @@ select teste.falha($$select app.registrar_pedido_site('Ana', '45999990000', 'BR'
 select teste.ok((select count(*) from app.pedidos_site) = 0, 'Visitante não lê pedidos do site');
 reset role;
 select teste.ok((select jsonb_array_length(itens) from app.pedidos_site where nome = 'Maria Salão') = 1, 'Só o produto real foi guardado');
+
+\echo '== Cadastro de produto pela tela =='
+set role vc_app;
+select teste.como(:'GERENTE');
+select app.salvar_produto(null, 'NOVO-01', 'Shampoo Novo 300ml', 'Soul', 'UN', null, 5.5, true) as novo \gset
+select teste.ok((select nome from app.produtos where id = :'novo') = 'Shampoo Novo 300ml', 'Gerente cria produto');
+select teste.falha($$select app.salvar_produto(null, 'NOVO-01', 'Outro', null, null, null, null, true)$$, 'já é do produto', 'Código repetido é recusado');
+select app.salvar_produto(:'novo', 'NOVO-02', 'Shampoo Novo 300ml', 'Soul', 'UN', null, 5.5, true) \g /dev/null
+select teste.ok(exists (select 1 from app.produto_codigos where codigo = 'NOVO-01' and produto_id = :'novo'), 'Código antigo continua reconhecido');
+select teste.falha(format($$select app.definir_foto(%L, '/etc/passwd')$$, :'novo'), 'Foto inválida', 'Caminho de foto estranho é recusado');
+select app.definir_foto(:'novo', '/fotos/' || :'novo' || '-1.jpg') \g /dev/null
+select teste.ok((select foto from app.vitrine_publica() where produto_id = :'novo') like '/fotos/%', 'Foto aparece na vitrine');
+select teste.como(:'KEILA');
+select teste.falha($$select app.salvar_produto(null, 'X-1', 'Produto X', null, null, null, null, true)$$, 'Só gerente ou dono', 'Vendedora não cadastra produto');
+reset role;
 \echo 'Testes de importação passaram.'

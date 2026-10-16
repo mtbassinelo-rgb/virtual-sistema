@@ -52,7 +52,7 @@ for (const [email, quem] of [["gerente@teste.local", "Gerente"], ["keila@teste.l
   if (quem === "Keila") ok(outro.status === 404, "Keila não abre pedido da Yessica");
   else ok(outro.status === 200, "Gerente abre pedido de qualquer vendedora");
 }
-for (const tela of ["/promocoes", "/estoque/importar", "/estoque/precos"]) {
+for (const tela of ["/promocoes", "/estoque/importar", "/estoque/precos", "/produtos", "/produtos/novo", "/produtos?filtro=sem-foto"]) {
   const r = await abrir(tela, await sessao("gerente@teste.local"));
   ok(r.status === 200 && !r.html.includes("Application error"), `Gerente: ${tela} abre`);
 }
@@ -72,6 +72,9 @@ ok(vitrine.status === 200 && vitrine.html.includes("Cartela de matizadores") && 
 ok((await abrir("/loja?linha=kits")).status === 200 && (await abrir("/loja?q=shampoo")).status === 200, "Filtro por linha e busca funcionam");
 ok([302, 303, 307, 308].includes((await abrir("/loja/pedidos")).status), "Meus pedidos sem link manda para a tela de acesso");
 ok((await fetch(base + "/marca/icone.png")).status === 200, "Logo é servido");
+ok((await fetch(base + "/fotos/..%2Fetc%2Fpasswd")).status === 404, "Rota de fotos não aceita caminho estranho");
+const umProduto = (await db.query("select id from app.produtos limit 1")).rows[0]?.id;
+if (umProduto) ok((await abrir(`/produtos/${umProduto}`, await sessao("gerente@teste.local"))).status === 200, "Ficha do produto abre");
 const convite = randomBytes(32).toString("base64url");
 await db.query(
   `insert into app.portal_convites (token_hash, cliente_id, expira_em)

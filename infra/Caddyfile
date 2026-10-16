@@ -17,7 +17,7 @@ teste.{$DOMINIO} {
 	encode gzip
 	@raiz path /
 	redir @raiz /loja
-	@cliente path /loja /loja/* /_next/* /marca/* /icon.png /favicon.ico
+	@cliente path /loja /loja/* /_next/* /marca/* /fotos/* /icon.png /favicon.ico
 	handle @cliente {
 		reverse_proxy app-producao:3000
 	}
