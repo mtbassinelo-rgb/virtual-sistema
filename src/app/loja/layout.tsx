@@ -5,7 +5,7 @@ import { linkWhatsApp, telefone } from "@/lib/formato";
 import { TEXTOS, idiomaAtual, textosCarrinho } from "@/lib/idioma";
 import { LINHAS, interno, linhaDe, marcaDe } from "@/lib/vitrine";
 import { BotaoCarrinho, Carrinho } from "./carrinho";
-import { MenuSite } from "./menu-site";
+import { FecharMenus, MenuSite } from "./menu-site";
 import "./loja.css";
 
 export const metadata = {
@@ -59,6 +59,7 @@ export default async function LayoutLoja({ children }: { children: React.ReactNo
       <link rel="stylesheet" precedence="default"
             href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Figtree:wght@400;500;600;700&display=swap" />
       <Carrinho cliente={c ? { nome: c.nome, vendedora: c.vendedora, moeda: c.moeda } : null} t={textosCarrinho(t, c)}>
+        <div className="fixo">
         <header className="topo">
           <div className="in topo-in">
             <MenuSite rotulo={t.menu} fechar={t.fechar} grupos={[
@@ -67,6 +68,7 @@ export default async function LayoutLoja({ children }: { children: React.ReactNo
                 { href: "/loja?promocao=1#catalogo", texto: t.promocoes },
                 { href: "/loja?novidade=1#catalogo", texto: t.novidades },
                 { href: "/loja#mais-vendidos", texto: t.maisVendidos },
+                { href: "/loja/quem-somos", texto: t.quemSomos },
               ] },
               { titulo: t.categorias, links: LINHAS.filter((l) => porLinha.get(l.chave)).map((l) => ({ href: `/loja?linha=${l.chave}#catalogo`, texto: t.linhas[l.chave], qtd: porLinha.get(l.chave) })) },
               { titulo: t.marcas, links: [...marcas.slice().sort((a, b) => b[1] - a[1]).slice(0, 12).map(([m, n]) => ({ href: `/loja?marca=${encodeURIComponent(m)}#catalogo`, texto: m, qtd: n })),
@@ -112,9 +114,12 @@ export default async function LayoutLoja({ children }: { children: React.ReactNo
               <Link href="/loja?novidade=1#catalogo">{t.novidades}</Link>
               <Link href="/loja#mais-vendidos">{t.maisVendidos}</Link>
               <Link href="/loja?linha=kits#catalogo">{t.linhas.kits}</Link>
+              <Link href="/loja/quem-somos">{t.quemSomos}</Link>
             </div>
           </div>
         </nav>
+        </div>
+        <FecharMenus />
 
         <main className="principal">{children}</main>
 
@@ -123,6 +128,7 @@ export default async function LayoutLoja({ children }: { children: React.ReactNo
             <div>
               <img className="rodape-logo" src="/marca/logo.png" width={202} height={116} alt="Virtual Cosméticos" />
               <p>{t.rodapeTexto}</p>
+              <Link href="/loja/quem-somos">{t.quemSomos}</Link>
             </div>
             <div>
               <h3>{t.atendimento}</h3>

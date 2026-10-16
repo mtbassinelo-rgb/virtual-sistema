@@ -59,6 +59,7 @@ const PT = {
   atendimentoDe: (v: string) => `Atendimento: ${v}`, sair: "Sair da área do cliente",
   linhas: { kits: "Kits", matizadores: "Matizadores", cabelo: "Cabelo", corpo: "Corpo e banho", rosto: "Rosto", maquiagem: "Maquiagem", unhas: "Unhas e cílios", perfumaria: "Perfumaria", outros: "Outros" } as Record<string, string>,
   marcasTexto: (n: number) => `${n} marcas no catálogo. Toque numa marca para ver os produtos.`,
+  quemSomos: "Quem somos",
   zapMsg: "Olá! Quero comprar no atacado da Virtual Cosméticos.",
   idioma: "Español", idiomaCodigo: "es",
   // carrinho
@@ -124,6 +125,7 @@ const ES: typeof PT = {
   atendimentoDe: (v: string) => `Atención: ${v}`, sair: "Salir del área de clientes",
   linhas: { kits: "Kits", matizadores: "Matizadores", cabelo: "Cabello", corpo: "Cuerpo y baño", rosto: "Rostro", maquiagem: "Maquillaje", unhas: "Uñas y pestañas", perfumaria: "Perfumería", outros: "Otros" },
   marcasTexto: (n: number) => `${n} marcas en el catálogo. Toque una marca para ver los productos.`,
+  quemSomos: "Nosotros",
   zapMsg: "¡Hola! Quiero comprar al por mayor en Virtual Cosméticos.",
   idioma: "Português", idiomaCodigo: "pt",
   seuPedido: "Su pedido", fechar: "Cerrar",

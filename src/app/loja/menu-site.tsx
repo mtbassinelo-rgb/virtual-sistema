@@ -49,3 +49,21 @@ export function MenuSite({ rotulo, fechar, grupos }: { rotulo: string; fechar: s
     </div>
   );
 }
+
+/** Fecha os menus "Categorias" e "Marcas" ao escolher uma opção, ao clicar fora ou com Esc. */
+export function FecharMenus() {
+  useEffect(() => {
+    const fechar = (exceto?: Element | null) =>
+      document.querySelectorAll<HTMLDetailsElement>("details.menu-cair[open]").forEach((d) => { if (d !== exceto) d.open = false; });
+    const clique = (e: MouseEvent) => {
+      const alvo = e.target as Element;
+      if (alvo.closest(".menu-painel a")) return fechar();
+      fechar(alvo.closest("details.menu-cair"));
+    };
+    const tecla = (e: KeyboardEvent) => { if (e.key === "Escape") fechar(); };
+    document.addEventListener("click", clique);
+    document.addEventListener("keydown", tecla);
+    return () => { document.removeEventListener("click", clique); document.removeEventListener("keydown", tecla); };
+  }, []);
+  return null;
+}
