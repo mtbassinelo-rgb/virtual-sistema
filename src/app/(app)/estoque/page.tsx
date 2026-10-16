@@ -3,7 +3,7 @@ import { comUsuario } from "@/lib/db";
 import { dataHora, STATUS_TRANSFERENCIA } from "@/lib/formato";
 import { Avisos, Selo } from "../avisos";
 import {
-  ajustarEstoque, cancelarTransferencia, criarTransferencia, entradaCompra, enviarTransferencia, receberTransferencia,
+  ajustarEstoque, cancelarTransferencia, criarTransferencia, definirKit, entradaCompra, enviarTransferencia, receberTransferencia,
 } from "./acoes";
 
 export const metadata = { title: "Estoque" };
@@ -57,17 +57,21 @@ export default async function Estoque({ searchParams }: { searchParams: Promise<
   }
   const operaAlgum = d.depositos.some((x) => x.opera);
   const linhas = Array.from({ length: 6 }, (_, i) => i);
+  // Um único catálogo para todos os campos de produto (digite código ou nome e escolha)
   const produtoSelect = (i: number) => (
-    <select name={`produto_${i}`} defaultValue="" aria-label={`Produto ${i + 1}`}>
-      <option value="">—</option>
-      {d.produtos.map((p) => <option key={p.id} value={p.id}>{p.codigo} · {p.nome}</option>)}
-    </select>
+    <input name={`produto_${i}`} list="lista-produtos" placeholder="Código ou nome do produto" aria-label={`Produto ${i + 1}`} autoComplete="off" />
   );
 
   return (
     <>
-      <section>
+      <datalist id="lista-produtos">
+        {d.produtos.map((p) => <option key={p.id} value={p.codigo}>{p.nome}</option>)}
+      </datalist>
+      <section className="linha entre">
         <h1>Estoque</h1>
+        {ehGestao(u) && <a className="botao" href="/estoque/importar">Importar produtos do Bling</a>}
+      </section>
+      <section>
         <div className="suave pequeno">
           {d.depositos.map((x) => `${x.nome}${x.cidade ? " (" + x.cidade + ")" : ""}`).join(" · ")}. Na fase atual o estoque oficial continua no Bling; aqui roda em paralelo.
         </div>
@@ -99,11 +103,33 @@ export default async function Estoque({ searchParams }: { searchParams: Promise<
           })}</tbody></table></div>
       )}
 
-      {d.kits.length > 0 && (
-        <section className="painel">
+      {(d.kits.length > 0 || ehGestao(u)) && (
+        <section className="painel" id="kits">
           <h2>Kits</h2>
           <p className="pequeno suave">Kit não tem estoque próprio: ao vender, saem os componentes. A disponibilidade é a do componente que acabar primeiro.</p>
-          <ul className="lista-simples">{d.kits.map((k) => <li key={k.id}><b>{k.nome}</b> <span className="suave">({k.codigo})</span>: {k.composicao}</li>)}</ul>
+          {d.kits.length === 0 ? <p className="suave">Nenhum kit montado ainda.</p> :
+            <ul className="lista-simples">{d.kits.map((k) => <li key={k.id}><b>{k.nome}</b> <span className="suave">({k.codigo})</span>: {k.composicao}</li>)}</ul>}
+          {ehGestao(u) && (
+            <details>
+              <summary>Montar ou alterar um kit</summary>
+              <form action={definirKit} className="campos" style={{ marginTop: 10 }}>
+                <label className="largo">Produto que é o kit
+                  <input name="kit" list="lista-produtos" required placeholder="Ex.: MPLA-CM" autoComplete="off" />
+                </label>
+                {[0, 1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="largo linha">
+                    <div style={{ flex: 3, minWidth: 200 }}>{produtoSelect(i)}</div>
+                    <input name={`qtd_${i}`} inputMode="decimal" placeholder="Qtd" defaultValue={i < 3 ? "1" : ""} style={{ flex: 1, minWidth: 80 }} aria-label={`Quantidade ${i + 1}`} />
+                  </div>
+                ))}
+                <p className="largo pequeno suave">Ex.: Kit Platinum = 1 shampoo + 1 condicionador + 1 máscara. Salvar de novo substitui a composição.</p>
+                <div className="largo linha">
+                  <button className="principal">Salvar kit</button>
+                  <button name="desfazer" value="1" formNoValidate>Desfazer kit (volta a ser produto simples)</button>
+                </div>
+              </form>
+            </details>
+          )}
         </section>
       )}
 
@@ -227,10 +253,7 @@ export default async function Estoque({ searchParams }: { searchParams: Promise<
                   </select>
                 </label>
                 <label className="largo">Produto
-                  <select name="produto_id" required defaultValue="">
-                    <option value="">Escolha…</option>
-                    {d.produtos.map((p) => <option key={p.id} value={p.id}>{p.codigo} · {p.nome}</option>)}
-                  </select>
+                  <input name="produto" list="lista-produtos" required placeholder="Código ou nome do produto" autoComplete="off" />
                 </label>
                 <label>Quantidade contada<input name="contado" inputMode="decimal" required /></label>
                 <label className="largo">Motivo<input name="motivo" required placeholder="Ex.: inventário mensal" /></label>

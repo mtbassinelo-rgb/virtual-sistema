@@ -1,5 +1,6 @@
 "use server";
 
+import type { PoolClient } from "pg";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { exigirUsuario } from "@/lib/auth";
@@ -18,12 +19,23 @@ async function executar(ok: string, fn: (uid: string) => Promise<unknown>) {
   redirect(`/estoque?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent(ok)}#transferencias`);
 }
 
-function itens(fd: FormData) {
+type Cliente = PoolClient;
+
+/** Código digitado (ou escolhido na lista) → id do produto */
+async function produtoId(c: Cliente, codigo: string): Promise<string> {
+  const r = await c.query(
+    `select id from app.produtos where codigo = $1
+     union all select produto_id from app.produto_codigos where codigo = $1 limit 1`, [codigo.trim()]);
+  if (!r.rows[0]) throw new Error(`Produto com código "${codigo}" não encontrado.`);
+  return String(r.rows[0].id);
+}
+
+async function itens(c: Cliente, fd: FormData, max = 10) {
   const lista: { produto_id: string; quantidade: number }[] = [];
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < max; i++) {
     const p = texto(fd, `produto_${i}`);
     const q = numero(fd, `qtd_${i}`);
-    if (p && q && q > 0) lista.push({ produto_id: p, quantidade: q });
+    if (p && q && q > 0) lista.push({ produto_id: await produtoId(c, p), quantidade: q });
   }
   if (lista.length === 0) throw new Error("Inclua pelo menos um produto com quantidade.");
   return lista;
@@ -31,8 +43,8 @@ function itens(fd: FormData) {
 
 export async function criarTransferencia(fd: FormData) {
   await executar("Transferência criada. Envie quando a mercadoria sair.", (uid) =>
-    comUsuario(uid, (c) => c.query("select app.criar_transferencia($1, $2, $3, nullif($4,''))",
-      [texto(fd, "origem_id"), texto(fd, "destino_id"), JSON.stringify(itens(fd)), texto(fd, "observacao")])));
+    comUsuario(uid, async (c) => c.query("select app.criar_transferencia($1, $2, $3, nullif($4,''))",
+      [texto(fd, "origem_id"), texto(fd, "destino_id"), JSON.stringify(await itens(c, fd)), texto(fd, "observacao")])));
 }
 
 export async function enviarTransferencia(fd: FormData) {
@@ -62,12 +74,21 @@ export async function receberTransferencia(fd: FormData) {
 
 export async function entradaCompra(fd: FormData) {
   await executar("Entrada de mercadoria registrada.", (uid) =>
-    comUsuario(uid, (c) => c.query("select app.entrada_compra($1, $2, $3, nullif($4,''))",
-      [texto(fd, "deposito_id"), JSON.stringify(itens(fd)), texto(fd, "referencia"), texto(fd, "observacao")])));
+    comUsuario(uid, async (c) => c.query("select app.entrada_compra($1, $2, $3, nullif($4,''))",
+      [texto(fd, "deposito_id"), JSON.stringify(await itens(c, fd)), texto(fd, "referencia"), texto(fd, "observacao")])));
 }
 
 export async function ajustarEstoque(fd: FormData) {
   await executar("Estoque ajustado.", (uid) =>
-    comUsuario(uid, (c) => c.query("select app.ajustar_estoque($1, $2, $3, $4)",
-      [texto(fd, "deposito_id"), texto(fd, "produto_id"), numero(fd, "contado"), texto(fd, "motivo")])));
+    comUsuario(uid, async (c) => c.query("select app.ajustar_estoque($1, $2, $3, $4)",
+      [texto(fd, "deposito_id"), await produtoId(c, texto(fd, "produto")), numero(fd, "contado"), texto(fd, "motivo")])));
+}
+
+export async function definirKit(fd: FormData) {
+  await executar("Kit salvo: ao vender, saem os componentes.", (uid) =>
+    comUsuario(uid, async (c) => {
+      const kit = await produtoId(c, texto(fd, "kit"));
+      const comps = fd.get("desfazer") ? [] : await itens(c, fd, 6);
+      return c.query("select app.definir_kit($1, $2)", [kit, JSON.stringify(comps)]);
+    }));
 }
