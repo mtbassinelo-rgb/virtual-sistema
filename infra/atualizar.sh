@@ -10,6 +10,12 @@ set -a; . ./.env; set +a
 git -C .. pull --ff-only
 senha_var="DB_$(echo "$alvo" | tr a-z A-Z)_SENHA"; app_var="APP_$(echo "$alvo" | tr a-z A-Z)_SENHA"
 docker compose --env-file .env up -d "db-$alvo"
+# espera o banco aceitar conexões (na primeira vez ele leva alguns segundos para iniciar)
+for i in $(seq 1 60); do
+  docker run --rm --network virtual_interna postgres:16 pg_isready -q -h "db-$alvo" -U virtual_admin && break
+  [ "$i" = 60 ] && { echo "O banco db-$alvo não respondeu."; exit 1; }
+  sleep 2
+done
 # 1) estrutura do banco
 docker run --rm --network virtual_interna -v "$(cd .. && pwd)/db:/db" \
   -e DATABASE_URL="postgresql://virtual_admin:${!senha_var}@db-$alvo/virtual" postgres:16 bash /db/migrar.sh
