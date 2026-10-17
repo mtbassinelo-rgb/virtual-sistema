@@ -8,7 +8,7 @@ import {
 } from "@/lib/formato";
 import { Avisos, Selo } from "../../avisos";
 import {
-  anexarComprovante, atualizarPedido, conferirPagamento, conferirSeparacao, confirmarTotal, decidirPedidoPortal,
+  anexarComprovante, atualizarPedido, avancarEntrega, conferirPagamento, conferirSeparacao, confirmarTotal, decidirPedidoPortal,
   reconhecerBling, recusarPagamento, registrarAtendimento, registrarPagamento,
 } from "../acoes";
 
@@ -33,8 +33,11 @@ export default async function Pedido({ params, searchParams }: {
          from app.pedido_itens i left join app.depositos d on d.id = i.deposito_origem_id
         where i.pedido_id = $1 order by i.codigo, d.nome`, [id])).rows;
     const fluxo = (await c.query(
-      `select separacao_conferida_em, total_confirmado_em, conta_pagamento, app.pode_operar_deposito(deposito_id) as opera
+      `select separacao_conferida_em, total_confirmado_em, conta_pagamento, app.pode_operar_deposito(deposito_id) as opera,
+              chegou_em, local_retirada, (select nome from app.depositos where id = deposito_id) as deposito_nome
          from app.pedidos where id = $1`, [id])).rows[0];
+    const indisponiveis = (await c.query(
+      "select descricao, quantidade_pedida, quantidade_faltou from app.pedido_itens_indisponiveis where pedido_id = $1 order by descricao", [id])).rows;
     const transf = (await c.query(
       "select numero, status from app.transferencias where pedido_id = $1 order by numero", [id])).rows;
     const bling = p.bling_id
@@ -134,13 +137,15 @@ export default async function Pedido({ params, searchParams }: {
       {p.status_comercial === "em_separacao" && p.origem !== "bling" && !fluxo?.separacao_conferida_em && (gestao || fluxo?.opera) && (
         <section className="painel" style={{ borderColor: "var(--info)" }}>
           <h2>Conferir separação</h2>
-          <p className="suave pequeno">Informe quanto foi separado de cada item. O total do pedido é recalculado.</p>
+          <p className="suave pequeno">Informe quanto foi separado de cada item. Se não tem, marque “Não tem”: o item sai do pedido, o total é recalculado e o cliente vê no acompanhamento que ele não estava disponível.</p>
           <form action={conferirSeparacao} className="campos">
             <input type="hidden" name="pedido_id" value={p.id} />
             {d.itens.map((i) => (
-              <label key={i.id}>{i.descricao} (pedido {Number(i.quantidade_pedida)})
-                <input name={`sep_${i.id}`} inputMode="decimal" defaultValue={Number(i.quantidade)} />
-              </label>
+              <div key={i.id} className="largo linha separar-item">
+                <span style={{ flex: 1, minWidth: 180 }}>{i.descricao} <span className="suave">(pedido {Number(i.quantidade_pedida)})</span></span>
+                <input name={`sep_${i.id}`} inputMode="decimal" defaultValue={Number(i.quantidade)} aria-label={`Separado de ${i.descricao}`} style={{ width: 90 }} />
+                <label className="linha" style={{ gap: 6 }}><input type="checkbox" name={`falta_${i.id}`} /> Não tem</label>
+              </div>
             ))}
             <button className="principal">Separação conferida</button>
           </form>
@@ -168,6 +173,56 @@ export default async function Pedido({ params, searchParams }: {
           <span>Total confirmado ao cliente em {dataHora(fluxo.total_confirmado_em)}.</span>
           {whatsTotal && <a className="botao whatsapp" href={whatsTotal} target="_blank" rel="noopener noreferrer">Enviar total e conta pelo WhatsApp</a>}
         </div>
+      )}
+      {d.indisponiveis.length > 0 && (
+        <div className="aviso-caixa">
+          <b>Itens que a expedição não tinha</b> (o cliente vê no acompanhamento):
+          <ul className="lista-simples">{d.indisponiveis.map((x, k) => (
+            <li key={k}>{x.descricao}: faltou {Number(x.quantidade_faltou)} de {Number(x.quantidade_pedida)}</li>))}
+          </ul>
+        </div>
+      )}
+      {p.origem !== "bling" && (escrever || fluxo?.opera) && ["em_separacao", "enviado", "aguardando_retirada"].includes(p.status_comercial)
+        && (fluxo?.separacao_conferida_em) && (
+        <section className="painel" style={{ borderColor: "var(--ok)" }}>
+          <h2>Entrega</h2>
+          <div className="etapas-entrega pequeno">
+            {["Separado", "Em transporte", "Aguardando retirada", "Retirado"].map((e, k) => {
+              const atual = p.status_comercial === "em_separacao" ? 0 : p.status_comercial === "enviado" ? 1 : 2;
+              return <span key={e} className={k <= atual ? "feita" : ""}>{e}</span>;
+            })}
+          </div>
+          {p.status_comercial === "em_separacao" && (
+            <form action={avancarEntrega} className="linha">
+              <input type="hidden" name="pedido_id" value={p.id} /><input type="hidden" name="etapa" value="transporte" />
+              <button className="principal">Despachar: em transporte</button>
+              {Number(p.saldo) > 0 && <span className="pequeno suave">Atenção: ainda há saldo a pagar de {dinheiro(p.saldo, moeda)}.</span>}
+            </form>
+          )}
+          {p.status_comercial === "enviado" && (
+            <form action={avancarEntrega} className="linha" style={{ alignItems: "end" }}>
+              <input type="hidden" name="pedido_id" value={p.id} /><input type="hidden" name="etapa" value="retirada" />
+              <label style={{ flex: 1, minWidth: 220 }}>Onde o cliente retira
+                <input name="local" required defaultValue={fluxo?.local_retirada ?? fluxo?.deposito_nome ?? ""} placeholder="Ex.: Loja Ciudad del Este, Transportadora X em Asunción" />
+              </label>
+              <button className="principal">Chegou: aguardando retirada</button>
+            </form>
+          )}
+          {p.status_comercial === "aguardando_retirada" && (
+            <>
+              <p style={{ margin: 0 }}>Aguardando retirada em <b>{fluxo?.local_retirada}</b>{fluxo?.chegou_em ? ` desde ${dataHora(fluxo.chegou_em)}` : ""}.</p>
+              {(() => {
+                const z = cliente ? linkWhatsApp(cliente.whatsapp ?? cliente.telefone,
+                  `Olá ${cliente.nome}! Aqui é a ${p.vendedora_nome}, da Virtual Cosméticos. Seu pedido${p.bling_numero ? " nº " + p.bling_numero : ""} já está disponível para retirada em ${fluxo?.local_retirada}.`) : null;
+                return z ? <a className="botao whatsapp" href={z} target="_blank" rel="noopener noreferrer">Avisar o cliente pelo WhatsApp</a> : null;
+              })()}
+              <form action={avancarEntrega}>
+                <input type="hidden" name="pedido_id" value={p.id} /><input type="hidden" name="etapa" value="entregue" />
+                <button className="principal">Cliente retirou</button>
+              </form>
+            </>
+          )}
+        </section>
       )}
       {d.transf.length > 0 && (
         <div className="aviso-caixa">

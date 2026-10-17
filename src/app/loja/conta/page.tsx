@@ -5,6 +5,7 @@ import { pool, mensagemErro } from "@/lib/db";
 import { dinheiro, data, linkWhatsApp, telefone, type Moeda } from "@/lib/formato";
 import { idiomaAtual } from "@/lib/idioma";
 import { conferirCliente, exigirCliente } from "@/lib/portal";
+import { Acompanhamento, type PedidoAcomp } from "../acompanhamento";
 
 export const metadata = { title: "Minha área" };
 
@@ -14,30 +15,30 @@ const T = {
     total: "Total comprado", pedidos: "Pedidos", ultimo: "Última compra", saldo: "Saldo a pagar", meta: "Sua meta",
     metaTexto: (falta: string, fim: string, premio: string) => `Faltam ${falta} em compras até ${fim} para ganhar ${premio} em mercadorias.`,
     metaBatida: (premio: string) => `Meta batida! Você ganhou ${premio} em mercadorias.`,
-    historico: "Histórico de compras", verTodos: "Ver todos os pedidos e pagamentos", nenhum: "Você ainda não fez pedidos por aqui.",
+    historico: "Histórico de compras", acompanhar: "Acompanhe seu pedido", verTodos: "Ver todos os pedidos e pagamentos", nenhum: "Você ainda não fez pedidos por aqui.",
     maisComprados: "O que você mais compra", comprarNovo: "Ver catálogo", troca: "Trocar senha", atual: "Senha atual",
     nova: "Nova senha (mínimo 6 caracteres)", repetir: "Repita a nova senha", salvar: "Trocar senha", ok: "Senha trocada. Use a nova senha da próxima vez.",
     curta: "A nova senha precisa ter pelo menos 6 caracteres.", diferente: "As duas senhas novas não são iguais.", atualErrada: "A senha atual não confere.",
     etapas: { aguardando_vendedora: "Aguardando a vendedora", em_separacao: "Em separação", aguardando_pagamento: "Aguardando pagamento",
-              pago_preparando_envio: "Pago: preparando envio", enviado: "Enviado", entregue: "Entregue", cancelado: "Cancelado" } as Record<string, string>,
+              pago_preparando_envio: "Pago: preparando envio", enviado: "Em transporte", aguardando_retirada: "Aguardando retirada", entregue: "Retirado", cancelado: "Cancelado" } as Record<string, string>,
   },
   es: {
     titulo: "Mi área", ola: (n: string) => `¡Hola, ${n}!`, doc: "Usuario (documento)", vendedora: "Su vendedora", falar: "Hablar por WhatsApp",
     total: "Total comprado", pedidos: "Pedidos", ultimo: "Última compra", saldo: "Saldo a pagar", meta: "Su meta",
     metaTexto: (falta: string, fim: string, premio: string) => `Faltan ${falta} en compras hasta el ${fim} para ganar ${premio} en mercaderías.`,
     metaBatida: (premio: string) => `¡Meta cumplida! Ganó ${premio} en mercaderías.`,
-    historico: "Historial de compras", verTodos: "Ver todos los pedidos y pagos", nenhum: "Todavía no hizo pedidos por aquí.",
+    historico: "Historial de compras", acompanhar: "Siga su pedido", verTodos: "Ver todos los pedidos y pagos", nenhum: "Todavía no hizo pedidos por aquí.",
     maisComprados: "Lo que más compra", comprarNovo: "Ver catálogo", troca: "Cambiar contraseña", atual: "Contraseña actual",
     nova: "Nueva contraseña (mínimo 6 caracteres)", repetir: "Repita la nueva contraseña", salvar: "Cambiar contraseña", ok: "Contraseña cambiada. Use la nueva la próxima vez.",
     curta: "La nueva contraseña debe tener al menos 6 caracteres.", diferente: "Las dos contraseñas nuevas no son iguales.", atualErrada: "La contraseña actual no es correcta.",
     etapas: { aguardando_vendedora: "Esperando a la vendedora", em_separacao: "En preparación", aguardando_pagamento: "Esperando pago",
-              pago_preparando_envio: "Pagado: preparando envío", enviado: "Enviado", entregue: "Entregado", cancelado: "Cancelado" } as Record<string, string>,
+              pago_preparando_envio: "Pagado: preparando envío", enviado: "En transporte", aguardando_retirada: "Esperando retiro", entregue: "Retirado", cancelado: "Cancelado" } as Record<string, string>,
   },
 };
-const COR: Record<string, string> = { aguardando_vendedora: "aviso", em_separacao: "info", aguardando_pagamento: "marca", pago_preparando_envio: "ok", enviado: "ok", entregue: "ok", cancelado: "" };
+const COR: Record<string, string> = { aguardando_retirada: "ok", aguardando_vendedora: "aviso", em_separacao: "info", aguardando_pagamento: "marca", pago_preparando_envio: "ok", enviado: "ok", entregue: "ok", cancelado: "" };
 
 type Pedido = { id: string; data_pedido: string; bling_numero: string | null; valor_total: string; saldo: string; moeda: Moeda; etapa: string;
-  total_confirmado: boolean; itens: { descricao: string; quantidade: number }[] };
+  total_confirmado: boolean; itens: { descricao: string; quantidade: number }[] } & PedidoAcomp;
 type Meta = { fim: string; moeda: Moeda; valor_meta: string; valor_premio: string; vendido: string; falta: string; percentual: string; meta_batida: boolean };
 
 async function trocar(fd: FormData) {
@@ -105,6 +106,16 @@ export default async function MinhaArea({ searchParams }: { searchParams: Promis
         <div><span>{t.ultimo}</span><b>{validos[0] ? data(validos[0].data_pedido) : "—"}</b></div>
         <div><span>{t.saldo}</span><b>{dinheiro(saldo, moeda)}</b></div>
       </div>
+
+      {(() => {
+        const emAndamento = pedidos.find((p) => !["entregue", "cancelado"].includes(p.etapa));
+        return emAndamento ? (
+          <section className="painel area-bloco">
+            <div className="linha entre"><h2>{t.acompanhar}</h2><span className="suave pequeno">{data(emAndamento.data_pedido)} · {dinheiro(emAndamento.valor_total, emAndamento.moeda)}</span></div>
+            <Acompanhamento p={emAndamento} idioma={idioma} />
+          </section>
+        ) : null;
+      })()}
 
       {meta && (
         <section className="painel area-bloco">

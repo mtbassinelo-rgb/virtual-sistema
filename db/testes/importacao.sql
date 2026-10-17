@@ -267,4 +267,25 @@ select teste.falha(format($$select app.portal_criar_pedido(%L, '[{"produto_id":"
 select app.portal_criar_pedido(:'ses_enc', format('[{"produto_id":"%s","quantidade":12,"encomenda":true}]', :'prod_enc')::jsonb) as ped_enc \gset
 reset role;
 select teste.ok((select descricao from app.pedido_itens where pedido_id = :'ped_enc') like '%ENCOMENDA%', 'Produto esgotado entra como ENCOMENDA no pedido');
+\echo '== Acompanhamento do pedido =='
+set role vc_app;
+select teste.como(:'GERENTE');
+select app.decidir_pedido_portal(:'ped_enc', true);
+select teste.falha(format($$select app.avancar_entrega(%L, 'transporte')$$, :'ped_enc'), 'conferir a separação', 'Não despacha antes de conferir a separação');
+select app.conferir_separacao(:'ped_enc', (select jsonb_agg(jsonb_build_object('item_id', id, 'quantidade', 5)) from app.pedido_itens where pedido_id = :'ped_enc'));
+select teste.ok((select quantidade_faltou from app.pedido_itens_indisponiveis where pedido_id = :'ped_enc') = 7, 'O que a expedição não tinha fica registrado como indisponível');
+select app.ajustar_estoque((select deposito_id from app.pedidos where id = :'ped_enc'), :'prod_enc', 5, 'Chegou a encomenda');
+select app.avancar_entrega(:'ped_enc', 'transporte');
+select teste.ok((select status_comercial::text from app.pedidos where id = :'ped_enc') = 'enviado', 'Pedido em transporte');
+select teste.falha(format($$select app.avancar_entrega(%L, 'retirada', '')$$, :'ped_enc'), 'onde o cliente retira', 'Aguardando retirada exige o local');
+select app.avancar_entrega(:'ped_enc', 'retirada', 'Loja Ciudad del Este');
+select teste.como('');
+select teste.ok((select etapa = 'aguardando_retirada' and local_retirada = 'Loja Ciudad del Este' and jsonb_array_length(indisponiveis) = 1
+                   from app.portal_pedidos(:'ses_enc') where id = :'ped_enc'), 'Cliente vê aguardando retirada, o local e o item indisponível');
+select teste.como(:'GERENTE');
+select app.avancar_entrega(:'ped_enc', 'entregue');
+select teste.ok((select status_comercial::text from app.pedidos where id = :'ped_enc') = 'entregue', 'Pedido retirado/entregue');
+select teste.como(:'KEILA');
+select teste.falha(format($$select app.avancar_entrega(%L, 'transporte')$$, :'ped_enc'), null, 'Vendedora de outra carteira não mexe na entrega');
+reset role;
 \echo 'Testes de importação passaram.'

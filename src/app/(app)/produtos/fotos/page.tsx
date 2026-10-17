@@ -109,6 +109,7 @@ export default async function FotosCatalogo({ searchParams }: {
                     <input name="produto" list="lista-produtos" placeholder="Outro produto: digite nome ou código" aria-label="Outro produto" style={{ flex: 1, minWidth: 0 }} />
                     <button>Usar</button>
                   </form>
+                  <Link className="botao" href={`/produtos/novo?foto=${x.id}`}>➕ Criar produto novo com esta foto</Link>
                   <form action={descartarFoto}>
                     <input type="hidden" name="id" value={x.id} />
                     <input type="hidden" name="volta" value={volta} />

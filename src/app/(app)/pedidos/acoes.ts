@@ -206,7 +206,8 @@ export async function conferirSeparacao(fd: FormData) {
     const itens: { item_id: string; quantidade: number }[] = [];
     for (const [k, v] of fd.entries()) {
       if (!k.startsWith("sep_")) continue;
-      const q = Number(String(v).replace(",", "."));
+      // "Não tem": a expedição marca para tirar da lista (vira indisponível para o cliente)
+      const q = fd.get(`falta_${k.slice(4)}`) === "on" ? 0 : Number(String(v).replace(",", "."));
       if (!Number.isFinite(q)) throw new Error("Quantidade separada inválida.");
       itens.push({ item_id: k.slice(4), quantidade: q });
     }
@@ -218,5 +219,15 @@ export async function confirmarTotal(fd: FormData) {
   const pedido = texto(fd, "pedido_id");
   await executar(pedido, "Total confirmado. Envie o WhatsApp para o cliente.", async (uid) => {
     await comUsuario(uid, (c) => c.query("select app.confirmar_total($1, $2)", [pedido, texto(fd, "conta")]));
+  });
+}
+
+/** Acompanhamento da entrega: em transporte → aguardando retirada (local) → entregue/retirado. */
+export async function avancarEntrega(fd: FormData) {
+  const pedido = texto(fd, "pedido_id");
+  const etapa = texto(fd, "etapa");
+  const msg = etapa === "transporte" ? "Pedido despachado: em transporte." : etapa === "retirada" ? "Pedido chegou: aguardando retirada do cliente." : "Pedido entregue / retirado.";
+  await executar(pedido, msg, async (uid) => {
+    await comUsuario(uid, (c) => c.query("select app.avancar_entrega($1, $2, nullif($3,''))", [pedido, etapa, texto(fd, "local")]));
   });
 }

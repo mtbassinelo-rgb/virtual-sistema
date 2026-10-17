@@ -7,7 +7,8 @@ import { redirect } from "next/navigation";
 import { ehGestao, exigirUsuario } from "@/lib/auth";
 import { comUsuario, mensagemErro } from "@/lib/db";
 import { numero, texto } from "@/lib/formato";
-import { pastaFotos, tipoImagem } from "@/lib/arquivos";
+import { copyFile } from "node:fs/promises";
+import { pastaFotos, pastaFotosCatalogo, tipoImagem } from "@/lib/arquivos";
 
 const TABELAS = ["py_normal", "py_vip", "br_normal", "br_vip"] as const;
 
@@ -41,6 +42,37 @@ export async function salvarProduto(fd: FormData) {
       await c.query("select app.definir_caixas($1::jsonb)", [JSON.stringify([{ codigo: cod, unidades: texto(fd, "unidades_caixa").replace(/\D/g, "") }])]);
       const precos = TABELAS.map((t) => ({ codigo: cod, tabela: t, valor: numero(fd, t) })).filter((p) => p.valor != null);
       if (precos.length) await c.query("select app.importar_precos($1::jsonb)", [JSON.stringify(precos)]);
+      // Kit: componentes digitados como "código — nome" (até 6 linhas)
+      if (fd.get("kit") === "on") {
+        const comps: { produto_id: string; quantidade: number }[] = [];
+        for (let k = 0; k < 6; k++) {
+          const cod = texto(fd, `comp_${k}`).split(" — ")[0].trim();
+          if (!cod) continue;
+          const q = Number(texto(fd, `qtd_${k}`).replace(",", ".")) || 1;
+          const r = (await c.query("select id from app.produtos where codigo = $1", [cod])).rows[0];
+          if (!r) throw new Error(`Produto do kit não encontrado: "${cod}". Escolha da lista.`);
+          if (String(r.id) === pid) throw new Error("O kit não pode conter ele mesmo.");
+          comps.push({ produto_id: String(r.id), quantidade: q });
+        }
+        if (comps.length === 0) throw new Error("Informe os produtos que formam o kit.");
+        // kit não tem estoque próprio: zera o saldo que existir antes de virar kit (fica no histórico)
+        for (const s of (await c.query("select deposito_id from app.estoque_saldos where produto_id = $1 and quantidade <> 0", [pid])).rows)
+          await c.query("select app.ajustar_estoque($1, $2, 0, 'Produto virou kit: o estoque passa a ser dos produtos do kit')", [s.deposito_id, pid]);
+        await c.query("select app.definir_kit($1, $2::jsonb)", [pid, JSON.stringify(comps)]);
+      } else if ((await c.query("select 1 from app.kit_componentes where kit_id = $1 limit 1", [pid])).rowCount) {
+        await c.query("select app.definir_kit($1, '[]'::jsonb)", [pid]);
+      }
+      // Foto vinda do catálogo (criar produto a partir da foto)
+      const fc = texto(fd, "foto_catalogo");
+      if (!bytes && /^p[0-9]{2}-[0-9]{2}$/.test(fc)) {
+        await mkdir(pastaFotos(), { recursive: true });
+        const nome = `${pid}-${Date.now()}.webp`;
+        await copyFile(path.join(pastaFotosCatalogo(), `${fc}.webp`), path.join(pastaFotos(), nome));
+        fotoNova = nome;
+        const antiga = (await c.query("select app.definir_foto($1, $2) as antiga", [pid, `/fotos/${nome}`])).rows[0].antiga as string | null;
+        await c.query("select app.decidir_foto_catalogo($1, 'aplicar', $2)", [fc, pid]);
+        if (antiga) await rm(path.join(pastaFotos(), path.basename(antiga)), { force: true });
+      }
       if (bytes && ext) {
         await mkdir(pastaFotos(), { recursive: true });
         const nome = `${pid}-${Date.now()}.${ext}`;

@@ -15,7 +15,7 @@ const TABELAS = [
 ];
 
 export default async function Produto({ params, searchParams }: {
-  params: Promise<{ id: string }>; searchParams: Promise<{ ok?: string; erro?: string }>;
+  params: Promise<{ id: string }>; searchParams: Promise<{ ok?: string; erro?: string; foto?: string }>;
 }) {
   const u = await exigirUsuario();
   const { id } = await params;
@@ -40,6 +40,14 @@ export default async function Produto({ params, searchParams }: {
     return { p, precos, historico, estoque, componentes };
   });
   if (!novo && !d) notFound();
+  // Novo produto a partir de uma foto do catálogo (Produtos → Fotos do catálogo)
+  const fotoCat = novo && f.foto && /^p[0-9]{2}-[0-9]{2}$/.test(f.foto)
+    ? await comUsuario(u.id, async (c) => (await c.query("select id, nome from app.fotos_catalogo where id = $1 and status = 'pendente'", [f.foto])).rows[0] as { id: string; nome: string } | undefined)
+    : undefined;
+  const opcoes = pode ? await comUsuario(u.id, async (c) => (await c.query(
+    "select codigo, nome from app.produtos where ativo and tipo <> 'kit' order by nome")).rows as { codigo: string; nome: string }[]) : [];
+  const comps: { codigo: string; nome: string; quantidade: number }[] = (d?.componentes ?? []).map((c) => ({ codigo: c.codigo, nome: c.nome, quantidade: Number(c.quantidade) }));
+  const linhasKit = [...comps, ...Array(Math.max(0, 6 - comps.length)).fill(null)].slice(0, 6) as ({ codigo: string; nome: string; quantidade: number } | null)[];
   const p = d?.p;
   const preco = (t: string) => d?.precos.find((x) => x.tabela === t)?.valor;
   const fmt = (v: unknown, gs: boolean) => (v == null ? "" : gs ? String(Math.round(Number(v))) : Number(v).toFixed(2).replace(".", ","));
@@ -63,11 +71,12 @@ export default async function Produto({ params, searchParams }: {
 
       <form action={salvarProduto} className="duas-colunas">
         <input type="hidden" name="id" value={novo ? "" : id} />
+        {fotoCat && <input type="hidden" name="foto_catalogo" value={fotoCat.id} />}
         <section className="painel">
           <h2>Dados</h2>
           <div className="campos" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10 }}>
             <label>Código (SKU)<input name="codigo" defaultValue={p?.codigo ?? ""} required disabled={!pode} placeholder="Ex.: RHE-020" /></label>
-            <label style={{ gridColumn: "span 2" }}>Nome<input name="nome" defaultValue={p?.nome ?? ""} required disabled={!pode} /></label>
+            <label style={{ gridColumn: "span 2" }}>Nome<input name="nome" defaultValue={p?.nome ?? fotoCat?.nome ?? ""} required disabled={!pode} /></label>
             <label>Marca<input name="marca" defaultValue={p?.marca ?? ""} disabled={!pode} placeholder="Ex.: Maycrene" /></label>
             <label>Unidade<input name="unidade" defaultValue={p?.unidade ?? "UN"} disabled={!pode} /></label>
             <label>Código de barras<input name="gtin" defaultValue={p?.gtin ?? ""} disabled={!pode} inputMode="numeric" /></label>
@@ -83,6 +92,22 @@ export default async function Produto({ params, searchParams }: {
               <input type="checkbox" name="novidade" defaultChecked={p ? p.novidade : false} disabled={!pode} style={{ width: "auto" }} /> Novidade no site
             </label>
           </div>
+          <h2 style={{ marginTop: 8 }}>Kit</h2>
+          <label style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <input type="checkbox" name="kit" defaultChecked={comps.length > 0 || /^kit\b/i.test(fotoCat?.nome ?? "")} disabled={!pode} style={{ width: "auto" }} />
+            Este produto é um kit (vende junto, mas o estoque sai de cada produto)
+          </label>
+          <p className="pequeno suave">Ex.: Kit Selagem = 1 shampoo + 1 condicionador + 1 máscara. O kit não tem estoque próprio: fica disponível enquanto houver os produtos dele, e ao vender sai 1 de cada.</p>
+          <div className="kit-linhas">
+            {linhasKit.map((c, k) => (
+              <div key={k} className="linha">
+                <input name={`comp_${k}`} list="lista-componentes" defaultValue={c ? `${c.codigo} — ${c.nome}` : ""} disabled={!pode}
+                       placeholder={k === 0 ? "Produto do kit: digite nome ou código" : ""} aria-label={`Produto ${k + 1} do kit`} style={{ flex: 1, minWidth: 0 }} autoComplete="off" />
+                <input name={`qtd_${k}`} defaultValue={c ? c.quantidade : 1} inputMode="numeric" disabled={!pode} aria-label={`Quantidade ${k + 1}`} style={{ width: 70 }} />
+              </div>
+            ))}
+          </div>
+          {pode && <datalist id="lista-componentes">{opcoes.map((o) => <option key={o.codigo} value={`${o.codigo} — ${o.nome}`} />)}</datalist>}
           <h2 style={{ marginTop: 8 }}>Preços</h2>
           <p className="pequeno suave">O preço novo vale a partir de hoje; o anterior fica no histórico. Gs é arredondado para múltiplos de 500. Deixar em branco não altera.</p>
           <div className="campos" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10 }}>
@@ -97,7 +122,9 @@ export default async function Produto({ params, searchParams }: {
         <div className="coluna">
           <section className="painel">
             <h2>Foto</h2>
-            {p?.foto ? <img src={p.foto} alt={p.nome} style={{ width: "100%", maxWidth: 320, aspectRatio: "1", objectFit: "cover", borderRadius: 12, background: "#fff" }} />
+            {fotoCat ? <><img src={`/fotos-catalogo/${fotoCat.id}.webp`} alt={fotoCat.nome} style={{ width: "100%", maxWidth: 320, aspectRatio: "1", objectFit: "contain", borderRadius: 12, background: "#fff" }} />
+              <p className="pequeno suave" style={{ margin: 0 }}>Foto do catálogo: entra neste produto ao criar.</p></>
+            : p?.foto ? <img src={p.foto} alt={p.nome} style={{ width: "100%", maxWidth: 320, aspectRatio: "1", objectFit: "cover", borderRadius: 12, background: "#fff" }} />
               : <div className="vazio" style={{ background: "var(--afundado)", borderRadius: 12 }}>Sem foto: no site aparece o rótulo colorido.</div>}
             {pode && <label>{p?.foto ? "Trocar foto" : "Enviar foto"} (JPG, PNG ou WEBP, até 5 MB)<input type="file" name="foto" accept="image/jpeg,image/png,image/webp" /></label>}
             <p className="pequeno suave">Dica: foto quadrada, com fundo branco e o produto centralizado fica melhor no site.</p>

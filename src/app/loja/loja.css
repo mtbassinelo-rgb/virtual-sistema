@@ -418,3 +418,25 @@
 .area-cli .selo { display: inline-flex; font-size: .72rem; font-weight: 700; padding: 2px 9px; border-radius: 999px; background: #eee; color: #555; white-space: nowrap; }
 .area-cli .selo.ok { background: #e3f7e8; color: #0b5d2a; } .area-cli .selo.aviso { background: #fff3d6; color: #7a4a00; }
 .area-cli .selo.info { background: #e3eefb; color: #0b3d7a; } .area-cli .selo.marca { background: var(--roxo-suave); color: var(--roxo); }
+
+/* ---------- Acompanhamento do pedido ---------- */
+.acomp { display: grid; gap: 10px; }
+.acomp-passos { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.acomp-passos li { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; position: relative; font-size: .78rem; color: var(--apagado); }
+.acomp-passos li::before { content: ""; position: absolute; top: 13px; left: -50%; width: 100%; height: 3px; background: var(--linha-l); z-index: 0; }
+.acomp-passos li:first-child::before { display: none; }
+.acomp-passos li.feito::before, .acomp-passos li.atual::before { background: var(--verde); }
+.acomp-ponto { position: relative; z-index: 1; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; background: var(--linha-l); color: var(--apagado); }
+.acomp-passos li.feito .acomp-ponto { background: var(--verde); color: var(--verde-tinta); }
+.acomp-passos li.atual .acomp-ponto { background: var(--roxo); color: #fff; }
+.acomp-passos li.feito, .acomp-passos li.atual { color: var(--roxo-tinta); font-weight: 600; }
+.acomp-quando { font-weight: 400; font-size: .72rem; color: var(--apagado); }
+.acomp-retirada { background: #e3f7e8; color: #0b5d2a; border-radius: 12px; padding: 10px 12px; }
+.acomp-indisp { background: #fff3d6; color: #7a4a00; border-radius: 12px; padding: 10px 12px; font-size: .9rem; }
+.acomp-indisp ul { margin: 6px 0 0; padding-left: 18px; }
+.acomp-cancelado { background: #eee; color: #555; border-radius: 12px; padding: 10px 12px; }
+@media (max-width: 620px) {
+  .acomp-passos { grid-template-columns: 1fr; gap: 0; }
+  .acomp-passos li { flex-direction: row; text-align: left; gap: 10px; padding: 4px 0; }
+  .acomp-passos li::before { display: none; }
+}

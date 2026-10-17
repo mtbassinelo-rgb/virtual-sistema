@@ -3,6 +3,8 @@ import { exigirCliente } from "@/lib/portal";
 import { dinheiro, data, hojeISO, linkWhatsApp, telefone, type Moeda } from "@/lib/formato";
 import { enviarComprovante } from "../acoes";
 import { LimparCarrinho } from "../carrinho";
+import { Acompanhamento, type PedidoAcomp } from "../acompanhamento";
+import { idiomaAtual } from "@/lib/idioma";
 
 export const metadata = { title: "Meus pedidos" };
 
@@ -11,8 +13,9 @@ const ETAPAS: Record<string, { texto: string; cor: string }> = {
   em_separacao: { texto: "Em separação: conferindo as quantidades", cor: "info" },
   aguardando_pagamento: { texto: "Total confirmado: aguardando pagamento", cor: "marca" },
   pago_preparando_envio: { texto: "Pago: preparando o envio", cor: "ok" },
-  enviado: { texto: "Enviado", cor: "ok" },
-  entregue: { texto: "Entregue", cor: "ok" },
+  enviado: { texto: "Em transporte", cor: "info" },
+  aguardando_retirada: { texto: "Aguardando retirada", cor: "ok" },
+  entregue: { texto: "Retirado / entregue", cor: "ok" },
   cancelado: { texto: "Cancelado", cor: "" },
 };
 
@@ -21,12 +24,13 @@ type Pedido = {
   saldo: string; moeda: Moeda; etapa: string; total_confirmado: boolean; conta_pagamento: string | null;
   previsao_envio: string | null; vencimento: string | null; observacoes: string | null;
   itens: { descricao: string; quantidade: number; pedida: number; preco: number; total: number }[];
-};
+} & PedidoAcomp;
 
 export default async function MeusPedidos({ searchParams }: { searchParams: Promise<{ ok?: string; erro?: string; novo?: string }> }) {
   const { sessao, cliente } = await exigirCliente();
   const avisos = await searchParams;
   const pedidos = (await pool.query("select * from app.portal_pedidos($1)", [sessao])).rows as Pedido[];
+  const idioma = await idiomaAtual();
 
   return (
     <div className="in pagina">
@@ -50,6 +54,7 @@ export default async function MeusPedidos({ searchParams }: { searchParams: Prom
               <b>Pedido de {data(p.data_pedido)}{p.bling_numero ? ` · nº ${p.bling_numero}` : ""}</b>
               <span className={`selo ${e.cor}`}>{e.texto}</span>
             </div>
+            <Acompanhamento p={p} idioma={idioma} />
             <div className="tabela">
               <table style={{ minWidth: 420 }}>
                 <thead><tr><th>Produto</th><th>Qtd</th><th>Preço</th><th>Total</th></tr></thead>

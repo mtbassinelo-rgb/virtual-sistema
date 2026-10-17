@@ -29,8 +29,9 @@ export function hojeISO(somarDias = 0): string {
 export const STATUS_COMERCIAL: Record<string, string> = {
   aguardando_aprovacao: "Aguardando aprovação",
   em_separacao: "Em separação",
-  enviado: "Enviado",
-  entregue: "Entregue",
+  enviado: "Em transporte",
+  aguardando_retirada: "Aguardando retirada",
+  entregue: "Entregue / retirado",
   cancelado: "Cancelado",
 };
 
