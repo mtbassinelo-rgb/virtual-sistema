@@ -291,7 +291,7 @@
 .linha-qtd .adicionar { width: 100%; padding: 8px 10px; }
 .precos .preco small { font-family: var(--texto-f); font-weight: 500; font-size: .75rem; color: var(--apagado); }
 .preco-un { font-size: .78rem; color: var(--apagado); font-variant-numeric: tabular-nums; }
-.caixa-info { font-size: .78rem; font-weight: 600; color: var(--roxo); }
+.caixa-info { align-self: flex-start; font-size: .76rem; font-weight: 700; color: var(--roxo); background: var(--roxo-suave); border-radius: 999px; padding: 2px 9px; }
 .g-caixa { font-size: .78rem; color: var(--apagado); }
 @media (max-width: 640px) {
   .linha-cat { grid-template-columns: 48px minmax(0, 1fr) 128px; grid-template-areas: "img info info" "img preco qtd"; gap: 6px 12px; }

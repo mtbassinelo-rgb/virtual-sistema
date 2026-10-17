@@ -26,7 +26,7 @@ const PT = {
     `Olá! Quero ser cliente da Virtual Cosméticos.\nEmpresa: ${d.nome}${d.contato ? `\nContato: ${d.contato}` : ""}${d.cidade ? `\nCidade: ${d.cidade}` : ""}${d.tipo ? `\nTipo: ${d.tipo}` : ""}${d.email ? `\nE-mail: ${d.email}` : ""}${d.mensagem ? `\nProcuro: ${d.mensagem}` : ""}`,
 
   jaSouCliente: "Já sou cliente", meusPedidos: "Meus pedidos", pedido: "Pedido",
-  categorias: "Categorias", verAgora: "Ver produtos", menu: "Menu", inicio: "Início", caixaCom: (n: number) => `Caixa com ${n} un.`, porCaixa: "a caixa", porUnidade: "a unidade", unidade: "Unidade", lista: "Lista", grade: "Grade", promocoes: "Promoções", maisVendidos: "Mais vendidos", destaques: "Destaques", marcas: "Marcas", novidades: "Novidades",
+  categorias: "Categorias", verAgora: "Ver produtos", menu: "Menu", inicio: "Início", caixaCom: (n: number) => `Caixa com ${n} ${n === 1 ? "unidade" : "unidades"}`, porCaixa: "a caixa", porUnidade: "a unidade", unidade: "Unidade", lista: "Lista", grade: "Grade", promocoes: "Promoções", maisVendidos: "Mais vendidos", destaques: "Destaques", marcas: "Marcas", novidades: "Novidades",
   verTodas: "Ver todas", verTodosKits: "Ver todos os kits", verTodasMarcas: "Ver todas as marcas", verTodasPromocoes: "Ver todas as promoções",
   kitsCompletos: "Kits completos", catalogo: "Catálogo", tudo: "Tudo",
   heroTitulo: "Distribuidora de cosméticos direto de fábrica em Foz do Iguaçu.",
@@ -92,7 +92,7 @@ const ES: typeof PT = {
     `¡Hola! Quiero ser cliente de Virtual Cosméticos.\nEmpresa: ${d.nome}${d.contato ? `\nContacto: ${d.contato}` : ""}${d.cidade ? `\nCiudad: ${d.cidade}` : ""}${d.tipo ? `\nTipo: ${d.tipo}` : ""}${d.email ? `\nCorreo: ${d.email}` : ""}${d.mensagem ? `\nBusco: ${d.mensagem}` : ""}`,
 
   jaSouCliente: "Ya soy cliente", meusPedidos: "Mis pedidos", pedido: "Pedido",
-  categorias: "Categorías", verAgora: "Ver productos", menu: "Menú", inicio: "Inicio", caixaCom: (n: number) => `Caja con ${n} un.`, porCaixa: "la caja", porUnidade: "la unidad", unidade: "Unidad", lista: "Lista", grade: "Cuadrícula", promocoes: "Promociones", maisVendidos: "Más vendidos", destaques: "Destacados", marcas: "Marcas", novidades: "Novedades",
+  categorias: "Categorías", verAgora: "Ver productos", menu: "Menú", inicio: "Inicio", caixaCom: (n: number) => `Caja con ${n} ${n === 1 ? "unidad" : "unidades"}`, porCaixa: "la caja", porUnidade: "la unidad", unidade: "Unidad", lista: "Lista", grade: "Cuadrícula", promocoes: "Promociones", maisVendidos: "Más vendidos", destaques: "Destacados", marcas: "Marcas", novidades: "Novedades",
   verTodas: "Ver todas", verTodosKits: "Ver todos los kits", verTodasMarcas: "Ver todas las marcas", verTodasPromocoes: "Ver todas las promociones",
   kitsCompletos: "Kits completos", catalogo: "Catálogo", tudo: "Todo",
   heroTitulo: "Distribuidora de cosméticos directo de fábrica en Foz do Iguaçu.",
