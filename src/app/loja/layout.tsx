@@ -87,7 +87,15 @@ export default async function LayoutLoja({ children }: { children: React.ReactNo
             </form>
             <nav className="nav" aria-label="Menu">
               <a className="idioma" href={`/loja/idioma?l=${t.idiomaCodigo}`} hrefLang={t.idiomaCodigo} lang={t.idiomaCodigo}>{t.idioma}</a>
-              {c ? <Link href="/loja/pedidos">{t.meusPedidos}</Link> : <Link href="/loja/cadastro">{t.querSerCliente}</Link>}
+              {c ? <Link href="/loja/pedidos">{t.meusPedidos}</Link> : (
+                <details className="menu-cair area-cliente">
+                  <summary>{t.areaCliente}</summary>
+                  <div className="menu-painel">
+                    <a href="/loja/acesso">{t.entrarCliente}</a>
+                    <a href="/loja/cadastro">{t.querSerCliente}</a>
+                  </div>
+                </details>
+              )}
               <BotaoCarrinho />
             </nav>
           </div>

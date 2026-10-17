@@ -378,3 +378,11 @@
 .acesso-form input:focus { outline: none; border-color: var(--roxo); }
 .acesso-form .adicionar { background: var(--roxo); color: #fff; padding: 11px 14px; }
 .aviso-ok { background: #e3f7e8; color: #0b5d2a; border-radius: var(--raio-p); padding: 10px 14px; }
+
+/* Botão "Área do cliente" no topo (entrar ou quero ser cliente) */
+.area-cliente > summary { color: var(--roxo-tinta); font-weight: 600; font-size: .92rem; border-radius: 999px; padding: 8px 12px; }
+.area-cliente .menu-painel { left: auto; right: 0; min-width: 220px; z-index: 30; }
+@media (max-width: 720px) {
+  .area-cliente > summary { padding: 8px; font-size: .88rem; }
+  .area-cliente .menu-painel { position: absolute; left: auto; right: 0; top: calc(100% + 6px); }
+}
