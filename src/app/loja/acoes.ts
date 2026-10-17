@@ -103,7 +103,17 @@ export async function enviarCarrinho(_: RespostaCarrinho, fd: FormData): Promise
 
   // Quem navega em espanhol é atendido pelo WhatsApp de vendas em guaranis; em português, pelo principal
   const idioma = await idiomaAtual();
-  const nome = texto(fd, "nome"), zap = texto(fd, "whatsapp"), pais = idioma === "es" ? "PY" : "BR", cidade = texto(fd, "cidade");
+  const es = idioma === "es";
+  // A tela foi aberta como cliente, mas a sessão já não vale (expirou, senha nova, acesso bloqueado):
+  // o formulário não tem os campos de visitante. Leva para entrar de novo; o carrinho fica guardado.
+  if (!fd.has("nome")) {
+    const aviso = es ? "Su sesión terminó. Ingrese de nuevo para enviar el pedido (su carrito sigue guardado)."
+                     : "Sua sessão terminou. Entre de novo para enviar o pedido (o carrinho continua guardado).";
+    return { url: "/loja/acesso?erro=" + encodeURIComponent(aviso) };
+  }
+  const nome = texto(fd, "nome"), zap = texto(fd, "whatsapp"), pais = es ? "PY" : "BR", cidade = texto(fd, "cidade");
+  if (nome.trim().length < 2) return { erro: es ? "Escriba su nombre." : "Informe o seu nome." };
+  if (zap.replace(/\D/g, "").length < 8) return { erro: es ? "Escriba un WhatsApp válido, con código de área." : "Informe um WhatsApp válido, com DDD." };
   try {
     const r = await pool.query("select app.registrar_pedido_site($1, $2, $3, $4, $5, $6) as numero",
       [nome, zap, pais, cidade, JSON.stringify(itens), obs]);
