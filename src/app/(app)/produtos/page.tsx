@@ -3,6 +3,8 @@ import { ehGestao, exigirUsuario } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
 import { dinheiro } from "@/lib/formato";
 import { Avisos, Selo } from "../avisos";
+import { produtosEmLote } from "./acoes";
+import { BarraLote, MarcarTodos } from "./lote";
 
 export const metadata = { title: "Produtos" };
 
@@ -33,6 +35,7 @@ export default async function Produtos({ searchParams }: {
   });
   const paginas = Math.max(1, Math.ceil(d.total / POR_PAGINA));
   const fotosPendentes = d.fotosPendentes;
+  const gestao = ehGestao(u);
   const url = (mud: Record<string, string | number | undefined>) => {
     const s = new URLSearchParams();
     for (const [k, v] of Object.entries({ q: f.q, filtro: f.filtro, ...mud })) if (v) s.set(k, String(v));
@@ -66,10 +69,17 @@ export default async function Produtos({ searchParams }: {
         <button className="principal">Buscar</button>
       </form>
 
+      {gestao && (
+        <>
+          <form id="lote" action={produtosEmLote} hidden><input type="hidden" name="volta" value={url({ pagina: pagina > 1 ? pagina : undefined }).replace(/\?$/, "")} /></form>
+          <BarraLote form="lote" />
+        </>
+      )}
       <div className="tabela"><table>
-        <thead><tr><th></th><th>Código</th><th>Produto</th><th>PY Normal</th><th>PY VIP</th><th>BR Normal</th><th>BR VIP</th></tr></thead>
+        <thead><tr>{gestao && <th style={{ width: 32 }}><MarcarTodos form="lote" /></th>}<th></th><th>Código</th><th>Produto</th><th>PY Normal</th><th>PY VIP</th><th>BR Normal</th><th>BR VIP</th></tr></thead>
         <tbody>{d.lista.map((p) => (
           <tr key={p.id}>
+            {gestao && <td><input type="checkbox" name="ids" value={p.id} form="lote" aria-label={`Selecionar ${p.nome}`} /></td>}
             <td style={{ width: 52 }}>
               {p.foto ? <img src={p.foto} alt="" width={40} height={40} style={{ objectFit: "cover", borderRadius: 6, display: "block" }} />
                 : <div style={{ width: 40, height: 40, borderRadius: 6, background: "var(--afundado)" }} />}

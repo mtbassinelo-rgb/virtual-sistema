@@ -74,3 +74,33 @@ export async function removerFoto(fd: FormData) {
   revalidatePath("/loja");
   redirect(`/produtos/${id}?${q}`);
 }
+
+/** Ativar, inativar ou excluir vários produtos de uma vez (lista de Produtos). */
+export async function produtosEmLote(fd: FormData) {
+  const u = await exigirUsuario();
+  const ids = fd.getAll("ids").map(String).filter((x) => /^[0-9a-f-]{36}$/i.test(x));
+  const acao = texto(fd, "acao");
+  const v = texto(fd, "volta");
+  const volta = /^\/produtos(\?[\w=&%.+-]*)?$/.test(v) ? v : "/produtos";
+  let q: string;
+  try {
+    if (!ehGestao(u)) throw new Error("Só gerente ou dono altera produtos em lote.");
+    if (!["ativar", "inativar", "excluir"].includes(acao)) throw new Error("Escolha o que fazer com os produtos selecionados.");
+    if (ids.length === 0) throw new Error("Marque pelo menos um produto.");
+    const r = await comUsuario(u.id, async (c) => (await c.query("select app.produtos_em_lote($1::uuid[], $2) as r", [ids, acao])).rows[0].r as
+      { ativados: number; inativados: number; excluidos: number; inativados_por_historico: number; fotos: string[] });
+    for (const f of r.fotos) await rm(path.join(pastaFotos(), path.basename(f)), { force: true });
+    const partes = [
+      r.ativados && `${r.ativados} ativado(s)`,
+      r.inativados && `${r.inativados} inativado(s)`,
+      r.excluidos && `${r.excluidos} excluído(s)`,
+      r.inativados_por_historico && `${r.inativados_por_historico} não podia(m) ser excluído(s) porque já tem pedido ou movimento de estoque, então ficou(aram) inativo(s)`,
+    ].filter(Boolean);
+    q = "ok=" + encodeURIComponent(partes.length ? partes.join(" · ") + "." : "Nada mudou: os produtos já estavam assim.");
+  } catch (e) {
+    q = "erro=" + encodeURIComponent(mensagemErro(e));
+  }
+  revalidatePath("/produtos");
+  revalidatePath("/loja");
+  redirect(`${volta}${volta.includes("?") ? "&" : "?"}${q}`);
+}

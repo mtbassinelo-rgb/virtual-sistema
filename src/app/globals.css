@@ -105,3 +105,4 @@ details summary { cursor: pointer; color: var(--marca); font-weight: 600; }
 .sugestao-foto button { flex-shrink: 0; }
 button.discreto { border-color: transparent; background: transparent; color: var(--suave); padding-inline: 0; }
 button.discreto:hover { color: var(--erro); border-color: transparent; }
+.lote-barra { position: sticky; top: 64px; z-index: 5; padding: 10px 14px; }

@@ -239,4 +239,18 @@ select teste.como(:'GERENTE');
 select app.bloquear_portal(:'cli1');
 select teste.ok((select count(*) from app.portal_dados_login('45678901')) = 0, 'Bloquear acesso impede o login');
 reset role;
+\echo '== Produtos em lote =='
+set role vc_app;
+select teste.como(:'GERENTE');
+select app.salvar_produto(null, 'LOTE-A', 'Produto Lote A', 'Soul', 'UN', null, 1, true) as la \gset
+select app.salvar_produto(null, 'LOTE-B', 'Produto Lote B', 'Soul', 'UN', null, 1, true) as lb \gset
+select app.importar_precos('[{"codigo":"LOTE-A","tabela":"br_normal","valor":10}]'::jsonb);
+select teste.ok((app.produtos_em_lote(array[:'la', :'lb']::uuid[], 'inativar')->>'inativados')::int = 2, 'Gerente inativa produtos em lote');
+select teste.ok((app.produtos_em_lote(array[:'la']::uuid[], 'ativar')->>'ativados')::int = 1, 'Gerente reativa em lote');
+select teste.ok((app.produtos_em_lote(array[:'la', :'lb']::uuid[], 'excluir')->>'excluidos')::int = 2, 'Produto sem histórico é excluído (com o preço)');
+select teste.ok((select count(*) from app.produtos where codigo in ('LOTE-A','LOTE-B')) = 0, 'Produtos excluídos somem');
+select teste.ok((app.produtos_em_lote(array[(select produto_id from app.pedido_itens limit 1)]::uuid[], 'excluir')->>'inativados_por_historico')::int = 1, 'Produto com pedido não é apagado: fica inativo');
+select teste.como(:'KEILA');
+select teste.falha(format($$select app.produtos_em_lote(array[%L]::uuid[], 'inativar')$$, (select produto_id from app.pedido_itens limit 1)), 'Só gerente ou dono', 'Vendedora não altera em lote');
+reset role;
 \echo 'Testes de importação passaram.'
