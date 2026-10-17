@@ -96,3 +96,12 @@ details summary { cursor: pointer; color: var(--marca); font-weight: 600; }
 .entrada .painel { width: 100%; max-width: 380px; }
 
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Fotos do catálogo (conferência das fotos tiradas do PDF) */
+.fotos-cat { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.foto-cat { gap: 10px; scroll-margin-top: 80px; }
+.foto-cat img { width: 100%; height: auto; aspect-ratio: 1; object-fit: contain; background: #fff; border-radius: 10px; border: 1px solid var(--linha); }
+.sugestao-foto { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border-radius: 10px; background: var(--afundado); }
+.sugestao-foto button { flex-shrink: 0; }
+button.discreto { border-color: transparent; background: transparent; color: var(--suave); padding-inline: 0; }
+button.discreto:hover { color: var(--erro); border-color: transparent; }

@@ -17,3 +17,8 @@ export function tipoImagem(b: Buffer): "jpg" | "png" | "webp" | null {
   if (b.length > 12 && b.subarray(0, 4).toString("ascii") === "RIFF" && b.subarray(8, 12).toString("ascii") === "WEBP") return "webp";
   return null;
 }
+
+/** Fotos candidatas tiradas do catálogo em PDF (só a equipe vê, até alguém confirmar). */
+export function pastaFotosCatalogo(): string {
+  return path.join(pastaFotos(), "catalogo");
+}

@@ -178,4 +178,18 @@ select teste.ok(app.definir_caixas('[{"codigo":"NOVO-02","unidades":"12"},{"codi
 select teste.falha($$select app.definir_caixas('[{"codigo":"NOVO-02","unidades":"0"}]'::jsonb)$$, 'entre 1 e 1000', 'Caixa com zero peças é recusada');
 select teste.ok((select unidades_caixa from app.vitrine_publica() where codigo = 'NOVO-02') = 12, 'Vitrine mostra as peças por caixa');
 reset role;
+\echo '== Fotos do catálogo =='
+set role vc_app;
+select teste.como(:'GERENTE');
+select teste.ok(app.importar_fotos_catalogo('[{"id":"p05-01","pagina":5,"nome":"Body Splash","sugestao":"NOVO-02","confianca":"0.9"},{"id":"p05-02","pagina":5,"nome":"Sem produto","sugestao":"NAO-EXISTE"}]'::jsonb) = 2, 'Gerente carrega as fotos do catálogo');
+select teste.ok((select sugestao from app.fotos_catalogo where id = 'p05-01') = (select id from app.produtos where codigo = 'NOVO-02'), 'Sugestão ligada ao produto pelo código');
+select app.decidir_foto_catalogo('p05-01', 'aplicar', (select id from app.produtos where codigo = 'NOVO-02'));
+select app.decidir_foto_catalogo('p05-02', 'descartar', null);
+select teste.ok(app.importar_fotos_catalogo('[{"id":"p05-01","pagina":5,"nome":"Outro nome"}]'::jsonb) = 0, 'Recarga não desfaz o que já foi decidido');
+select teste.falha($$select app.decidir_foto_catalogo('p05-02', 'aplicar', null)$$, 'Escolha o produto', 'Aplicar exige o produto');
+select teste.falha($$select app.importar_fotos_catalogo('[{"id":"../x","pagina":1}]'::jsonb)$$, null, 'Identificador de foto inválido é recusado');
+select teste.como(:'KEILA');
+select teste.ok((select count(*) from app.fotos_catalogo) = 0, 'Vendedora não vê as fotos do catálogo');
+select teste.falha($$select app.decidir_foto_catalogo('p05-02', 'reabrir', null)$$, 'Só gerente ou dono', 'Vendedora não decide as fotos');
+reset role;
 \echo 'Testes de importação passaram.'

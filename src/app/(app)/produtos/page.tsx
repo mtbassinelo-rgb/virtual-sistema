@@ -28,9 +28,11 @@ export default async function Produtos({ searchParams }: {
     const total = Number((await c.query(`select count(*) n ${base}`, par)).rows[0].n);
     const lista = (await c.query(`select p.id, p.codigo, p.nome, p.marca, p.foto, p.tipo, p.ativo, p.codigo_provisorio, x.* ${base}
       order by p.nome limit ${POR_PAGINA} offset ${(pagina - 1) * POR_PAGINA}`, par)).rows;
-    return { total, lista };
+    const fotosPendentes = ehGestao(u) ? Number((await c.query("select count(*) n from app.fotos_catalogo where status = 'pendente'")).rows[0].n) : 0;
+    return { total, lista, fotosPendentes };
   });
   const paginas = Math.max(1, Math.ceil(d.total / POR_PAGINA));
+  const fotosPendentes = d.fotosPendentes;
   const url = (mud: Record<string, string | number | undefined>) => {
     const s = new URLSearchParams();
     for (const [k, v] of Object.entries({ q: f.q, filtro: f.filtro, ...mud })) if (v) s.set(k, String(v));
@@ -43,6 +45,7 @@ export default async function Produtos({ searchParams }: {
         <div><h1>Produtos</h1><div className="suave pequeno">{d.total.toLocaleString("pt-BR")} produto(s)</div></div>
         {ehGestao(u) && (
           <div className="linha">
+            <a className="botao" href="/produtos/fotos">Fotos do catálogo{fotosPendentes > 0 ? ` (${fotosPendentes} para conferir)` : ""}</a>
             <a className="botao" href="/estoque/precos">Preços em planilha</a>
             <a className="botao principal" href="/produtos/novo">Novo produto</a>
           </div>
