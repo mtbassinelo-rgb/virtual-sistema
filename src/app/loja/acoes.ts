@@ -60,7 +60,7 @@ export async function enviarComprovante(fd: FormData) {
 
 export type RespostaCarrinho = { erro?: string; url?: string; alternativa?: string };
 
-type Linha = { produto_id: string; quantidade: number; caixas?: number | null };
+type Linha = { produto_id: string; quantidade: number; caixas?: number | null; encomenda?: boolean };
 
 function lerItens(fd: FormData): Linha[] {
   try {
@@ -68,7 +68,7 @@ function lerItens(fd: FormData): Linha[] {
     if (!Array.isArray(v)) return [];
     return v.filter((i) => typeof i?.produto_id === "string" && /^[0-9a-f-]{36}$/.test(i.produto_id) && Number(i.quantidade) > 0)
             .slice(0, 200).map((i) => ({ produto_id: i.produto_id, quantidade: Math.floor(Number(i.quantidade)),
-              caixas: Number(i.caixas) > 0 ? Math.floor(Number(i.caixas)) : null }));
+              caixas: Number(i.caixas) > 0 ? Math.floor(Number(i.caixas)) : null, encomenda: i.encomenda === true }));
   } catch {
     return [];
   }
@@ -79,7 +79,7 @@ async function listaTexto(itens: Linha[]): Promise<string> {
     [itens.map((i) => i.produto_id)]);
   const nome = new Map(rows.map((r) => [String(r.produto_id), String(r.nome)]));
   return itens.filter((i) => nome.has(i.produto_id))
-    .map((i) => `• ${i.caixas ? `${i.caixas} cx (${i.quantidade} un.)` : `${i.quantidade}×`} ${nome.get(i.produto_id)}`).join("\n");
+    .map((i) => `• ${i.caixas ? `${i.caixas} cx (${i.quantidade} un.)` : `${i.quantidade}×`} ${nome.get(i.produto_id)}${i.encomenda ? " (encomenda)" : ""}`).join("\n");
 }
 
 /** Envia o carrinho: cliente com acesso → pedido no sistema; visitante → pedido do site + WhatsApp da empresa. */
@@ -93,7 +93,7 @@ export async function enviarCarrinho(_: RespostaCarrinho, fd: FormData): Promise
     const t = await tokenCliente();
     try {
       await pool.query("select app.portal_criar_pedido($1, $2, $3)",
-        [sha256(t!), JSON.stringify(itens.map(({ produto_id, quantidade }) => ({ produto_id, quantidade }))), obs]);
+        [sha256(t!), JSON.stringify(itens.map(({ produto_id, quantidade, encomenda }) => ({ produto_id, quantidade, encomenda: !!encomenda }))), obs]);
       return { url: "/loja/pedidos?novo=1&ok=" + encodeURIComponent("Pedido enviado! A vendedora confere e avisa o total para pagamento.") };
     } catch (e) {
       const msg = `Olá, ${cliente.vendedora}! Sou ${cliente.nome}. Quero fazer este pedido:\n${await listaTexto(itens)}${obs ? "\nObs.: " + obs : ""}`;

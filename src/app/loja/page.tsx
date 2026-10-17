@@ -256,8 +256,8 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
 function Cartao({ p, moeda, cliente, t }: { p: Produto; moeda: Moeda; cliente: boolean; t: Textos }) {
   const cor = corRotulo(p.nome, p.linha);
   const pr = p.p;
-  const semEstoque = pr ? pr.disponibilidade === "indisponivel" && !pr.disponivel_abastecedor : false;
-  const item = itemCarrinho(p);
+  const semEstoque = esgotado(p, cliente);
+  const item = itemCarrinho(p, semEstoque);
   const promo = pr?.desconto_pct ?? p.x?.promo_pct;
   return (
     <article className="cartao">
@@ -271,7 +271,8 @@ function Cartao({ p, moeda, cliente, t }: { p: Produto; moeda: Moeda; cliente: b
         {promo && <span className="etiqueta-promo">−{Number(promo)}%</span>}
         {!promo && p.novidade && <span className="etiqueta-promo">{t.novo}</span>}
         {p.linha === "kits" && !promo && !p.novidade && <span className="etiqueta-kit">{t.kit}</span>}
-        {Number(p.x?.vendidos_90d ?? 0) > 0 && <span className="etiqueta-vendido">{t.maisVendido}</span>}
+        {semEstoque ? <span className="etiqueta-esgotado">{t.esgotado}</span>
+          : Number(p.x?.vendidos_90d ?? 0) > 0 && <span className="etiqueta-vendido">{t.maisVendido}</span>}
       </div>
       <div className="cartao-corpo">
         <h3>{p.nome}</h3>
@@ -282,20 +283,26 @@ function Cartao({ p, moeda, cliente, t }: { p: Produto; moeda: Moeda; cliente: b
             {pr.disponibilidade === "disponivel" && t.emEstoque}
             {pr.disponibilidade === "ultimas" && t.ultimas}
             {pr.disponibilidade === "indisponivel" && pr.disponivel_abastecedor && t.encomenda(pr.prazo_abastecimento)}
-            {semEstoque && t.semEstoque}
+            {semEstoque && t.itemEncomenda}
           </div>
         )}
         {pr?.ultima_compra && <div className="estoque">{t.comprouEm(data(pr.ultima_compra))}</div>}
-        <Quantidade item={item} rotulo={cliente ? t.adicionarPedido : t.adicionar} />
+        <Quantidade item={item} rotulo={semEstoque ? t.pedirEncomenda : cliente ? t.adicionarPedido : t.adicionar} />
       </div>
     </article>
   );
 }
 
-function itemCarrinho(p: Produto) {
+/** Sem estoque em lugar nenhum: aparece "Esgotado" e o botão vira "Pedir por encomenda". */
+function esgotado(p: Produto, cliente: boolean): boolean {
+  if (cliente && p.p) return p.p.disponibilidade === "indisponivel" && !p.p.disponivel_abastecedor;
+  return !p.tem_estoque;
+}
+
+function itemCarrinho(p: Produto, encomenda = false) {
   const pr = p.p;
   return { id: p.produto_id, nome: p.nome, marca: p.marcaNome, preco: pr ? Number(pr.preco) : null,
-           limite: pr?.limite_qtd ? Number(pr.limite_qtd) : null, caixa: p.unidades_caixa };
+           limite: pr?.limite_qtd ? Number(pr.limite_qtd) : null, caixa: p.unidades_caixa, encomenda };
 }
 
 /** Preço principal = caixa fechada (unidade × peças); embaixo, o preço da unidade. */
@@ -331,10 +338,11 @@ function LinhaCatalogo({ p, moeda, cliente, t }: { p: Produto; moeda: Moeda; cli
           {[p.marcaNome, t.linhas[p.linha], p.unidades_caixa ? t.caixaCom(p.unidades_caixa) : null].filter(Boolean).join(" · ")}
           {promo && <span className="etiqueta-mini promo">−{Number(promo)}%</span>}
           {p.novidade && !promo && <span className="etiqueta-mini">{t.novo}</span>}
+          {esgotado(p, cliente) && <span className="etiqueta-mini esgotado">{t.esgotado}</span>}
         </div>
       </div>
       <div className="linha-preco"><Precos p={p} moeda={moeda} cliente={cliente} t={t} /></div>
-      <div className="linha-qtd"><Quantidade item={itemCarrinho(p)} rotulo={t.adicionar} /></div>
+      <div className="linha-qtd"><Quantidade item={itemCarrinho(p, esgotado(p, cliente))} rotulo={esgotado(p, cliente) ? t.pedirEncomenda : t.adicionar} /></div>
     </article>
   );
 }

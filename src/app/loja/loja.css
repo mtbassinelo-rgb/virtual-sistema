@@ -386,3 +386,35 @@
   .area-cliente > summary { padding: 8px; font-size: .88rem; }
   .area-cliente .menu-painel { position: absolute; left: auto; right: 0; top: calc(100% + 6px); }
 }
+
+/* Produto esgotado: etiqueta e pedido por encomenda */
+.etiqueta-esgotado { position: absolute; top: 12px; right: 12px; border-radius: 999px; padding: 3px 10px; font-weight: 700; font-size: .75rem;
+  font-family: var(--titulo); background: #2a0e36; color: #fff; }
+.compacta .etiqueta-esgotado { top: 8px; right: 8px; font-size: .7rem; padding: 2px 8px; }
+.etiqueta-mini.esgotado { background: #2a0e36; color: #fff; }
+.g-encomenda { font-size: .76rem; font-weight: 600; color: #8a4b00; }
+
+/* ---------- Minha área (cliente) ---------- */
+.area-cli { gap: 16px; }
+.area-topo { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; background: linear-gradient(135deg, var(--roxo-escuro), var(--roxo)); color: #fff; border-radius: var(--raio-g); padding: 22px; }
+.area-topo h1 { color: #fff; margin: 4px 0; font-size: clamp(1.3rem, 3vw, 1.8rem); }
+.area-topo .suave { color: rgba(255,255,255,.8); }
+.area-vendedora { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.botao-zap { margin-top: 6px; background: var(--verde); color: var(--verde-tinta); font-weight: 700; text-decoration: none; border-radius: 999px; padding: 8px 14px; font-size: .9rem; }
+.area-numeros { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.area-numeros div { background: var(--papel); border: 1px solid var(--linha-l); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 4px; }
+.area-numeros span { font-size: .8rem; color: var(--apagado); }
+.area-numeros b { font-family: var(--titulo); font-size: 1.15rem; color: var(--roxo-tinta); font-variant-numeric: tabular-nums; }
+.area-bloco { background: var(--papel); border: 1px solid var(--linha-l); border-radius: var(--raio-g); padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.area-bloco h2 { margin: 0; font-size: 1.1rem; color: var(--roxo-tinta); }
+.area-barra { height: 10px; border-radius: 999px; background: var(--roxo-suave); overflow: hidden; }
+.area-barra span { display: block; height: 100%; background: var(--verde); }
+.area-pedidos, .area-top { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.area-pedidos li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--linha-l); }
+.area-pedidos li:last-child, .area-top li:last-child { border-bottom: 0; }
+.area-ped-dir { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+.area-top li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--linha-l); font-size: .92rem; }
+@media (max-width: 720px) { .area-numeros { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.area-cli .selo { display: inline-flex; font-size: .72rem; font-weight: 700; padding: 2px 9px; border-radius: 999px; background: #eee; color: #555; white-space: nowrap; }
+.area-cli .selo.ok { background: #e3f7e8; color: #0b5d2a; } .area-cli .selo.aviso { background: #fff3d6; color: #7a4a00; }
+.area-cli .selo.info { background: #e3eefb; color: #0b3d7a; } .area-cli .selo.marca { background: var(--roxo-suave); color: var(--roxo); }

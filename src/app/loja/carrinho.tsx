@@ -5,7 +5,7 @@ import { enviarCarrinho, type RespostaCarrinho } from "./acoes";
 import type { TextosCarrinho } from "@/lib/idioma";
 
 /** qtd = caixas fechadas quando o produto tem "caixa" (peças por caixa); senão, unidades. preco = por unidade. */
-export type ItemCarrinho = { id: string; nome: string; marca: string | null; preco: number | null; qtd: number; limite?: number | null; caixa?: number | null };
+export type ItemCarrinho = { id: string; nome: string; marca: string | null; preco: number | null; qtd: number; limite?: number | null; caixa?: number | null; encomenda?: boolean };
 export type ClienteCarrinho = { nome: string; vendedora: string; moeda: "GS" | "BRL" } | null;
 
 type Ctx = {
@@ -115,7 +115,7 @@ function Gaveta({ cliente }: { cliente: ClienteCarrinho }) {
   const un = (i: ItemCarrinho) => i.qtd * (i.caixa || 1);
   const total = cliente ? itens.reduce((s, i) => s + (i.preco ?? 0) * un(i), 0) : 0;
   const semPreco = cliente ? itens.filter((i) => i.preco == null).length : 0;
-  const payload = JSON.stringify(itens.map((i) => ({ produto_id: i.id, quantidade: un(i), caixas: i.caixa ? i.qtd : null })));
+  const payload = JSON.stringify(itens.map((i) => ({ produto_id: i.id, quantidade: un(i), caixas: i.caixa ? i.qtd : null, encomenda: !!i.encomenda })));
 
   return (
     <div className={`gaveta ${aberto ? "aberta" : ""}`} aria-hidden={!aberto}>
@@ -135,6 +135,7 @@ function Gaveta({ cliente }: { cliente: ClienteCarrinho }) {
                 <li key={i.id}>
                   <div>
                     <div className="g-nome">{i.nome}</div>
+                    {i.encomenda && <div className="g-encomenda">{t.itemEncomenda}</div>}
                     {i.caixa ? <div className="g-caixa">{t.caixas.replace("9999", String(i.qtd))} · {un(i)} {t.un}</div> : null}
                     {cliente && <div className="g-preco">{i.preco != null ? fmt(i.preco * un(i), cliente.moeda) : t.precoConfirmar}</div>}
                   </div>

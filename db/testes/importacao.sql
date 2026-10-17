@@ -253,4 +253,18 @@ select teste.ok((app.produtos_em_lote(array[(select produto_id from app.pedido_i
 select teste.como(:'KEILA');
 select teste.falha(format($$select app.produtos_em_lote(array[%L]::uuid[], 'inativar')$$, (select produto_id from app.pedido_itens limit 1)), 'Só gerente ou dono', 'Vendedora não altera em lote');
 reset role;
+\echo '== Pedido por encomenda =='
+select id as cli_enc from app.clientes where id in (select cliente_id from app.portal_sessoes) limit 1 \gset
+select token_hash as ses_enc from app.portal_sessoes where cliente_id = :'cli_enc' and expira_em > now() limit 1 \gset
+set role vc_app;
+select teste.como(:'GERENTE');
+select app.salvar_produto(null, 'ENC-01', 'Produto Esgotado', 'Soul', 'UN', null, 1, true) as prod_enc \gset
+select app.importar_precos('[{"codigo":"ENC-01","tabela":"py_normal","valor":10000},{"codigo":"ENC-01","tabela":"py_vip","valor":9000},{"codigo":"ENC-01","tabela":"br_normal","valor":10},{"codigo":"ENC-01","tabela":"br_vip","valor":9}]'::jsonb);
+reset role;
+set role vc_app;
+select teste.como('');
+select teste.falha(format($$select app.portal_criar_pedido(%L, '[{"produto_id":"%s","quantidade":12}]')$$, :'ses_enc', :'prod_enc'), 'maior que a disponível', 'Sem marcar encomenda, produto esgotado é recusado');
+select app.portal_criar_pedido(:'ses_enc', format('[{"produto_id":"%s","quantidade":12,"encomenda":true}]', :'prod_enc')::jsonb) as ped_enc \gset
+reset role;
+select teste.ok((select descricao from app.pedido_itens where pedido_id = :'ped_enc') like '%ENCOMENDA%', 'Produto esgotado entra como ENCOMENDA no pedido');
 \echo 'Testes de importação passaram.'
