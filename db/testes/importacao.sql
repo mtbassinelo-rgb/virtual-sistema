@@ -192,4 +192,25 @@ select teste.como(:'KEILA');
 select teste.ok((select count(*) from app.fotos_catalogo) = 0, 'Vendedora não vê as fotos do catálogo');
 select teste.falha($$select app.decidir_foto_catalogo('p05-02', 'reabrir', null)$$, 'Só gerente ou dono', 'Vendedora não decide as fotos');
 reset role;
+\echo '== Minha conta e equipe =='
+\set DONO '00000000-0000-0000-0000-000000000001'
+set role vc_app;
+select teste.como(:'GERENTE');
+select teste.ok(app.convidar_pessoa('Nova.Pessoa@Loja.com', 'Nova Pessoa', 'consulta', null, repeat('a',64), 48) is not null, 'Gerente cadastra pessoa com link');
+select teste.ok((select tem_senha = false and link_pendente is not null from app.equipe() where email = 'nova.pessoa@loja.com'), 'Equipe mostra link pendente, sem senha');
+select teste.falha($$select app.convidar_pessoa('outro@dono.com', 'Outro Dono', 'dono', null, repeat('b',64), 48)$$, 'Só o dono', 'Gerente não cria dono');
+select teste.falha(format($$select app.gerar_link_senha(%L, %L, 48)$$, :'DONO', repeat('c',64)), 'Só o dono', 'Gerente não gera link para o dono');
+select teste.falha(format($$select app.ativar_pessoa(%L, false)$$, :'GERENTE'), 'próprio acesso', 'Ninguém desativa a si mesmo');
+select app.gerar_link_senha((select id from app.equipe() where email = 'nova.pessoa@loja.com'), repeat('d',64), 24);
+select teste.ok((select count(*) from app.convite_usuario(repeat('a',64))) = 0 and (select count(*) from app.convite_usuario(repeat('d',64))) = 1, 'Só o link mais recente vale');
+select app.trocar_minha_senha(repeat('h',40), 'sessao-atual');
+select teste.falha($$select app.trocar_minha_senha('curta', null)$$, 'Senha inválida', 'Hash de senha inválido é recusado');
+select teste.como(:'KEILA');
+select teste.falha($$select * from app.equipe()$$, 'Só gerente ou dono', 'Vendedora não vê a equipe');
+select app.trocar_minha_senha(repeat('k',40), null);
+select teste.como(:'DONO');
+select app.ativar_pessoa((select id from app.equipe() where email = 'nova.pessoa@loja.com'), false);
+select teste.ok((select count(*) from app.convite_usuario(repeat('d',64))) = 0, 'Pessoa desativada perde o link');
+reset role;
+select teste.ok((select senha_hash from app.usuarios where id = :'KEILA') = repeat('k',40), 'Vendedora troca a própria senha');
 \echo 'Testes de importação passaram.'

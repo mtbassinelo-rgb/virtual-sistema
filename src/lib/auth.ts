@@ -69,3 +69,22 @@ export async function sair(): Promise<void> {
 
 export const ehGestao = (u: Usuario) => u.perfil === "dono" || u.perfil === "gerente";
 export const podeEscrever = (u: Usuario) => u.perfil !== "consulta";
+
+/** Hash da sessão aberta neste navegador (para manter esta sessão ao trocar a senha). */
+export async function hashSessaoAtual(): Promise<string | null> {
+  const token = (await cookies()).get(COOKIE)?.value;
+  return token ? sha256(token) : null;
+}
+
+/** Confere a senha de quem está logado (conta como tentativa: 5 erros bloqueiam por 15 minutos). */
+export async function conferirSenha(email: string, senha: string): Promise<string | null> {
+  const { rows } = await pool.query("select senha_hash, bloqueado from app.dados_login($1)", [email]);
+  const u = rows[0] as { senha_hash: string | null; bloqueado: boolean } | undefined;
+  if (u?.bloqueado) return "Muitas tentativas erradas. Aguarde 15 minutos e tente de novo.";
+  let ok = false;
+  if (u?.senha_hash) {
+    try { ok = await verify(u.senha_hash, senha); } catch { ok = false; }
+  }
+  await pool.query("select app.registrar_tentativa($1, $2)", [email, ok]);
+  return ok ? null : "A senha atual não confere.";
+}

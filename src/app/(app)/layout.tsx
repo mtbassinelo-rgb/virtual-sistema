@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { exigirUsuario, sair } from "@/lib/auth";
+import { ehGestao, exigirUsuario, sair } from "@/lib/auth";
 import { PERFIS } from "@/lib/formato";
 
 async function acaoSair() {
@@ -28,11 +28,12 @@ export default async function AreaInterna({ children }: { children: React.ReactN
             <Link href="/estoque">Estoque</Link>
             <Link href="/promocoes">Promoções</Link>
             <Link href="/site">Site</Link>
+            {ehGestao(u) && <Link href="/equipe">Equipe</Link>}
           </nav>
           <div className="quem">
-            <span>
+            <Link href="/conta" title="Minha conta: trocar senha">
               {u.nome} · {PERFIS[u.perfil]}
-            </span>
+            </Link>
             <form action={acaoSair}>
               <button type="submit">Sair</button>
             </form>
