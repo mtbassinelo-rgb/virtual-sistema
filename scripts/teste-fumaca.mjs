@@ -87,6 +87,8 @@ await db.query(
   `insert into app.portal_convites (token_hash, cliente_id, expira_em)
    select $1, id, now() + interval '1 day' from app.clientes where nome = 'Salão Exemplo da Loja'`,
   [createHash("sha256").update(convite).digest("hex")]);
+const previa = await fetch(`${base}/loja/entrar/${convite}`, { redirect: "manual", headers: { "user-agent": "WhatsApp/2.23.20.0 A" } });
+ok(previa.status === 200 && !(previa.headers.get("set-cookie") ?? "").includes("vc_cliente"), "Pré-visualização do WhatsApp não gasta o link");
 const entrada = await fetch(`${base}/loja/entrar/${convite}`, { redirect: "manual" });
 const cookieCliente = (entrada.headers.get("set-cookie") ?? "").split(";")[0];
 ok(entrada.status === 303 && cookieCliente.startsWith("vc_cliente="), "Link de acesso abre a sessão do cliente");
@@ -97,6 +99,11 @@ ok(cat.status === 200 && cat.html.includes("Kit Platinum") && cat.html.includes(
 ok(cat.html.includes("Sob encomenda"), "Cliente da loja vê os produtos sob encomenda (vêm do CD)");
 ok(cat.html.includes("wa.me/"), "Área do cliente mostra o WhatsApp da empresa");
 ok((await abrir("/loja/acesso")).html.includes("wa.me/5545999972092"), "Sem login, o site mostra o WhatsApp principal (Brasil)");
+ok((await abrir("/loja/acesso")).html.includes("CPF, CNPJ, CI ou RUC"), "Tela de acesso pede documento e senha");
+ok([302, 303, 307, 308].includes((await abrir("/loja/conta")).status), "Minha conta do cliente exige login");
+ok((await abrir("/loja/conta", cookieCliente)).status === 200, "Cliente logado abre Minha conta");
+ok((await abrir("/conta", await sessao("keila@teste.local"))).html.includes("Trocar senha"), "Equipe abre Minha conta");
+ok((await abrir("/equipe", await sessao("gerente@teste.local"))).html.includes("Adicionar pessoa"), "Gerente abre a tela Equipe");
 const meus = await abrir("/loja/pedidos", cookieCliente);
 ok(meus.status === 200, "Meus pedidos abre");
 

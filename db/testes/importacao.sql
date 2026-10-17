@@ -213,4 +213,30 @@ select app.ativar_pessoa((select id from app.equipe() where email = 'nova.pessoa
 select teste.ok((select count(*) from app.convite_usuario(repeat('d',64))) = 0, 'Pessoa desativada perde o link');
 reset role;
 select teste.ok((select senha_hash from app.usuarios where id = :'KEILA') = repeat('k',40), 'Vendedora troca a própria senha');
+\echo '== Login do cliente por documento =='
+select c.id as cli1 from app.clientes c join app.vendedoras v on v.id = c.vendedora_id where v.nome = 'Keila' and c.mesclado_em is null order by c.criado_em limit 1 \gset
+select c.id as cli2 from app.clientes c where c.id <> :'cli1' and c.mesclado_em is null order by c.criado_em limit 1 \gset
+set role vc_app;
+select teste.como(:'KEILA');
+select teste.ok(app.definir_acesso_cliente(:'cli1', '4.567.890-1', repeat('s',40)) = '45678901', 'Vendedora cria acesso com CI (pontuação ignorada)');
+select teste.ok((select count(*) from app.portal_dados_login('4567890-1')) = 1, 'Login acha o cliente pelo documento em qualquer formato');
+select teste.como(:'GERENTE');
+select teste.falha(format($$select app.definir_acesso_cliente(%L, '45678901', %L)$$, :'cli2', repeat('t',40)), 'outro cliente', 'Mesmo documento não vale para dois clientes');
+select teste.falha(format($$select app.definir_acesso_cliente(%L, '12', %L)$$, :'cli2', repeat('t',40)), 'Informe o CI', 'Documento curto é recusado');
+select teste.como('');
+select app.portal_registrar_tentativa('45678901', false) from generate_series(1,5);
+select teste.ok((select bloqueado from app.portal_dados_login('45678901')), '5 senhas erradas bloqueiam o documento');
+select app.portal_abrir_sessao(:'cli1', 'sessao-cli-1');
+select app.portal_abrir_sessao(:'cli1', 'sessao-cli-2');
+select teste.ok(app.portal_documento('sessao-cli-1') = '4.567.890-1', 'Cliente logado vê o próprio documento');
+select app.portal_trocar_senha('sessao-cli-1', repeat('n',40));
+select teste.ok(app.portal_cliente_id('sessao-cli-2') is null and app.portal_cliente_id('sessao-cli-1') = :'cli1', 'Trocar senha derruba as outras sessões');
+select teste.falha($$select app.portal_trocar_senha('sessao-que-nao-existe', repeat('n',40))$$, 'Entre na área', 'Sem sessão não troca senha');
+reset role;
+select teste.ok((select senha_hash from app.portal_acessos where cliente_id = :'cli1') = repeat('n',40), 'Senha do cliente trocada');
+set role vc_app;
+select teste.como(:'GERENTE');
+select app.bloquear_portal(:'cli1');
+select teste.ok((select count(*) from app.portal_dados_login('45678901')) = 0, 'Bloquear acesso impede o login');
+reset role;
 \echo 'Testes de importação passaram.'

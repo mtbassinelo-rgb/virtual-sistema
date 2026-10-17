@@ -7,7 +7,8 @@ import {
   type Moeda,
 } from "@/lib/formato";
 import { Avisos, Barra, Selo } from "../../avisos";
-import { atendimentoCliente, bloquearCliente, convidarCliente, depositoCliente, salvarCliente } from "../acoes";
+import { atendimentoCliente, bloquearCliente, depositoCliente, salvarCliente } from "../acoes";
+import { AcessoCliente } from "./acesso-cliente";
 
 export const metadata = { title: "Cliente" };
 
@@ -31,6 +32,7 @@ export default async function Cliente({ params, searchParams }: {
       metas: (await c.query("select * from app.v_metas where cliente_id = $1 order by inicio desc", [id])).rows,
       depositos: (await c.query("select id, nome from app.depositos where ativo order by nome")).rows,
       depositoAtual: (await c.query("select d.nome from app.depositos d where d.id = app.deposito_do_cliente($1)", [id])).rows[0]?.nome ?? null,
+      temAcesso: Boolean((await c.query("select 1 from app.portal_dados_login(coalesce((select documento from app.clientes where id = $1), '-'))", [id])).rowCount),
       atendimentos: (await c.query(
         `select a.*, u.nome as usuario_nome from app.atendimentos a left join app.usuarios u on u.id = a.usuario_id
           where a.cliente_id = $1 order by a.em desc limit 50`, [id])).rows,
@@ -48,11 +50,6 @@ export default async function Cliente({ params, searchParams }: {
     : `Olá ${cli.nome}! Aqui é a ${cli.vendedora}, da Virtual Cosméticos. Tudo bem?`;
   const whats = linkWhatsApp(cli.whatsapp ?? cli.telefone, msg);
   const ro = !podeEscrever(u);
-  const msgConvite = avisos.convite
-    ? `Olá ${cli.nome}! Aqui é a ${cli.vendedora}, da Virtual Cosméticos. Agora você pode ver o catálogo com os seus preços e fazer pedidos por este link (é pessoal, não compartilhe): ${avisos.convite}`
-    : null;
-  const whatsConvite = msgConvite ? linkWhatsApp(cli.whatsapp ?? cli.telefone, msgConvite) : null;
-
   return (
     <>
       <section className="linha entre">
@@ -72,16 +69,6 @@ export default async function Cliente({ params, searchParams }: {
         </div>
       </section>
       <Avisos ok={avisos.ok} erro={avisos.erro} />
-      {avisos.convite && (
-        <div className="aviso-caixa ok">
-          <div><b>Link de acesso criado.</b> Vale por 7 dias e só pode ser usado uma vez. Envie para o cliente:</div>
-          <div className="linha" style={{ marginTop: 8 }}>
-            {whatsConvite && <a className="botao whatsapp" href={whatsConvite} target="_blank" rel="noopener noreferrer">Enviar pelo WhatsApp</a>}
-            <input readOnly value={avisos.convite} aria-label="Link de acesso" style={{ flex: 1, minWidth: 220 }} />
-          </div>
-        </div>
-      )}
-
       <div className="indicadores">
         <div className="indicador"><span className="rotulo">Total comprado</span><span className="valor num">{dinheiro(total, moeda)}</span></div>
         <div className="indicador"><span className="rotulo">Pedidos</span><span className="valor">{ativos.length}</span></div>
@@ -168,13 +155,13 @@ export default async function Cliente({ params, searchParams }: {
         <section className="painel">
           <h2>Área do cliente (atacado)</h2>
           <p className="pequeno suave">
-            {cli.portal_ativo ? "O cliente pode entrar pelo link enviado pela vendedora." : "Acesso bloqueado."} Estoque que ele vê: {d.depositoAtual ?? "—"}
+            {!cli.portal_ativo ? "Acesso bloqueado." : d.temAcesso ? <>O cliente entra em <b>distribuidoravirtualcosmeticos.com/loja</b> com o documento e a senha.</> : "Ainda sem acesso: informe o documento e crie o acesso."} Estoque que ele vê: {d.depositoAtual ?? "—"}
             {d.depositoAtual === "Loja Ciudad del Este" ? " (pode pedir do CD de Foz, 1 a 3 dias)" : ""}.
           </p>
+          {!ro && <AcessoCliente clienteId={cli.id} documento={cli.documento ?? null} temAcesso={d.temAcesso} />}
           {!ro && (
             <div className="linha">
-              <form action={convidarCliente}><input type="hidden" name="cliente_id" value={cli.id} /><button className="principal">Gerar link de acesso</button></form>
-              {cli.portal_ativo && <form action={bloquearCliente}><input type="hidden" name="cliente_id" value={cli.id} /><button className="perigo">Bloquear acesso</button></form>}
+              {cli.portal_ativo && d.temAcesso && <form action={bloquearCliente}><input type="hidden" name="cliente_id" value={cli.id} /><button className="perigo">Bloquear acesso</button></form>}
             </div>
           )}
           {ehGestao(u) && (

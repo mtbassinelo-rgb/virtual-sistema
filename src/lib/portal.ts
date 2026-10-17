@@ -38,3 +38,25 @@ export function urlPortal(host: string | null, proto: string | null): string {
   if (process.env.PORTAL_URL) return process.env.PORTAL_URL.replace(/\/$/, "");
   return `${proto ?? "https"}://${host ?? "localhost:3000"}`;
 }
+
+/** Abre a sessão do cliente neste navegador (cookie só para /loja). */
+export async function abrirSessaoCliente(clienteId: string): Promise<void> {
+  const sessao = novoToken();
+  await pool.query("select app.portal_abrir_sessao($1, $2)", [clienteId, sha256(sessao)]);
+  (await cookies()).set(COOKIE_CLIENTE, sessao, {
+    httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/loja", maxAge: 90 * 86400,
+  });
+}
+
+/** Confere documento + senha do cliente. Devolve o id do cliente ou a mensagem de erro. */
+export async function conferirCliente(documento: string, senha: string, es: boolean): Promise<{ id?: string; erro?: string }> {
+  const { verify } = await import("@node-rs/argon2");
+  const { rows } = await pool.query("select cliente_id, senha_hash, bloqueado from app.portal_dados_login($1)", [documento]);
+  const r = rows[0] as { cliente_id: string; senha_hash: string; bloqueado: boolean } | undefined;
+  if (r?.bloqueado) return { erro: es ? "Demasiados intentos. Espere 15 minutos e intente de nuevo." : "Muitas tentativas erradas. Aguarde 15 minutos e tente de novo." };
+  let ok = false;
+  if (r?.senha_hash) { try { ok = await verify(r.senha_hash, senha); } catch { ok = false; } }
+  await pool.query("select app.portal_registrar_tentativa($1, $2)", [documento, ok]);
+  if (!r || !ok) return { erro: es ? "Documento o contraseña incorrectos." : "Documento ou senha incorretos." };
+  return { id: r.cliente_id };
+}

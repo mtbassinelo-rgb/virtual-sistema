@@ -114,3 +114,35 @@ export async function depositoCliente(fd: FormData) {
   revalidatePath(`/clientes/${id}`);
   redirect(`/clientes/${id}?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Depósito do cliente atualizado.")}`);
 }
+
+export type RespostaAcesso = { erro?: string; login?: string; senha?: string; mensagem?: string; whatsapp?: string | null };
+
+/** Cria (ou refaz) o acesso do cliente: documento + senha de 6 números sorteada, mostrada uma única vez. */
+export async function criarAcessoCliente(_: RespostaAcesso, fd: FormData): Promise<RespostaAcesso> {
+  const u = await exigirUsuario();
+  const id = texto(fd, "cliente_id");
+  const documento = texto(fd, "documento");
+  try {
+    const { randomInt } = await import("node:crypto");
+    const { hash } = await import("@node-rs/argon2");
+    const { headers } = await import("next/headers");
+    const { urlPortal } = await import("@/lib/portal");
+    const senha = String(randomInt(0, 1_000_000)).padStart(6, "0");
+    const senhaHash = await hash(senha, { memoryCost: 19456, timeCost: 2, parallelism: 1 });
+    const cli = await comUsuario(u.id, async (c) => {
+      await c.query("select app.definir_acesso_cliente($1, $2, $3)", [id, documento, senhaHash]);
+      return (await c.query(
+        "select c.nome, c.pais, c.whatsapp, c.telefone, v.nome as vendedora from app.clientes c join app.vendedoras v on v.id = c.vendedora_id where c.id = $1", [id])).rows[0];
+    });
+    const h = await headers();
+    const host = (h.get("x-forwarded-host") ?? h.get("host") ?? "").replace(/^app\.|^teste\./, "");
+    const site = `${urlPortal(host || null, h.get("x-forwarded-proto"))}/loja/acesso`;
+    const mensagem = cli.pais === "PY"
+      ? `¡Hola ${cli.nome}! Soy ${cli.vendedora}, de Virtual Cosméticos. Ya puede ver el catálogo con sus precios y hacer pedidos:\n${site}\nUsuario: ${documento}\nContraseña: ${senha}\nPuede cambiar la contraseña en "Mi cuenta".`
+      : `Olá ${cli.nome}! Aqui é a ${cli.vendedora}, da Virtual Cosméticos. Agora você pode ver o catálogo com os seus preços e fazer pedidos:\n${site}\nUsuário: ${documento}\nSenha: ${senha}\nVocê pode trocar a senha em "Minha conta".`;
+    revalidatePath(`/clientes/${id}`);
+    return { login: documento, senha, mensagem, whatsapp: cli.whatsapp ?? cli.telefone };
+  } catch (e) {
+    return { erro: mensagemErro(e) };
+  }
+}

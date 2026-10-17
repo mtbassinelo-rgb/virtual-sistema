@@ -74,7 +74,7 @@ export default async function LayoutLoja({ children }: { children: React.ReactNo
               { titulo: t.marcas, links: [...marcas.slice().sort((a, b) => b[1] - a[1]).slice(0, 12).map(([m, n]) => ({ href: `/loja?marca=${encodeURIComponent(m)}#catalogo`, texto: m, qtd: n })),
                 { href: "/loja/marcas", texto: t.verTodasMarcas }] },
               { titulo: c ? c.nome : t.clientes, links: c
-                ? [{ href: "/loja/pedidos", texto: t.meusPedidos }, { href: "/loja/sair", texto: t.sair }]
+                ? [{ href: "/loja/pedidos", texto: t.meusPedidos }, { href: "/loja/conta", texto: t.minhaConta }, { href: "/loja/sair", texto: t.sair }]
                 : [{ href: "/loja/cadastro", texto: t.querSerCliente }, { href: "/loja/acesso", texto: t.jaSouCliente }] },
               { linha: true, links: [{ href: `/loja/idioma?l=${t.idiomaCodigo}`, texto: t.idioma }, { href: INSTAGRAM, texto: "Instagram" }, { href: FACEBOOK, texto: "Facebook" }] },
             ]} />

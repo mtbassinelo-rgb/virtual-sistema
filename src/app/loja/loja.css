@@ -369,3 +369,12 @@
 .sobre-botao:hover { background: var(--roxo-escuro); border-color: var(--roxo-escuro); color: #fff; }
 @media (max-width: 860px) { .sobre-pilares { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 520px) { .sobre-pilares { grid-template-columns: 1fr; } .sobre-topo { padding: 32px 0 28px; } .sobre-numeros { gap: 18px; } .sobre-numeros dt { font-size: 1.5rem; } }
+
+/* ---------- Área do cliente: entrar / minha conta ---------- */
+.acesso-cliente { max-width: 460px; display: flex; flex-direction: column; gap: 14px; background: var(--papel); border: 1px solid var(--linha-l); border-radius: var(--raio-g); padding: 22px; }
+.acesso-form { display: grid; gap: 12px; }
+.acesso-form label { display: grid; gap: 6px; font-weight: 600; font-size: .9rem; color: var(--roxo-tinta); }
+.acesso-form input { font: inherit; padding: 11px 14px; border-radius: 12px; border: 1.5px solid var(--linha-l); background: #fff; }
+.acesso-form input:focus { outline: none; border-color: var(--roxo); }
+.acesso-form .adicionar { background: var(--roxo); color: #fff; padding: 11px 14px; }
+.aviso-ok { background: #e3f7e8; color: #0b5d2a; border-radius: var(--raio-p); padding: 10px 14px; }
