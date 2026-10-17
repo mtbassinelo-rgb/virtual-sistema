@@ -138,8 +138,8 @@ export async function criarAcessoCliente(_: RespostaAcesso, fd: FormData): Promi
     const host = (h.get("x-forwarded-host") ?? h.get("host") ?? "").replace(/^app\.|^teste\./, "");
     const site = `${urlPortal(host || null, h.get("x-forwarded-proto"))}/loja/acesso`;
     const mensagem = cli.pais === "PY"
-      ? `¡Hola ${cli.nome}! Soy ${cli.vendedora}, de Virtual Cosméticos. Ya puede ver el catálogo con sus precios y hacer pedidos:\n${site}\nUsuario: ${documento}\nContraseña: ${senha}\nPuede cambiar la contraseña en "Mi cuenta".`
-      : `Olá ${cli.nome}! Aqui é a ${cli.vendedora}, da Virtual Cosméticos. Agora você pode ver o catálogo com os seus preços e fazer pedidos:\n${site}\nUsuário: ${documento}\nSenha: ${senha}\nVocê pode trocar a senha em "Minha conta".`;
+      ? `¡Hola ${cli.nome}! Soy ${cli.vendedora}, de Virtual Cosméticos. Ya puede ver el catálogo con sus precios y hacer pedidos:\n${site}\nUsuario: ${documento}\nContraseña: ${senha}\nEs una contraseña provisoria: en el primer ingreso usted crea la suya.`
+      : `Olá ${cli.nome}! Aqui é a ${cli.vendedora}, da Virtual Cosméticos. Agora você pode ver o catálogo com os seus preços e fazer pedidos:\n${site}\nUsuário: ${documento}\nSenha: ${senha}\nÉ uma senha provisória: no primeiro acesso você cria a sua.`;
     revalidatePath(`/clientes/${id}`);
     return { login: documento, senha, mensagem, whatsapp: cli.whatsapp ?? cli.telefone };
   } catch (e) {

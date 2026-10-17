@@ -230,6 +230,11 @@ select teste.ok((select bloqueado from app.portal_dados_login('45678901')), '5 s
 select app.portal_abrir_sessao(:'cli1', 'sessao-cli-1');
 select app.portal_abrir_sessao(:'cli1', 'sessao-cli-2');
 select teste.ok(app.portal_documento('sessao-cli-1') = '4.567.890-1', 'Cliente logado vê o próprio documento');
+select teste.ok(app.portal_senha_provisoria('sessao-cli-1'), 'Senha enviada pela vendedora é provisória');
+select app.portal_criar_senha('sessao-cli-1', repeat('p',40));
+select teste.ok(not app.portal_senha_provisoria('sessao-cli-1'), 'Depois de criar a própria senha, deixa de ser provisória');
+select teste.falha($$select app.portal_criar_senha('sessao-cli-1', repeat('q',40))$$, 'já foi criada', 'Criar senha sem a atual só vale no primeiro acesso');
+select app.portal_abrir_sessao(:'cli1', 'sessao-cli-2');
 select app.portal_trocar_senha('sessao-cli-1', repeat('n',40));
 select teste.ok(app.portal_cliente_id('sessao-cli-2') is null and app.portal_cliente_id('sessao-cli-1') = :'cli1', 'Trocar senha derruba as outras sessões');
 select teste.falha($$select app.portal_trocar_senha('sessao-que-nao-existe', repeat('n',40))$$, 'Entre na área', 'Sem sessão não troca senha');

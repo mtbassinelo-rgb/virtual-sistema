@@ -75,6 +75,7 @@ async function trocar(fd: FormData) {
 
 export default async function MinhaArea({ searchParams }: { searchParams: Promise<{ ok?: string; erro?: string }> }) {
   const { cliente, sessao } = await exigirCliente();
+  if ((await pool.query("select app.portal_senha_provisoria($1) as p", [sessao])).rows[0]?.p) redirect("/loja/criar-senha");
   const f = await searchParams;
   const idioma = await idiomaAtual();
   const t = T[idioma];

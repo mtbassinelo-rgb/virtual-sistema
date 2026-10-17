@@ -25,7 +25,7 @@ export function AcessoCliente({ clienteId, documento, temAcesso }: { clienteId: 
       {r.senha && (
         <div className="aviso-caixa ok" role="status" style={{ display: "grid", gap: 8 }}>
           <div><b>Acesso pronto.</b> Usuário: <b>{r.login}</b> · Senha: <b className="num" style={{ letterSpacing: 2 }}>{r.senha}</b></div>
-          <div className="pequeno">A senha aparece só agora. Envie para o cliente; ele pode trocar depois em “Minha conta”. Não expira.</div>
+          <div className="pequeno">A senha aparece só agora. É provisória: no primeiro acesso o cliente cria a própria senha. Não expira.</div>
           <div className="linha">
             {zap && <a className="botao whatsapp" href={zap} target="_blank" rel="noopener noreferrer">Enviar pelo WhatsApp</a>}
             <button type="button" onClick={async () => { await navigator.clipboard.writeText(r.mensagem!); setCopiado(true); }}>
