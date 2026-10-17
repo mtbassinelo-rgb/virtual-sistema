@@ -162,3 +162,31 @@ export async function definirCredito(fd: FormData) {
   revalidatePath(`/clientes/${id}`);
   redirect(`/clientes/${id}?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Linha de crédito atualizada.")}`);
 }
+
+/** Vendedora sugere a linha de crédito; o gerente/dono decide. */
+export async function sugerirCredito(fd: FormData) {
+  const u = await exigirUsuario();
+  const id = texto(fd, "cliente_id");
+  const num = (k: string) => { const v = texto(fd, k).replace(/\./g, "").replace(",", "."); return v ? Number(v) : null; };
+  let erro: string | null = null;
+  try {
+    await comUsuario(u.id, (c) => c.query("select app.sugerir_credito_cliente($1, $2, $3, $4)", [id, num("limite"), num("prazo"), texto(fd, "obs")]));
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  revalidatePath(`/clientes/${id}`);
+  redirect(`/clientes/${id}?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Sugestão de crédito enviada para o gerente aprovar.")}`);
+}
+
+export async function recusarSugestaoCredito(fd: FormData) {
+  const u = await exigirUsuario();
+  const id = texto(fd, "cliente_id");
+  let erro: string | null = null;
+  try {
+    await comUsuario(u.id, (c) => c.query("select app.recusar_sugestao_credito($1)", [id]));
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  revalidatePath(`/clientes/${id}`);
+  redirect(`/clientes/${id}?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Sugestão de crédito recusada.")}`);
+}

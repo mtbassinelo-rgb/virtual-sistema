@@ -293,11 +293,15 @@ reset role;
 select c.id as cli_cred from app.clientes c join app.vendedoras v on v.id = c.vendedora_id where v.nome = 'Keila' and c.mesclado_em is null order by c.criado_em limit 1 \gset
 set role vc_app;
 select teste.como(:'KEILA');
+select teste.falha(format($$select app.definir_credito_cliente(%L, true, 5000000, 15)$$, :'cli_cred'), 'Só o gerente', 'Vendedora não libera crédito');
+select app.sugerir_credito_cliente(:'cli_cred', 5000000, 15, 'Cliente antigo, paga em dia');
+select teste.ok((select credito_sugestao_limite = 5000000 and not credito_habilitado from app.clientes where id = :'cli_cred'), 'Vendedora sugere crédito (ainda não liberado)');
+select teste.como(:'YESSICA');
+select teste.falha(format($$select app.sugerir_credito_cliente(%L, 1, 30, null)$$, :'cli_cred'), 'Sem permissão', 'Outra vendedora não sugere crédito para cliente que não é dela');
+select teste.como(:'GERENTE');
 select teste.falha(format($$select app.definir_credito_cliente(%L, true, null, 30)$$, :'cli_cred'), 'limite', 'Crédito exige limite');
 select app.definir_credito_cliente(:'cli_cred', true, 5000000, 15);
-select teste.ok((select credito_habilitado and limite_credito = 5000000 and prazo_credito_dias = 15 from app.clientes where id = :'cli_cred'), 'Vendedora libera linha de crédito do cliente dela');
-select teste.como(:'YESSICA');
-select teste.falha(format($$select app.definir_credito_cliente(%L, true, 1, 30)$$, :'cli_cred'), 'Sem permissão', 'Outra vendedora não mexe no crédito');
+select teste.ok((select credito_habilitado and limite_credito = 5000000 and prazo_credito_dias = 15 and credito_sugestao_limite is null from app.clientes where id = :'cli_cred'), 'Gerente libera o crédito e a sugestão é baixada');
 reset role;
 select app.portal_abrir_sessao(:'cli_cred', 'sessao-credito') where exists (select 1 from app.portal_acessos where cliente_id = :'cli_cred');
 update app.clientes set portal_ativo = true where id = :'cli_cred';

@@ -7,7 +7,7 @@ import {
   type Moeda,
 } from "@/lib/formato";
 import { Avisos, Barra, Selo } from "../../avisos";
-import { atendimentoCliente, bloquearCliente, definirCredito, depositoCliente, salvarCliente } from "../acoes";
+import { atendimentoCliente, bloquearCliente, definirCredito, depositoCliente, recusarSugestaoCredito, salvarCliente, sugerirCredito } from "../acoes";
 import { AcessoCliente } from "./acesso-cliente";
 
 export const metadata = { title: "Cliente" };
@@ -33,6 +33,7 @@ export default async function Cliente({ params, searchParams }: {
       depositos: (await c.query("select id, nome from app.depositos where ativo order by nome")).rows,
       depositoAtual: (await c.query("select d.nome from app.depositos d where d.id = app.deposito_do_cliente($1)", [id])).rows[0]?.nome ?? null,
       temAcesso: Boolean((await c.query("select 1 from app.portal_dados_login(coalesce((select documento from app.clientes where id = $1), '-'))", [id])).rowCount),
+      sugeriu: cli.credito_sugerido_por ? (await c.query("select nome from app.usuarios where id = $1", [cli.credito_sugerido_por])).rows[0]?.nome ?? null : null,
       credito: (await c.query(
         `select coalesce(sum(v.saldo) filter (where v.saldo > 0), 0) as aberto,
                 coalesce(sum(v.saldo) filter (where v.saldo > 0 and v.vencimento < current_date), 0) as vencido,
@@ -56,6 +57,7 @@ export default async function Cliente({ params, searchParams }: {
     : `Olá ${cli.nome}! Aqui é a ${cli.vendedora}, da Virtual Cosméticos. Tudo bem?`;
   const whats = linkWhatsApp(cli.whatsapp ?? cli.telefone, msg);
   const ro = !podeEscrever(u);
+  const gestao = ehGestao(u);
   return (
     <>
       <section className="linha entre">
@@ -186,7 +188,7 @@ export default async function Cliente({ params, searchParams }: {
         <section className="painel">
           <h2>Linha de crédito</h2>
           <p className="pequeno suave" style={{ margin: 0 }}>
-            Com crédito, o pedido fica a prazo ao confirmar o total (vencimento = hoje + prazo). O cliente acompanha na área dele quanto deve, o que pagou e os vencimentos. Pagamento só vale depois de aprovado pela gerência.
+            A vendedora sugere; só o gerente ou o dono libera. Com crédito, o pedido fica a prazo ao confirmar o total (vencimento = hoje + prazo) e o cliente acompanha na área dele o que deve, o que pagou e os vencimentos. Pagamento só vale depois de aprovado pela gerência.
           </p>
           <div className="linha pequeno">
             <span>Em aberto: <b className="num">{dinheiro(d.credito.aberto, moeda)}</b></span>
@@ -194,17 +196,47 @@ export default async function Cliente({ params, searchParams }: {
             {Number(d.credito.conferir) > 0 && <span>Pagamentos a aprovar: <b className="num">{dinheiro(d.credito.conferir, moeda)}</b></span>}
             {cli.credito_habilitado && cli.limite_credito != null && <span>Disponível: <b className="num">{dinheiro(Math.max(0, Number(cli.limite_credito) - Number(d.credito.aberto)), moeda)}</b></span>}
           </div>
-          <form action={definirCredito} className="campos">
-            <input type="hidden" name="cliente_id" value={cli.id} />
-            <fieldset disabled={ro} style={{ display: "contents" }}>
+          {cli.credito_habilitado
+            ? <p style={{ margin: 0 }}><Selo cor="ok">crédito liberado</Selo> Limite <b className="num">{dinheiro(cli.limite_credito, moeda)}</b> · prazo {cli.prazo_credito_dias} dias</p>
+            : <p style={{ margin: 0 }}><Selo>sem crédito</Selo> <span className="pequeno suave">O cliente não vê nada de crédito na área dele.</span></p>}
+          {cli.credito_sugestao_limite != null && (
+            <div className="aviso-caixa">
+              <b>Sugestão da vendedora</b>{d.sugeriu ? ` (${d.sugeriu}, ${dataHora(cli.credito_sugerido_em)})` : ""}: limite <b className="num">{dinheiro(cli.credito_sugestao_limite, moeda)}</b> · prazo {cli.credito_sugestao_prazo} dias
+              {cli.credito_sugestao_obs && <div className="pequeno">“{cli.credito_sugestao_obs}”</div>}
+              {gestao ? (
+                <div className="linha" style={{ marginTop: 8 }}>
+                  <form action={definirCredito}>
+                    <input type="hidden" name="cliente_id" value={cli.id} /><input type="hidden" name="credito" value="on" />
+                    <input type="hidden" name="limite" value={String(Number(cli.credito_sugestao_limite))} /><input type="hidden" name="prazo" value={cli.credito_sugestao_prazo} />
+                    <button className="principal">Aprovar sugestão</button>
+                  </form>
+                  <form action={recusarSugestaoCredito}><input type="hidden" name="cliente_id" value={cli.id} /><button>Recusar</button></form>
+                </div>
+              ) : <div className="pequeno suave">Aguardando o gerente aprovar.</div>}
+            </div>
+          )}
+          {gestao ? (
+            <form action={definirCredito} className="campos">
+              <input type="hidden" name="cliente_id" value={cli.id} />
               <label className="largo" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                 <input type="checkbox" name="credito" defaultChecked={cli.credito_habilitado} style={{ width: "auto" }} /> Crédito liberado
               </label>
               <label>Limite ({moeda === "GS" ? "Gs" : "R$"})<input name="limite" inputMode="decimal" defaultValue={cli.limite_credito != null ? String(Number(cli.limite_credito)) : ""} /></label>
               <label>Prazo (dias)<input name="prazo" inputMode="numeric" defaultValue={cli.prazo_credito_dias ?? 30} /></label>
-              <button>Salvar crédito</button>
-            </fieldset>
-          </form>
+              <button>Salvar crédito (gerência)</button>
+            </form>
+          ) : !ro && (
+            <details>
+              <summary>{cli.credito_habilitado ? "Sugerir mudança no crédito" : "Sugerir crédito para este cliente"}</summary>
+              <form action={sugerirCredito} className="campos" style={{ marginTop: 8 }}>
+                <input type="hidden" name="cliente_id" value={cli.id} />
+                <label>Limite sugerido ({moeda === "GS" ? "Gs" : "R$"})<input name="limite" inputMode="decimal" required /></label>
+                <label>Prazo (dias)<input name="prazo" inputMode="numeric" defaultValue={30} required /></label>
+                <label className="largo">Por quê? (opcional)<input name="obs" maxLength={500} placeholder="Ex.: cliente desde 2024, sempre pagou em dia" /></label>
+                <button className="principal">Enviar sugestão ao gerente</button>
+              </form>
+            </details>
+          )}
         </section>
         <section className="painel">
           <h2>Cadastro</h2>

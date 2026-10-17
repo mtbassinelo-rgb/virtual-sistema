@@ -62,7 +62,10 @@ export default async function Hoje() {
            and (app.pode_gerir() or s.pais = (select pais from app.vendedoras where id = app.minha_vendedora()))
          order by s.criado_em desc limit 30`)).rows;
     const cadastros = Number((await c.query("select count(*) n from app.cadastros_site where atendido_em is null")).rows[0].n);
-    return { cadastros, site, aConferir, metasPropostas, recusados, envioAtrasado, pagAtrasado, metasPerto, transferencias, portal, separar, confirmar, pendencias };
+    const sugestoesCredito = gestao ? (await c.query(`select c.id, c.nome, c.moeda, c.credito_sugestao_limite, c.credito_sugestao_prazo, u.nome as quem
+        from app.clientes c left join app.usuarios u on u.id = c.credito_sugerido_por
+       where c.credito_sugestao_limite is not null order by c.credito_sugerido_em`)).rows : [];
+    return { sugestoesCredito, cadastros, site, aConferir, metasPropostas, recusados, envioAtrasado, pagAtrasado, metasPerto, transferencias, portal, separar, confirmar, pendencias };
   });
 
   return (
@@ -166,6 +169,15 @@ export default async function Hoje() {
           <span>{d.pendencias} pendência(s) de estoque de pedidos de marketplace (falta de estoque ou código sem cadastro).</span>
           <Link href="/estoque#pendencias">Ver pendências</Link>
         </div>
+      )}
+
+      {gestao && d.sugestoesCredito.length > 0 && (
+        <section className="painel">
+          <h2>Crédito sugerido pelas vendedoras</h2>
+          <ul className="lista-simples">{d.sugestoesCredito.map((x) => (
+            <li key={x.id}><Link href={`/clientes/${x.id}`}>{x.nome}</Link>: limite {dinheiro(x.credito_sugestao_limite, x.moeda)} · {x.credito_sugestao_prazo} dias <span className="suave">({x.quem ?? "vendedora"})</span></li>))}
+          </ul>
+        </section>
       )}
 
       {gestao && (
