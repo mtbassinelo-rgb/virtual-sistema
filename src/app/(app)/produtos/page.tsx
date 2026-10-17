@@ -3,7 +3,7 @@ import { ehGestao, exigirUsuario } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
 import { dinheiro } from "@/lib/formato";
 import { Avisos, Selo } from "../avisos";
-import { produtosEmLote } from "./acoes";
+import { produtosEmLote, salvarCaixas } from "./acoes";
 import { BarraLote, MarcarTodos } from "./lote";
 
 export const metadata = { title: "Produtos" };
@@ -21,6 +21,7 @@ export default async function Produtos({ searchParams }: {
   if (f.q) { par.push(`%${f.q}%`); cond.push(`(p.nome ilike $${par.length} or p.codigo ilike $${par.length} or p.marca ilike $${par.length} or p.gtin = $${par.length})`); }
   if (f.filtro === "sem-foto") cond.push("p.foto is null and p.ativo");
   if (f.filtro === "sem-preco-gs") cond.push("p.ativo and x.py_normal is null");
+  if (f.filtro === "sem-caixa") cond.push("p.ativo and p.unidades_caixa is null");
   if (f.filtro === "inativos") cond.push("not p.ativo"); else if (f.filtro !== "todos") cond.push("p.ativo");
 
   const precos = ["py_normal", "py_vip", "br_normal", "br_vip"].map((t) =>
@@ -28,7 +29,7 @@ export default async function Produtos({ searchParams }: {
   const d = await comUsuario(u.id, async (c) => {
     const base = `from app.produtos p cross join lateral (select ${precos}) x where ${cond.join(" and ")}`;
     const total = Number((await c.query(`select count(*) n ${base}`, par)).rows[0].n);
-    const lista = (await c.query(`select p.id, p.codigo, p.nome, p.marca, p.foto, p.tipo, p.ativo, p.codigo_provisorio, x.* ${base}
+    const lista = (await c.query(`select p.id, p.codigo, p.nome, p.marca, p.foto, p.tipo, p.ativo, p.codigo_provisorio, p.unidades_caixa, x.* ${base}
       order by p.nome limit ${POR_PAGINA} offset ${(pagina - 1) * POR_PAGINA}`, par)).rows;
     const fotosPendentes = ehGestao(u) ? Number((await c.query("select count(*) n from app.fotos_catalogo where status = 'pendente'")).rows[0].n) : 0;
     return { total, lista, fotosPendentes };
@@ -62,6 +63,7 @@ export default async function Produtos({ searchParams }: {
             <option value="">Ativos</option>
             <option value="sem-foto">Sem foto</option>
             <option value="sem-preco-gs">Sem preço em Gs</option>
+            <option value="sem-caixa">Sem peças por caixa</option>
             <option value="inativos">Inativos</option>
             <option value="todos">Todos</option>
           </select>
@@ -71,12 +73,13 @@ export default async function Produtos({ searchParams }: {
 
       {gestao && (
         <>
+          <form id="caixas" action={salvarCaixas} hidden><input type="hidden" name="volta" value={url({ pagina: pagina > 1 ? pagina : undefined }).replace(/\?$/, "")} /></form>
           <form id="lote" action={produtosEmLote} hidden><input type="hidden" name="volta" value={url({ pagina: pagina > 1 ? pagina : undefined }).replace(/\?$/, "")} /></form>
           <BarraLote form="lote" />
         </>
       )}
       <div className="tabela"><table>
-        <thead><tr>{gestao && <th style={{ width: 32 }}><MarcarTodos form="lote" /></th>}<th></th><th>Código</th><th>Produto</th><th>PY Normal</th><th>PY VIP</th><th>BR Normal</th><th>BR VIP</th></tr></thead>
+        <thead><tr>{gestao && <th style={{ width: 32 }}><MarcarTodos form="lote" /></th>}<th></th><th>Código</th><th>Produto</th><th title="Peças por caixa: o site mostra o preço da caixa fechada e o da unidade">Caixa</th><th>PY Normal</th><th>PY VIP</th><th>BR Normal</th><th>BR VIP</th></tr></thead>
         <tbody>{d.lista.map((p) => (
           <tr key={p.id}>
             {gestao && <td><input type="checkbox" name="ids" value={p.id} form="lote" aria-label={`Selecionar ${p.nome}`} /></td>}
@@ -89,6 +92,11 @@ export default async function Produtos({ searchParams }: {
               <Link href={`/produtos/${p.id}`}>{p.nome}</Link>
               <div className="pequeno suave">{p.marca ?? ""} {p.tipo === "kit" && <Selo cor="info">kit</Selo>} {!p.ativo && <Selo>inativo</Selo>}</div>
             </td>
+            <td className="num" style={{ width: 80 }}>
+              {gestao
+                ? <input name={`caixa:${p.id}`} form="caixas" defaultValue={p.unidades_caixa ?? ""} inputMode="numeric" placeholder="—" aria-label={`Peças por caixa de ${p.nome}`} style={{ width: 64 }} />
+                : (p.unidades_caixa ?? "—")}
+            </td>
             <td className="num">{p.py_normal ? dinheiro(p.py_normal, "GS") : "—"}</td>
             <td className="num">{p.py_vip ? dinheiro(p.py_vip, "GS") : "—"}</td>
             <td className="num">{p.br_normal ? dinheiro(p.br_normal, "BRL") : "—"}</td>
@@ -96,6 +104,12 @@ export default async function Produtos({ searchParams }: {
           </tr>))}
         </tbody>
       </table></div>
+      {gestao && d.lista.length > 0 && (
+        <div className="linha">
+          <button form="caixas" className="principal">Salvar peças por caixa desta página</button>
+          <span className="pequeno suave">Digite quantas peças vêm na caixa (2, 12, 40…). Em branco = vende por unidade. O preço continua sendo o da unidade: o site calcula o da caixa.</span>
+        </div>
+      )}
       {paginas > 1 && (
         <div className="linha" style={{ justifyContent: "center" }}>
           {pagina > 1 && <a className="botao" href={url({ pagina: pagina - 1 })}>Anterior</a>}

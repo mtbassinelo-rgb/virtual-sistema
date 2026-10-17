@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 /** Barra de ações em lote: conta os marcados, marca/desmarca todos da página e confirma a exclusão. */
 export function BarraLote({ form }: { form: string }) {
   const [n, setN] = useState(0);
+  const [acao, setAcao] = useState("");
   useEffect(() => {
     const f = document.getElementById(form) as HTMLFormElement | null;
     const contar = () => setN(document.querySelectorAll<HTMLInputElement>(`input[name="ids"][form="${form}"]:checked`).length);
@@ -19,12 +20,14 @@ export function BarraLote({ form }: { form: string }) {
   return (
     <div className="painel linha lote-barra">
       <b>{n} selecionado(s)</b>
-      <select name="acao" form={form} defaultValue="" aria-label="Ação">
+      <select name="acao" form={form} value={acao} onChange={(e) => setAcao(e.target.value)} aria-label="Ação">
         <option value="" disabled>O que fazer…</option>
+        <option value="caixa">Definir peças por caixa</option>
         <option value="ativar">Ativar</option>
         <option value="inativar">Inativar</option>
         <option value="excluir">Excluir</option>
       </select>
+      {acao === "caixa" && <input name="unidades" form={form} inputMode="numeric" placeholder="Peças" aria-label="Peças por caixa" style={{ width: 90 }} required />}
       <button form={form} className="principal" disabled={n === 0}>Aplicar</button>
       <span className="pequeno suave">Inativo não aparece no site nem nos pedidos novos. Excluir só apaga quem nunca teve pedido ou estoque.</span>
     </div>

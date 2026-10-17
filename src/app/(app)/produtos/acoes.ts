@@ -85,8 +85,17 @@ export async function produtosEmLote(fd: FormData) {
   let q: string;
   try {
     if (!ehGestao(u)) throw new Error("Só gerente ou dono altera produtos em lote.");
-    if (!["ativar", "inativar", "excluir"].includes(acao)) throw new Error("Escolha o que fazer com os produtos selecionados.");
+    if (!["ativar", "inativar", "excluir", "caixa"].includes(acao)) throw new Error("Escolha o que fazer com os produtos selecionados.");
     if (ids.length === 0) throw new Error("Marque pelo menos um produto.");
+    if (acao === "caixa") {
+      const unidades = texto(fd, "unidades").replace(/\D/g, "");
+      if (!unidades) throw new Error("Informe quantas peças vêm na caixa.");
+      const n = await comUsuario(u.id, async (c) => {
+        const cods = (await c.query("select codigo from app.produtos where id = any($1::uuid[])", [ids])).rows.map((r) => ({ codigo: r.codigo, unidades }));
+        return Number((await c.query("select app.definir_caixas($1::jsonb) as n", [JSON.stringify(cods)])).rows[0].n);
+      });
+      q = "ok=" + encodeURIComponent(`Caixa com ${unidades} peça(s) definida em ${n} produto(s).`);
+    } else {
     const r = await comUsuario(u.id, async (c) => (await c.query("select app.produtos_em_lote($1::uuid[], $2) as r", [ids, acao])).rows[0].r as
       { ativados: number; inativados: number; excluidos: number; inativados_por_historico: number; fotos: string[] });
     for (const f of r.fotos) await rm(path.join(pastaFotos(), path.basename(f)), { force: true });
@@ -97,6 +106,34 @@ export async function produtosEmLote(fd: FormData) {
       r.inativados_por_historico && `${r.inativados_por_historico} não podia(m) ser excluído(s) porque já tem pedido ou movimento de estoque, então ficou(aram) inativo(s)`,
     ].filter(Boolean);
     q = "ok=" + encodeURIComponent(partes.length ? partes.join(" · ") + "." : "Nada mudou: os produtos já estavam assim.");
+    }
+  } catch (e) {
+    q = "erro=" + encodeURIComponent(mensagemErro(e));
+  }
+  revalidatePath("/produtos");
+  revalidatePath("/loja");
+  redirect(`${volta}${volta.includes("?") ? "&" : "?"}${q}`);
+}
+
+/** Salva as peças por caixa digitadas direto na lista de Produtos (uma página inteira de uma vez). */
+export async function salvarCaixas(fd: FormData) {
+  const u = await exigirUsuario();
+  const v = texto(fd, "volta");
+  const volta = /^\/produtos(\?[\w=&%.+-]*)?$/.test(v) ? v : "/produtos";
+  let q: string;
+  try {
+    if (!ehGestao(u)) throw new Error("Só gerente ou dono altera produtos.");
+    const pares: { id: string; unidades: string }[] = [];
+    for (const [k, val] of fd.entries()) {
+      const m = /^caixa:([0-9a-f-]{36})$/i.exec(k);
+      if (m) pares.push({ id: m[1], unidades: String(val).replace(/\D/g, "") });
+    }
+    const n = await comUsuario(u.id, async (c) => {
+      const cod = new Map((await c.query("select id::text, codigo from app.produtos where id = any($1::uuid[])", [pares.map((p) => p.id)])).rows.map((r) => [r.id, r.codigo]));
+      const linhas = pares.filter((p) => cod.has(p.id)).map((p) => ({ codigo: cod.get(p.id), unidades: p.unidades }));
+      return Number((await c.query("select app.definir_caixas($1::jsonb) as n", [JSON.stringify(linhas)])).rows[0].n);
+    });
+    q = "ok=" + encodeURIComponent(n ? `Peças por caixa salvas em ${n} produto(s).` : "Nada mudou.");
   } catch (e) {
     q = "erro=" + encodeURIComponent(mensagemErro(e));
   }
