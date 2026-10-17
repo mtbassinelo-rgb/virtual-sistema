@@ -28,7 +28,7 @@
 /* ---------- Topo ---------- */
 /* Topo + barra de Categorias/Marcas ficam fixos durante a rolagem */
 .fixo { position: sticky; top: 0; z-index: 20; box-shadow: 0 6px 18px -14px rgba(42,14,54,.35); }
-.topo { background: var(--papel); border-bottom: 1px solid var(--linha-l); }
+.topo { background: var(--papel); border-bottom: 1px solid var(--linha-l); position: relative; z-index: 16; }  /* acima da barra de Categorias/Marcas (menus do topo abrem por cima dela) */
 .topo-in { display: flex; align-items: center; gap: 18px; padding-block: 10px; }
 .marca { display: flex; align-items: center; gap: 10px; text-decoration: none; flex-shrink: 0; }
 .marca img { display: block; border-radius: 9px; }
