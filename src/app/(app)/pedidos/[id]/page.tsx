@@ -67,7 +67,7 @@ export default async function Pedido({ params, searchParams }: {
         where (a.tabela = 'pedidos' and a.registro_id = $1)
            or (a.tabela = 'pagamentos' and a.registro_id in (select id::text from app.pagamentos where pedido_id = $1::uuid))
         order by a.em desc limit 50`, [id])).rows;
-    return { p, cliente, itens, fluxo, transf, bling, pagamentos, comprovantes, atendimentos, depositos, historico };
+    return { p, cliente, itens, fluxo, transf, bling, pagamentos, comprovantes, atendimentos, depositos, historico, indisponiveis };
   });
   if (!d) notFound();
   const { p, cliente } = d;
