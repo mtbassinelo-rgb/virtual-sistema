@@ -7,7 +7,7 @@ import {
   type Moeda,
 } from "@/lib/formato";
 import { Avisos, Barra, Selo } from "../../avisos";
-import { atendimentoCliente, bloquearCliente, depositoCliente, salvarCliente } from "../acoes";
+import { atendimentoCliente, bloquearCliente, definirCredito, depositoCliente, salvarCliente } from "../acoes";
 import { AcessoCliente } from "./acesso-cliente";
 
 export const metadata = { title: "Cliente" };
@@ -33,6 +33,12 @@ export default async function Cliente({ params, searchParams }: {
       depositos: (await c.query("select id, nome from app.depositos where ativo order by nome")).rows,
       depositoAtual: (await c.query("select d.nome from app.depositos d where d.id = app.deposito_do_cliente($1)", [id])).rows[0]?.nome ?? null,
       temAcesso: Boolean((await c.query("select 1 from app.portal_dados_login(coalesce((select documento from app.clientes where id = $1), '-'))", [id])).rowCount),
+      credito: (await c.query(
+        `select coalesce(sum(v.saldo) filter (where v.saldo > 0), 0) as aberto,
+                coalesce(sum(v.saldo) filter (where v.saldo > 0 and v.vencimento < current_date), 0) as vencido,
+                coalesce(sum(v.a_conferir), 0) as conferir
+           from app.v_pedidos v join app.pedidos x on x.id = v.id
+          where v.cliente_id = $1 and v.status_comercial <> 'cancelado' and x.total_confirmado_em is not null`, [id])).rows[0],
       atendimentos: (await c.query(
         `select a.*, u.nome as usuario_nome from app.atendimentos a left join app.usuarios u on u.id = a.usuario_id
           where a.cliente_id = $1 order by a.em desc limit 50`, [id])).rows,
@@ -176,6 +182,29 @@ export default async function Cliente({ params, searchParams }: {
               <button>Salvar</button>
             </form>
           )}
+        </section>
+        <section className="painel">
+          <h2>Linha de crédito</h2>
+          <p className="pequeno suave" style={{ margin: 0 }}>
+            Com crédito, o pedido fica a prazo ao confirmar o total (vencimento = hoje + prazo). O cliente acompanha na área dele quanto deve, o que pagou e os vencimentos. Pagamento só vale depois de aprovado pela gerência.
+          </p>
+          <div className="linha pequeno">
+            <span>Em aberto: <b className="num">{dinheiro(d.credito.aberto, moeda)}</b></span>
+            {Number(d.credito.vencido) > 0 && <span style={{ color: "var(--erro)" }}>Vencido: <b className="num">{dinheiro(d.credito.vencido, moeda)}</b></span>}
+            {Number(d.credito.conferir) > 0 && <span>Pagamentos a aprovar: <b className="num">{dinheiro(d.credito.conferir, moeda)}</b></span>}
+            {cli.credito_habilitado && cli.limite_credito != null && <span>Disponível: <b className="num">{dinheiro(Math.max(0, Number(cli.limite_credito) - Number(d.credito.aberto)), moeda)}</b></span>}
+          </div>
+          <form action={definirCredito} className="campos">
+            <input type="hidden" name="cliente_id" value={cli.id} />
+            <fieldset disabled={ro} style={{ display: "contents" }}>
+              <label className="largo" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <input type="checkbox" name="credito" defaultChecked={cli.credito_habilitado} style={{ width: "auto" }} /> Crédito liberado
+              </label>
+              <label>Limite ({moeda === "GS" ? "Gs" : "R$"})<input name="limite" inputMode="decimal" defaultValue={cli.limite_credito != null ? String(Number(cli.limite_credito)) : ""} /></label>
+              <label>Prazo (dias)<input name="prazo" inputMode="numeric" defaultValue={cli.prazo_credito_dias ?? 30} /></label>
+              <button>Salvar crédito</button>
+            </fieldset>
+          </form>
         </section>
         <section className="painel">
           <h2>Cadastro</h2>

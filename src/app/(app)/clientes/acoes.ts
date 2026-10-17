@@ -146,3 +146,19 @@ export async function criarAcessoCliente(_: RespostaAcesso, fd: FormData): Promi
     return { erro: mensagemErro(e) };
   }
 }
+
+/** Linha de crédito do cliente (vendedora da carteira ou gerência). */
+export async function definirCredito(fd: FormData) {
+  const u = await exigirUsuario();
+  const id = texto(fd, "cliente_id");
+  const num = (k: string) => { const v = texto(fd, k).replace(/\./g, "").replace(",", "."); return v ? Number(v) : null; };
+  let erro: string | null = null;
+  try {
+    await comUsuario(u.id, (c) => c.query("select app.definir_credito_cliente($1, $2, $3, $4)",
+      [id, fd.get("credito") === "on", num("limite"), num("prazo")]));
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  revalidatePath(`/clientes/${id}`);
+  redirect(`/clientes/${id}?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Linha de crédito atualizada.")}`);
+}

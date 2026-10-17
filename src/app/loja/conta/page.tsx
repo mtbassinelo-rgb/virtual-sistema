@@ -15,7 +15,11 @@ const T = {
     total: "Total comprado", pedidos: "Pedidos", ultimo: "Última compra", saldo: "Saldo a pagar", meta: "Sua meta",
     metaTexto: (falta: string, fim: string, premio: string) => `Faltam ${falta} em compras até ${fim} para ganhar ${premio} em mercadorias.`,
     metaBatida: (premio: string) => `Meta batida! Você ganhou ${premio} em mercadorias.`,
-    historico: "Histórico de compras", acompanhar: "Acompanhe seu pedido", verTodos: "Ver todos os pedidos e pagamentos", nenhum: "Você ainda não fez pedidos por aqui.",
+    historico: "Histórico de compras", acompanhar: "Acompanhe seu pedido",
+    credito: "Minha linha de crédito", limite: "Limite", aberto: "Em aberto", disponivel: "Disponível", vencido: "Vencido", proximo: "Próximo vencimento",
+    prazo: (d: number) => `Prazo de ${d} dias para pagar cada pedido.`, conferencia: (v: string) => `${v} em pagamentos enviados aguardando aprovação do gerente.`,
+    extrato: "Extrato", data: "Data", descricao: "Descrição", valor: "Valor", situacao: "Situação", vence: "Vence",
+    sit: { pago: "Pago", vencido: "Vencido", em_aberto: "Em aberto", aprovado: "Aprovado", recusado: "Recusado", em_conferencia: "Aguardando aprovação" } as Record<string, string>, verTodos: "Ver todos os pedidos e pagamentos", nenhum: "Você ainda não fez pedidos por aqui.",
     maisComprados: "O que você mais compra", comprarNovo: "Ver catálogo", troca: "Trocar senha", atual: "Senha atual",
     nova: "Nova senha (mínimo 6 caracteres)", repetir: "Repita a nova senha", salvar: "Trocar senha", ok: "Senha trocada. Use a nova senha da próxima vez.",
     curta: "A nova senha precisa ter pelo menos 6 caracteres.", diferente: "As duas senhas novas não são iguais.", atualErrada: "A senha atual não confere.",
@@ -27,7 +31,11 @@ const T = {
     total: "Total comprado", pedidos: "Pedidos", ultimo: "Última compra", saldo: "Saldo a pagar", meta: "Su meta",
     metaTexto: (falta: string, fim: string, premio: string) => `Faltan ${falta} en compras hasta el ${fim} para ganar ${premio} en mercaderías.`,
     metaBatida: (premio: string) => `¡Meta cumplida! Ganó ${premio} en mercaderías.`,
-    historico: "Historial de compras", acompanhar: "Siga su pedido", verTodos: "Ver todos los pedidos y pagos", nenhum: "Todavía no hizo pedidos por aquí.",
+    historico: "Historial de compras", acompanhar: "Siga su pedido",
+    credito: "Mi línea de crédito", limite: "Límite", aberto: "Pendiente", disponivel: "Disponible", vencido: "Vencido", proximo: "Próximo vencimiento",
+    prazo: (d: number) => `Plazo de ${d} días para pagar cada pedido.`, conferencia: (v: string) => `${v} en pagos enviados esperando aprobación del gerente.`,
+    extrato: "Estado de cuenta", data: "Fecha", descricao: "Descripción", valor: "Monto", situacao: "Estado", vence: "Vence",
+    sit: { pago: "Pagado", vencido: "Vencido", em_aberto: "Pendiente", aprovado: "Aprobado", recusado: "Rechazado", em_conferencia: "Esperando aprobación" } as Record<string, string>, verTodos: "Ver todos los pedidos y pagos", nenhum: "Todavía no hizo pedidos por aquí.",
     maisComprados: "Lo que más compra", comprarNovo: "Ver catálogo", troca: "Cambiar contraseña", atual: "Contraseña actual",
     nova: "Nueva contraseña (mínimo 6 caracteres)", repetir: "Repita la nueva contraseña", salvar: "Cambiar contraseña", ok: "Contraseña cambiada. Use la nueva la próxima vez.",
     curta: "La nueva contraseña debe tener al menos 6 caracteres.", diferente: "Las dos contraseñas nuevas no son iguales.", atualErrada: "La contraseña actual no es correcta.",
@@ -39,6 +47,8 @@ const COR: Record<string, string> = { aguardando_retirada: "ok", aguardando_vend
 
 type Pedido = { id: string; data_pedido: string; bling_numero: string | null; valor_total: string; saldo: string; moeda: Moeda; etapa: string;
   total_confirmado: boolean; itens: { descricao: string; quantidade: number }[] } & PedidoAcomp;
+type Credito = { habilitado: boolean; limite: string | null; prazo_dias: number; moeda: Moeda; em_aberto: string; vencido: string; em_conferencia: string; disponivel: string; proximo_vencimento: string | null };
+type Extrato = { data: string; tipo: string; descricao: string; valor: string; situacao: string; vencimento: string | null; saldo: string | null };
 type Meta = { fim: string; moeda: Moeda; valor_meta: string; valor_premio: string; vendido: string; falta: string; percentual: string; meta_batida: boolean };
 
 async function trocar(fd: FormData) {
@@ -68,10 +78,12 @@ export default async function MinhaArea({ searchParams }: { searchParams: Promis
   const f = await searchParams;
   const idioma = await idiomaAtual();
   const t = T[idioma];
-  const [doc, pedidos, meta] = await Promise.all([
+  const [doc, pedidos, meta, credito, extrato] = await Promise.all([
     pool.query("select app.portal_documento($1) as d", [sessao]).then((r) => String(r.rows[0]?.d ?? "")),
     pool.query("select * from app.portal_pedidos($1)", [sessao]).then((r) => r.rows as Pedido[]),
     pool.query("select * from app.portal_meta($1)", [sessao]).then((r) => (r.rows[0] as Meta | undefined) ?? null),
+    pool.query("select * from app.portal_credito($1)", [sessao]).then((r) => (r.rows[0] as Credito | undefined) ?? null),
+    pool.query("select * from app.portal_extrato($1)", [sessao]).then((r) => r.rows as Extrato[]),
   ]);
   const moeda = cliente.moeda;
   const validos = pedidos.filter((p) => p.etapa !== "cancelado");
@@ -116,6 +128,42 @@ export default async function MinhaArea({ searchParams }: { searchParams: Promis
           </section>
         ) : null;
       })()}
+
+      {credito?.habilitado && (
+        <section className="painel area-bloco">
+          <h2>{t.credito}</h2>
+          <div className="area-numeros">
+            <div><span>{t.limite}</span><b>{dinheiro(credito.limite ?? 0, credito.moeda)}</b></div>
+            <div><span>{t.aberto}</span><b>{dinheiro(credito.em_aberto, credito.moeda)}</b></div>
+            <div><span>{t.disponivel}</span><b>{dinheiro(credito.disponivel, credito.moeda)}</b></div>
+            <div className={Number(credito.vencido) > 0 ? "vencido" : ""}><span>{t.vencido}</span><b>{dinheiro(credito.vencido, credito.moeda)}</b></div>
+          </div>
+          <div className="area-barra"><span style={{ width: `${Math.min(100, Number(credito.limite) > 0 ? (Number(credito.em_aberto) / Number(credito.limite)) * 100 : 0)}%` }} /></div>
+          <p className="pequeno suave" style={{ margin: 0 }}>
+            {t.prazo(credito.prazo_dias)}{credito.proximo_vencimento ? ` ${t.proximo}: ${data(credito.proximo_vencimento)}.` : ""}
+            {Number(credito.em_conferencia) > 0 ? ` ${t.conferencia(dinheiro(credito.em_conferencia, credito.moeda))}` : ""}
+          </p>
+          {extrato.length > 0 && (
+            <>
+              <h3 style={{ margin: "4px 0 0", fontSize: "1rem" }}>{t.extrato}</h3>
+              <div className="extrato">
+                <table>
+                  <thead><tr><th>{t.data}</th><th>{t.descricao}</th><th>{t.valor}</th><th>{t.vence}</th><th>{t.situacao}</th></tr></thead>
+                  <tbody>{extrato.slice(0, 30).map((x, k) => (
+                    <tr key={k} className={x.tipo}>
+                      <td className="num">{data(x.data)}</td>
+                      <td>{x.descricao}</td>
+                      <td className="num">{x.tipo === "pagamento" ? "− " : ""}{dinheiro(x.valor, credito.moeda)}</td>
+                      <td className="num">{x.vencimento ? data(x.vencimento) : ""}</td>
+                      <td><span className={`selo ${x.situacao === "pago" || x.situacao === "aprovado" ? "ok" : x.situacao === "vencido" || x.situacao === "recusado" ? "erro" : "aviso"}`}>{t.sit[x.situacao] ?? x.situacao}</span></td>
+                    </tr>))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </section>
+      )}
 
       {meta && (
         <section className="painel area-bloco">

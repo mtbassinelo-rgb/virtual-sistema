@@ -440,3 +440,10 @@
   .acomp-passos li { flex-direction: row; text-align: left; gap: 10px; padding: 4px 0; }
   .acomp-passos li::before { display: none; }
 }
+.area-numeros div.vencido b { color: #b00020; }
+.extrato { overflow-x: auto; }
+.extrato table { width: 100%; border-collapse: collapse; font-size: .88rem; min-width: 520px; }
+.extrato th, .extrato td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--linha-l); }
+.extrato th { font-size: .76rem; color: var(--apagado); font-weight: 600; }
+.extrato tr.pagamento td { color: #0b5d2a; }
+.area-cli .selo.erro { background: #fbe4e7; color: #7a1020; }

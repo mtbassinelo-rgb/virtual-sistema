@@ -194,6 +194,7 @@ select teste.falha($$select app.decidir_foto_catalogo('p05-02', 'reabrir', null)
 reset role;
 \echo '== Minha conta e equipe =='
 \set DONO '00000000-0000-0000-0000-000000000001'
+\set YESSICA '00000000-0000-0000-0000-000000000004'
 set role vc_app;
 select teste.como(:'GERENTE');
 select teste.ok(app.convidar_pessoa('Nova.Pessoa@Loja.com', 'Nova Pessoa', 'consulta', null, repeat('a',64), 48) is not null, 'Gerente cadastra pessoa com link');
@@ -287,5 +288,24 @@ select app.avancar_entrega(:'ped_enc', 'entregue');
 select teste.ok((select status_comercial::text from app.pedidos where id = :'ped_enc') = 'entregue', 'Pedido retirado/entregue');
 select teste.como(:'KEILA');
 select teste.falha(format($$select app.avancar_entrega(%L, 'transporte')$$, :'ped_enc'), null, 'Vendedora de outra carteira não mexe na entrega');
+reset role;
+\echo '== Linha de crédito =='
+select c.id as cli_cred from app.clientes c join app.vendedoras v on v.id = c.vendedora_id where v.nome = 'Keila' and c.mesclado_em is null order by c.criado_em limit 1 \gset
+set role vc_app;
+select teste.como(:'KEILA');
+select teste.falha(format($$select app.definir_credito_cliente(%L, true, null, 30)$$, :'cli_cred'), 'limite', 'Crédito exige limite');
+select app.definir_credito_cliente(:'cli_cred', true, 5000000, 15);
+select teste.ok((select credito_habilitado and limite_credito = 5000000 and prazo_credito_dias = 15 from app.clientes where id = :'cli_cred'), 'Vendedora libera linha de crédito do cliente dela');
+select teste.como(:'YESSICA');
+select teste.falha(format($$select app.definir_credito_cliente(%L, true, 1, 30)$$, :'cli_cred'), 'Sem permissão', 'Outra vendedora não mexe no crédito');
+reset role;
+select app.portal_abrir_sessao(:'cli_cred', 'sessao-credito') where exists (select 1 from app.portal_acessos where cliente_id = :'cli_cred');
+update app.clientes set portal_ativo = true where id = :'cli_cred';
+insert into app.portal_sessoes (token_hash, cliente_id, expira_em) values ('sessao-credito-2', :'cli_cred', now() + interval '1 day');
+set role vc_app;
+select teste.como('');
+select teste.ok((select habilitado and limite = 5000000 and disponivel <= 5000000 from app.portal_credito('sessao-credito-2')), 'Cliente vê o limite e o disponível');
+select teste.ok((select count(*) from app.portal_extrato('sessao-credito-2')) >= 0, 'Extrato do cliente abre');
+select teste.ok((select count(*) from app.portal_credito('sessao-invalida')) = 0, 'Sem sessão não vê crédito');
 reset role;
 \echo 'Testes de importação passaram.'
