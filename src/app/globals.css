@@ -205,7 +205,7 @@ button.discreto:hover { color: var(--erro); border-color: transparent; }
 .campo-foto.compacto .soltar-vazio { font-size: .85rem; }
 
 /* Produtos: filtros em linha, tabela editável e estoque colorido */
-.painel.filtros { display: grid; grid-template-columns: minmax(220px, 2fr) repeat(4, minmax(140px, 1fr)) auto; gap: 10px 12px; align-items: end; }
+.painel.filtros { display: grid; grid-template-columns: minmax(220px, 2fr) repeat(5, minmax(120px, 1fr)) auto; gap: 10px 12px; align-items: end; }
 .painel.filtros .filtro-botoes { display: flex; gap: 8px; }
 @media (max-width: 1100px) { .painel.filtros { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); } .painel.filtros .filtro-busca { grid-column: 1 / -1; } }
 .painel.lote-barra { flex-direction: row; flex-wrap: wrap; align-items: center; }

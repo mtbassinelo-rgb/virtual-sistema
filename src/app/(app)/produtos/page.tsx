@@ -8,7 +8,7 @@ import { TabelaProdutos, type LinhaProduto } from "./tabela";
 
 export const metadata = { title: "Produtos" };
 
-const POR_PAGINA = 60;
+const TAMANHOS = [50, 100, 200, 500];
 
 const MOSTRAR: [string, string][] = [
   ["", "Ativos"], ["abaixo-minimo", "Abaixo do estoque mínimo"], ["sem-estoque", "Sem estoque"], ["com-estoque", "Com estoque"],
@@ -25,13 +25,14 @@ const ORDEM: Record<string, [string, string]> = {
   "preco-maior": ["Maior preço (PY Normal)", "x.py_normal desc nulls last, p.nome"],
 };
 
-type Filtros = { q?: string; filtro?: string; marca?: string; tipo?: string; ordem?: string; pagina?: string; ok?: string; erro?: string };
+type Filtros = { por?: string; q?: string; filtro?: string; marca?: string; tipo?: string; ordem?: string; pagina?: string; ok?: string; erro?: string };
 
 export default async function Produtos({ searchParams }: { searchParams: Promise<Filtros> }) {
   const u = await exigirUsuario();
   const gestao = ehGestao(u);
   const f = await searchParams;
   const pagina = Math.max(1, Number(f.pagina) || 1);
+  const POR_PAGINA = TAMANHOS.includes(Number(f.por)) ? Number(f.por) : 100;
   const par: unknown[] = [];
   const cond = ["true"];
   if (f.q) { par.push(`%${f.q}%`); cond.push(`(p.nome ilike $${par.length} or p.codigo ilike $${par.length} or p.marca ilike $${par.length} or p.gtin = $${par.length})`); }
@@ -80,7 +81,7 @@ export default async function Produtos({ searchParams }: { searchParams: Promise
   const paginas = Math.max(1, Math.ceil(d.total / POR_PAGINA));
   const url = (mud: Record<string, string | number | undefined>) => {
     const s = new URLSearchParams();
-    for (const [k, v] of Object.entries({ q: f.q, filtro: f.filtro, marca: f.marca, tipo: f.tipo, ordem: f.ordem, ...mud })) if (v) s.set(k, String(v));
+    for (const [k, v] of Object.entries({ q: f.q, filtro: f.filtro, marca: f.marca, tipo: f.tipo, ordem: f.ordem, por: f.por, ...mud })) if (v) s.set(k, String(v));
     return `/produtos?${s}`;
   };
   const volta = url({ pagina: pagina > 1 ? pagina : undefined }).replace(/\?$/, "");
@@ -135,6 +136,11 @@ export default async function Produtos({ searchParams }: { searchParams: Promise
         <label>Ordenar por
           <select name="ordem" defaultValue={f.ordem ?? ""}>
             {Object.entries(ORDEM).map(([k, [t]]) => <option key={k} value={k}>{t}</option>)}
+          </select>
+        </label>
+        <label>Mostrar por página
+          <select name="por" defaultValue={String(POR_PAGINA)}>
+            {TAMANHOS.map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
         </label>
         <div className="filtro-botoes">
