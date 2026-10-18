@@ -29,8 +29,8 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
   const idioma = await idiomaAtual();
   const t = TEXTOS[idioma];
   const proprios = (await pool.query("select * from app.banners_ativos($1)", [idioma])).rows as Banner[];
-  // sem banner cadastrado pela equipe, a loja usa os banners prontos (marcas e atacado)
-  const banners = proprios.length ? proprios : bannersPadrao(idioma, Boolean(cliente));
+  // banners da equipe primeiro, depois os prontos (marcas e atacado)
+  const banners = [...proprios, ...bannersPadrao(idioma, Boolean(cliente))];
   const token = cliente ? await tokenCliente() : null;
 
   const publicos = (await pool.query("select * from app.vitrine_publica()")).rows as Publico[];
