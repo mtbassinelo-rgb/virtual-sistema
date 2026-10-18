@@ -4,6 +4,7 @@ import { pool, mensagemErro } from "@/lib/db";
 import { linkWhatsApp, texto } from "@/lib/formato";
 import { TEXTOS, idiomaAtual } from "@/lib/idioma";
 import { avisarEquipe } from "@/lib/email";
+import { vendedoraDoLink } from "@/lib/vendedora-link";
 
 export type RespostaCadastro = { erro?: string; url?: string };
 
@@ -23,7 +24,9 @@ export async function enviarCadastro(_: RespostaCadastro, fd: FormData): Promise
       `Novo cadastro pelo site (${idioma === "es" ? "espanhol" : "português"})\n\nEmpresa: ${d.nome}\nContato: ${d.contato}\nWhatsApp: ${d.whatsapp}\n` +
       `E-mail: ${d.email}\nCidade: ${d.cidade}\nTipo: ${tipoNome}\nDocumento: ${d.documento}\nMensagem: ${d.mensagem}\n\n` +
       `Atenda em https://app.${process.env.DOMINIO ?? "distribuidoravirtualcosmeticos.com"} (tela Hoje).`);
-    const url = linkWhatsApp(String(r.rows[0].numero), t.cadMsgZap({ ...d, tipo: tipoNome }));
+    const vend = await vendedoraDoLink();
+    const zapVend = vend ? (await pool.query("select app.site_atribuir_vendedora('cadastro', $1, $2) as z", [d.whatsapp, vend.slug])).rows[0]?.z as string | null : null;
+    const url = linkWhatsApp(zapVend || String(r.rows[0].numero), t.cadMsgZap({ ...d, tipo: tipoNome }));
     return url ? { url } : { erro: "WhatsApp da empresa não configurado." };
   } catch (e) {
     return { erro: mensagemErro(e) };

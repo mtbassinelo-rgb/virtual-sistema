@@ -44,9 +44,11 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
   const publicos = (await pool.query("select * from app.vitrine_publica_unidade($1)", [unidade.id])).rows as Publico[];
   const precos = new Map<string, Preco>();
   let meta: Record<string, unknown> | null = null;
+  let chegaram: { produto_id: string; nome: string }[] = [];
   if (cliente && token) {
     for (const r of (await pool.query("select * from app.portal_catalogo($1)", [sha256(token)])).rows as Preco[]) precos.set(r.produto_id, r);
     meta = (await pool.query("select * from app.portal_meta($1)", [sha256(token)])).rows[0] ?? null;
+    chegaram = (await pool.query("select produto_id, nome from app.portal_chegaram($1)", [sha256(token)])).rows as { produto_id: string; nome: string }[];
   }
   const moeda: Moeda = cliente?.moeda ?? "BRL";
   const extras = new Map<string, Extra>();
@@ -103,6 +105,8 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
   }
   todos = exibidos;
   const total = todos.length;
+  // busca entra no funil de vendas (o que procuram e o que não acham)
+  if (q && !f.pagina) await pool.query("select app.registrar_evento_site('busca', null, $1, null, $2, $3, $4)", [token ? sha256(token) : null, q, total, unidade.codigo]).catch(() => undefined);
   const paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
   const pagina = Math.min(paginas, Math.max(1, Number(f.pagina) || 1));
   const lista = todos.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA);
@@ -143,6 +147,11 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
       {cliente && !filtrando && (
         <section className="in boas-vindas">
           <h1>{t.ola(cliente.nome)}</h1>
+          {chegaram.length > 0 && (
+            <div className="chegou"><b>{idioma === "es" ? "¡Llegó lo que pidió!" : "Chegou o que você pediu!"}</b> {chegaram.slice(0, 4).map((c) => c.nome).join(" · ")}
+              {" "}<Link href={`/loja?q=${encodeURIComponent(chegaram[0].nome.split(" ").slice(0, 3).join(" "))}#catalogo`}>{idioma === "es" ? "Ver" : "Ver agora"}</Link></div>
+          )}
+          <p className="pequeno"><Link href="/loja/reposicao">{t.reposicao} →</Link></p>
           <p>{t.precosCliente(cliente.categoria === "vip", moeda === "GS", cliente.vendedora)}</p>
           {meta && (
             <div className="meta">
@@ -372,7 +381,7 @@ function esgotado(p: Produto, cliente: boolean): boolean {
 function itemCarrinho(p: Produto, encomenda = false) {
   const pr = p.p;
   return { id: p.produto_id, nome: p.nome, marca: p.marcaNome, preco: pr ? Number(pr.preco) : null,
-           limite: pr?.limite_qtd ? Number(pr.limite_qtd) : null, caixa: p.unidades_caixa, encomenda };
+           limite: pr?.limite_qtd ? Number(pr.limite_qtd) : null, caixa: p.unidades_caixa, encomenda, marcaDb: p.marca };
 }
 
 /** Preço principal = caixa fechada (unidade × peças); embaixo, o preço da unidade. */

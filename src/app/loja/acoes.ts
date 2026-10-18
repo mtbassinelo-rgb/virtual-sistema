@@ -10,6 +10,8 @@ import { linkWhatsApp, numero, texto } from "@/lib/formato";
 import { TEXTOS, idiomaAtual } from "@/lib/idioma";
 import { avisarEquipe } from "@/lib/email";
 import { pastaArquivos } from "@/lib/arquivos";
+import { vendedoraDoLink } from "@/lib/vendedora-link";
+import { unidadeLoja } from "@/lib/unidade";
 
 const TIPOS: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "application/pdf": "pdf" };
 
@@ -92,8 +94,11 @@ export async function enviarCarrinho(_: RespostaCarrinho, fd: FormData): Promise
   if (cliente) {
     const t = await tokenCliente();
     try {
-      await pool.query("select app.portal_criar_pedido($1, $2, $3)",
-        [sha256(t!), JSON.stringify(itens.map(({ produto_id, quantidade, encomenda }) => ({ produto_id, quantidade, encomenda: !!encomenda }))), obs]);
+      const ped = (await pool.query("select app.portal_criar_pedido($1, $2, $3) as id",
+        [sha256(t!), JSON.stringify(itens.map(({ produto_id, quantidade, encomenda }) => ({ produto_id, quantidade, encomenda: !!encomenda }))), obs])).rows[0].id;
+      // desconto por quantidade (levando N caixas da marca) e registro para o funil de vendas
+      await pool.query("select app.portal_aplicar_desconto_quantidade($1, $2)", [sha256(t!), ped]).catch(() => undefined);
+      await pool.query("select app.registrar_evento_site('pedido', null, $1, null, null, null, null)", [sha256(t!)]).catch(() => undefined);
       await avisarEquipe(`Pedido novo pela área do cliente: ${cliente.nome}`,
         `Cliente: ${cliente.nome}\nVendedora: ${cliente.vendedora}\n\n${await listaTexto(itens)}${obs ? "\n\nObs.: " + obs : ""}`).catch(() => undefined);
       return { url: "/loja/pedidos?novo=1&ok=" + encodeURIComponent("Pedido enviado! A vendedora confere e avisa o total para pagamento.") };
@@ -122,7 +127,11 @@ export async function enviarCarrinho(_: RespostaCarrinho, fd: FormData): Promise
     const lista = await listaTexto(itens);
     const msg = TEXTOS[idioma].msgVisitante(nome, cidade, lista, obs);
     await avisarEquipe(`Pedido pelo site: ${nome}`, `Pedido de visitante pelo site\n\nNome: ${nome}\nWhatsApp: ${zap}\nCidade: ${cidade}\n\n${lista}${obs ? "\n\nObs.: " + obs : ""}`);
-    const url = linkWhatsApp(String(r.rows[0].numero), msg);
+    // entrou pelo link da vendedora: o pedido vai para a carteira dela e o WhatsApp é o dela
+    const vend = await vendedoraDoLink();
+    const zapVend = vend ? (await pool.query("select app.site_atribuir_vendedora('pedido', $1, $2) as z", [zap, vend.slug])).rows[0]?.z as string | null : null;
+    await pool.query("select app.registrar_evento_site('pedido', null, null, null, null, null, null)").catch(() => undefined);
+    const url = linkWhatsApp(zapVend || String(r.rows[0].numero), msg);
     return url ? { url } : { erro: "WhatsApp da empresa não configurado." };
   } catch (e) {
     return { erro: mensagemErro(e) };
@@ -179,4 +188,40 @@ export async function guardarCarrinho(itens: { produto_id: string; qtd: number }
   const t = await tokenCliente();
   if (!t) return;
   await pool.query("select app.portal_salvar_carrinho($1, $2::jsonb)", [sha256(t), JSON.stringify(itens.slice(0, 200))]).catch(() => undefined);
+}
+
+
+export type Sugestao = { id: string; nome: string; marca: string | null; foto: string | null; caixa: number | null; preco: number | null };
+
+/** "Compre junto": o que os clientes costumam levar com os produtos do carrinho (e a mesma linha da marca). */
+export async function sugestoesCompreJunto(ids: string[]): Promise<Sugestao[]> {
+  const lista = ids.filter((x) => /^[0-9a-f-]{36}$/i.test(x)).slice(0, 50);
+  if (!lista.length) return [];
+  const unidade = await unidadeLoja();
+  const r = (await pool.query(`select v.produto_id, v.nome, v.marca, v.foto, v.unidades_caixa
+      from app.compre_junto($1::uuid[], 12) cj join app.vitrine_publica_unidade($2) v on v.produto_id = cj.produto_id
+     where v.tem_estoque limit 4`, [lista, unidade.id])).rows;
+  if (!r.length) return [];
+  const t = await tokenCliente();
+  const precos = t ? new Map((await pool.query("select produto_id, preco from app.portal_catalogo($1) where produto_id = any($2::uuid[])",
+    [sha256(t), r.map((x) => x.produto_id)])).rows.map((x) => [String(x.produto_id), Number(x.preco)])) : new Map<string, number>();
+  return r.map((x) => ({ id: String(x.produto_id), nome: x.nome, marca: x.marca, foto: x.foto, caixa: x.unidades_caixa, preco: precos.get(String(x.produto_id)) ?? null }));
+}
+
+/** Lista de reposição: o que o cliente costuma comprar, com a quantidade de costume (em caixas quando o produto tem caixa). */
+export async function itensReposicao(): Promise<{ id: string; nome: string; marca: string | null; preco: number | null; caixa: number | null; qtd: number }[]> {
+  const t = await tokenCliente();
+  if (!t) return [];
+  const sessao = sha256(t);
+  const rep = (await pool.query("select produto_id, quantidade_media from app.portal_reposicao($1)", [sessao])).rows;
+  if (!rep.length) return [];
+  const unidade = await unidadeLoja();
+  const vit = new Map((await pool.query("select produto_id, nome, marca, unidades_caixa from app.vitrine_publica_unidade($1) where produto_id = any($2::uuid[])",
+    [unidade.id, rep.map((x) => x.produto_id)])).rows.map((x) => [String(x.produto_id), x]));
+  const precos = new Map((await pool.query("select produto_id, preco from app.portal_catalogo($1)", [sessao])).rows.map((x) => [String(x.produto_id), Number(x.preco)]));
+  return rep.filter((x) => vit.has(String(x.produto_id))).map((x) => {
+    const v = vit.get(String(x.produto_id)); const caixa = v.unidades_caixa ? Number(v.unidades_caixa) : null;
+    return { id: String(x.produto_id), nome: v.nome, marca: v.marca, preco: precos.get(String(x.produto_id)) ?? null, caixa,
+             qtd: caixa ? Math.max(1, Math.round(Number(x.quantidade_media) / caixa)) : Math.max(1, Math.round(Number(x.quantidade_media))) };
+  });
 }

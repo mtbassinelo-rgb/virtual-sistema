@@ -495,3 +495,18 @@
 .cartao-grupo.em-lista { flex-direction: row; }
 .cartao-grupo.em-lista .rotulo { width: 120px; min-width: 120px; aspect-ratio: auto; }
 .catalogo-lista .cartao-grupo { margin: 8px 0; }
+
+/* Carrinho: desconto por quantidade e compre junto */
+.g-descontos { list-style: none; margin: 0 16px 8px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.g-descontos li { font-size: .82rem; padding: 8px 10px; border-radius: 10px; background: #fff6e5; color: #7a4b00; }
+.g-descontos li.ok { background: #e3f6e8; color: #17703a; }
+.g-junto { margin: 0 16px 10px; padding: 10px; border: 1px dashed var(--linha-l); border-radius: 12px; }
+.g-junto-titulo { font-weight: 700; font-size: .85rem; color: var(--roxo-tinta); margin-bottom: 6px; }
+.g-junto ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.g-junto li { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.g-junto img, .g-junto-img { width: 40px; height: 40px; object-fit: cover; border-radius: 8px; background: var(--papel); display: block; }
+.g-junto li button { width: 32px; height: 32px; border-radius: 999px; border: 0; background: var(--roxo); color: #fff; font-weight: 800; cursor: pointer; }
+.chegou { margin: 6px 0; padding: 10px 14px; border-radius: 12px; background: #e3f6e8; color: #17703a; font-size: .9rem; }
+.chegou a { color: inherit; font-weight: 700; }
+.reposicao { list-style: none; margin: 16px 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.reposicao li { display: grid; grid-template-columns: minmax(0, 1fr) 150px; gap: 12px; align-items: center; background: var(--papel); border: 1px solid var(--linha-l); border-radius: var(--raio-g); padding: 12px 14px; }

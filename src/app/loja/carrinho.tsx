@@ -1,15 +1,34 @@
 "use client";
 
 import { createContext, useActionState, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { enviarCarrinho, guardarCarrinho, itensParaRepetir, type RespostaCarrinho } from "./acoes";
+import { enviarCarrinho, guardarCarrinho, itensParaRepetir, sugestoesCompreJunto, type RespostaCarrinho, type Sugestao } from "./acoes";
 import type { TextosCarrinho } from "@/lib/idioma";
 
 /** qtd = caixas fechadas quando o produto tem "caixa" (peças por caixa); senão, unidades. preco = por unidade. */
-export type ItemCarrinho = { id: string; produto?: string; nome: string; marca: string | null; preco: number | null; qtd: number; limite?: number | null; caixa?: number | null; encomenda?: boolean };
+export type ItemCarrinho = { id: string; produto?: string; marcaDb?: string | null; nome: string; marca: string | null; preco: number | null; qtd: number; limite?: number | null; caixa?: number | null; encomenda?: boolean };
 export type ClienteCarrinho = { nome: string; vendedora: string; moeda: "GS" | "BRL" } | null;
+export type DescontoQtd = { marca: string | null; min_qtd: number; desconto_pct: number; pais: "BR" | "PY" | null };
+
+/** Id anônimo do navegador (só para contar visitas e carrinhos no funil de vendas). */
+function sessaoAnonima(): string | null {
+  try {
+    let s = localStorage.getItem("vc_sid");
+    if (!s) { s = (crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`).replace(/[^a-z0-9-]/gi, ""); localStorage.setItem("vc_sid", s); }
+    return s;
+  } catch { return null; }
+}
+export function eventoSite(tipo: "visita" | "carrinho", dados: { produto?: string; unidade?: string } = {}) {
+  const sessao = sessaoAnonima();
+  if (!sessao) return;
+  const corpo = JSON.stringify({ tipo, sessao, ...dados });
+  try { if (!navigator.sendBeacon?.("/loja/evento", new Blob([corpo], { type: "application/json" }))) fetch("/loja/evento", { method: "POST", body: corpo, headers: { "content-type": "application/json" }, keepalive: true }); }
+  catch { /* opcional */ }
+}
+const chaveMarca = (m: string | null | undefined) => (m ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/gi, "").toUpperCase();
 
 type Ctx = {
   t: TextosCarrinho;
+  descontos: DescontoQtd[];
   itens: ItemCarrinho[];
   aberto: boolean;
   abrir: (v: boolean) => void;
@@ -33,8 +52,10 @@ function ler(chave: string): ItemCarrinho[] {
   }
 }
 
-export function Carrinho({ children, cliente, t, unidade }: { children: React.ReactNode; cliente: ClienteCarrinho; t: TextosCarrinho; unidade: string }) {
+export function Carrinho({ children, cliente, t, unidade, descontos = [] }: { children: React.ReactNode; cliente: ClienteCarrinho; t: TextosCarrinho; unidade: string; descontos?: DescontoQtd[] }) {
   const CHAVE_UNIDADE = chaveDe(unidade);
+  // uma visita por sessão do navegador
+  useEffect(() => { try { if (!sessionStorage.getItem("vc_visita")) { sessionStorage.setItem("vc_visita", "1"); eventoSite("visita", { unidade }); } } catch { /* opcional */ } }, [unidade]);
   const [itens, setItens] = useState<ItemCarrinho[]>([]);
   const [aberto, abrir] = useState(false);
   const carregado = useRef(false);
@@ -59,17 +80,18 @@ export function Carrinho({ children, cliente, t, unidade }: { children: React.Re
   }, [aberto]);
 
   const valor = useMemo<Ctx>(() => ({
-    t, itens, aberto, abrir,
+    t, descontos, itens, aberto, abrir,
     definir: (item, qtd) => setItens((atual) => {
       const maxCaixas = item.limite ? Math.floor(item.limite / (item.caixa || 1)) || 1 : 9999;
       const q = Math.max(0, Math.min(Math.floor(qtd), maxCaixas));
       const resto = atual.filter((i) => i.id !== item.id);
       if (q === 0) return resto;
       const existente = atual.find((i) => i.id === item.id);
+      if (!existente) eventoSite("carrinho", { produto: produtoDe(item), unidade });
       return existente ? atual.map((i) => (i.id === item.id ? { ...i, ...item, qtd: q } : i)) : [...atual, { ...item, qtd: q }];
     }),
     limpar: () => setItens([]),
-  }), [itens, aberto, t]);
+  }), [itens, aberto, t, descontos, unidade]);
 
   return (
     <Contexto.Provider value={valor}>
@@ -117,7 +139,7 @@ const fmt = (v: number, moeda: "GS" | "BRL") =>
   moeda === "GS" ? `Gs ${Math.round(v).toLocaleString("es-PY")}` : v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 function Gaveta({ cliente }: { cliente: ClienteCarrinho }) {
-  const { itens, aberto, abrir, definir, limpar, t } = useCarrinho();
+  const { itens, aberto, abrir, definir, limpar, t, descontos } = useCarrinho();
   const [estado, acao, enviando] = useActionState<RespostaCarrinho, FormData>(enviarCarrinho, {});
   useEffect(() => {
     if (estado.url) {
@@ -131,6 +153,7 @@ function Gaveta({ cliente }: { cliente: ClienteCarrinho }) {
   const total = cliente ? itens.reduce((s, i) => s + (i.preco ?? 0) * un(i), 0) : 0;
   const semPreco = cliente ? itens.filter((i) => i.preco == null).length : 0;
   const payload = JSON.stringify(itens.map((i) => ({ produto_id: produtoDe(i), quantidade: un(i), caixas: i.caixa ? i.qtd : null, encomenda: !!i.encomenda })));
+  const progresso = progressoDescontos(itens, descontos, cliente?.moeda === "BRL" ? "BR" : cliente?.moeda === "GS" ? "PY" : null);
 
   return (
     <div className={`gaveta ${aberto ? "aberta" : ""}`} aria-hidden={!aberto}>
@@ -164,6 +187,16 @@ function Gaveta({ cliente }: { cliente: ClienteCarrinho }) {
               ))}
             </ul>
 
+            {progresso.length > 0 && (
+              <ul className="g-descontos">{progresso.map((p) => (
+                <li key={p.marca} className={p.atingido ? "ok" : ""}>
+                  {p.atingido
+                    ? <>✓ <b>{p.atingido}% de desconto</b> em {p.nomeMarca} por quantidade{p.proximo ? ` · leve mais ${p.faltam} para ${p.proximo}%` : ""}</>
+                    : <>Leve mais <b>{p.faltam}</b> {p.faltam === 1 ? "caixa" : "caixas"} de {p.nomeMarca} e ganhe <b>{p.proximo}% de desconto</b></>}
+                </li>
+              ))}</ul>
+            )}
+            <CompreJunto itens={itens} cliente={cliente} definir={definir} />
             <form action={acao} className="gaveta-envio">
               <input type="hidden" name="itens" value={payload} />
               {cliente ? (
@@ -219,5 +252,63 @@ export function RepetirPedido({ pedidoId, rotulo, vazio }: { pedidoId: string; r
     }}>
       {estado === "vazio" ? vazio : estado === "carregando" ? "…" : rotulo}
     </button>
+  );
+}
+
+
+/** Para cada marca do carrinho: desconto já atingido e quanto falta para a próxima faixa. */
+function progressoDescontos(itens: ItemCarrinho[], regras: DescontoQtd[], pais: "BR" | "PY" | null) {
+  if (!regras.length) return [];
+  const porMarca = new Map<string, { nome: string; qtd: number }>();
+  for (const i of itens) {
+    const k = chaveMarca(i.marcaDb ?? i.marca);
+    if (!k) continue;
+    const m = porMarca.get(k) ?? { nome: i.marca ?? i.marcaDb ?? "", qtd: 0 };
+    m.qtd += i.qtd;
+    porMarca.set(k, m);
+  }
+  const saida: { marca: string; nomeMarca: string; atingido: number | null; proximo: number | null; faltam: number }[] = [];
+  for (const [k, m] of porMarca) {
+    const aplica = regras.filter((r) => (!r.marca || chaveMarca(r.marca) === k) && (!r.pais || !pais || r.pais === pais)).sort((a, b) => a.min_qtd - b.min_qtd);
+    if (!aplica.length) continue;
+    const feitas = aplica.filter((r) => m.qtd >= r.min_qtd);
+    const atingido = feitas.length ? Math.max(...feitas.map((r) => Number(r.desconto_pct))) : null;
+    const prox = aplica.find((r) => m.qtd < r.min_qtd && Number(r.desconto_pct) > (atingido ?? 0));
+    if (!atingido && !prox) continue;
+    saida.push({ marca: k, nomeMarca: m.nome, atingido, proximo: prox ? Number(prox.desconto_pct) : null, faltam: prox ? prox.min_qtd - m.qtd : 0 });
+  }
+  return saida;
+}
+
+/** "Compre junto": até 4 sugestões a partir do carrinho. */
+function CompreJunto({ itens, cliente, definir }: { itens: ItemCarrinho[]; cliente: ClienteCarrinho; definir: Ctx["definir"] }) {
+  const [sug, setSug] = useState<Sugestao[]>([]);
+  const ids = itens.map(produtoDe).sort().join(",");
+  useEffect(() => {
+    if (!ids) { setSug([]); return; }
+    const t = setTimeout(() => { sugestoesCompreJunto(ids.split(",")).then((s) => setSug(s.filter((x) => !ids.includes(x.id)))).catch(() => setSug([])); }, 600);
+    return () => clearTimeout(t);
+  }, [ids]);
+  if (!sug.length) return null;
+  return (
+    <div className="g-junto">
+      <div className="g-junto-titulo">Compre junto</div>
+      <ul>{sug.map((s) => (
+        <li key={s.id}>
+          {s.foto ? <img src={s.foto} alt="" width={40} height={40} loading="lazy" /> : <span className="g-junto-img" />}
+          <div><div className="g-nome">{s.nome}</div>
+            {cliente && s.preco != null && <div className="g-preco">{fmt(s.preco * (s.caixa || 1), cliente.moeda)}{s.caixa ? " / cx" : ""}</div>}</div>
+          <button type="button" onClick={() => definir({ id: s.id, nome: s.nome, marca: s.marca, marcaDb: s.marca, preco: s.preco, caixa: s.caixa }, 1)}>+</button>
+        </li>
+      ))}</ul>
+    </div>
+  );
+}
+
+/** Coloca vários itens no carrinho de uma vez (lista de reposição) e abre o pedido. */
+export function AdicionarTodos({ itens, rotulo }: { itens: ItemCarrinho[]; rotulo: string }) {
+  const { definir, abrir } = useCarrinho();
+  return (
+    <button type="button" className="botao-repetir" onClick={() => { for (const { qtd, ...item } of itens) definir(item, qtd); abrir(true); }}>{rotulo}</button>
   );
 }

@@ -14,9 +14,10 @@ const ABAS = [
   { k: "catalogo", t: "Saúde do catálogo", d: "Produtos sem preço, sem foto ou sem peças por caixa: o que falta arrumar na loja." },
   { k: "lucro", t: "Lucro e rankings", d: "Quem vendeu e lucrou mais e menos, e os produtos que mais e menos dão lucro.", gestao: true },
   { k: "resultado", t: "Resultado do mês", d: "Venda, custo da mercadoria, lucro bruto, despesas e resultado, mês a mês.", gestao: true },
+  { k: "site", t: "Funil do site", d: "Visitas, carrinhos e pedidos do site, o que os clientes procuram e o que não acham.", gestao: true },
   { k: "envios", t: "Envios ao Paraguai", d: "Caixas e produtos que saíram por semana para clientes do Paraguai, e o custo do passeiro.", gestao: true },
 ] as const;
-const COM_PERIODO = ["vendas", "produtos", "lucro", "envios"];
+const COM_PERIODO = ["vendas", "produtos", "lucro", "envios", "site"];
 
 type Soma = { moeda: Moeda; pedidos: number; vendido: string; recebido: string; saldo: string };
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -24,7 +25,7 @@ type Lin = Record<string, any>;
 type Dados = {
   totais?: Soma[]; vend?: Lin[]; meses?: Lin[]; canais?: Lin[]; itens?: Lin[]; marcas?: Lin[]; g?: Lin[]; minimo?: Lin[]; cat?: Lin; fotos?: number;
   luc?: Lin[]; rank?: Lin[]; topLucro?: Lin[]; baixaMargem?: Lin[]; poucaVenda?: Lin[]; campeoes?: Lin[]; resultado?: Lin[]; envios?: Lin[];
-  porCategoria?: Lin[]; custoVolume?: number;
+  porCategoria?: Lin[]; custoVolume?: number; funil?: Lin; buscas?: Lin[]; semResultado?: Lin[]; maisCarrinho?: Lin[]; dias?: Lin[];
 };
 
 export default async function Relatorios({ searchParams }: { searchParams: Promise<{ aba?: string; de?: string; ate?: string }> }) {
@@ -38,6 +39,25 @@ export default async function Relatorios({ searchParams }: { searchParams: Promi
 
   const d: Dados = await comUsuario(u.id, async (c): Promise<Dados> => {
     if (aba.k === "lucro") return carregarLucro(c, de, ate);
+    if (aba.k === "site") {
+      const per = [de, ate];
+      const funil = (await c.query(`select
+          (select count(distinct sessao) from app.eventos_site where tipo = 'visita' and em::date between $1 and $2)::int visitas,
+          (select count(distinct sessao) from app.eventos_site where tipo = 'carrinho' and em::date between $1 and $2)::int carrinhos,
+          (select count(*) from app.pedidos where origem = 'portal' and data_pedido between $1 and $2)::int pedidos_clientes,
+          (select count(*) from app.pedidos_site where criado_em::date between $1 and $2)::int pedidos_visitantes,
+          (select count(*) from app.cadastros_site where criado_em::date between $1 and $2)::int cadastros`, per)).rows[0];
+      const buscas = (await c.query(`select termo, count(*)::int n, round(avg(resultados))::int res from app.eventos_site
+          where tipo = 'busca' and termo is not null and em::date between $1 and $2 group by 1 order by 2 desc limit 20`, per)).rows;
+      const semResultado = (await c.query(`select termo, count(*)::int n from app.eventos_site
+          where tipo = 'busca' and resultados = 0 and termo is not null and em::date between $1 and $2 group by 1 order by 2 desc limit 20`, per)).rows;
+      const maisCarrinho = (await c.query(`select p.id, p.nome, count(distinct e.sessao)::int n from app.eventos_site e join app.produtos p on p.id = e.produto_id
+          where e.tipo = 'carrinho' and e.em::date between $1 and $2 group by 1, 2 order by 3 desc limit 20`, per)).rows;
+      const dias = (await c.query(`select em::date dia, count(distinct sessao) filter (where tipo = 'visita')::int visitas,
+          count(distinct sessao) filter (where tipo = 'carrinho')::int carrinhos from app.eventos_site
+          where em::date between $1 and $2 group by 1 order by 1`, per)).rows;
+      return { funil, buscas, semResultado, maisCarrinho, dias };
+    }
     if (aba.k === "resultado") return carregarResultado(c);
     if (aba.k === "envios") return carregarEnvios(c, de, ate);
     if (aba.k === "vendas") {
@@ -257,6 +277,7 @@ export default async function Relatorios({ searchParams }: { searchParams: Promi
       {aba.k === "lucro" && <Lucro d={d} de={de} ate={ate} />}
       {aba.k === "resultado" && <Resultado d={d} />}
       {aba.k === "envios" && <Envios d={d} de={de} ate={ate} />}
+      {aba.k === "site" && <Funil d={d} />}
 
       {aba.k === "catalogo" && cat && (
         <>
@@ -497,6 +518,57 @@ async function carregarEnvios(c: PoolClient, de: string, ate: string): Promise<D
   const envios = (await c.query("select * from app.envios_paraguai($1::date, $2::date)", [de, ate])).rows;
   const custoVolume = Number((await c.query("select app.param('passeiro_custo_volume') v")).rows[0].v ?? 0);
   return { envios, custoVolume };
+}
+
+function Funil({ d }: { d: Dados }) {
+  const f = d.funil ?? {};
+  const pedidos = Number(f.pedidos_clientes ?? 0) + Number(f.pedidos_visitantes ?? 0);
+  const pct = (a: number, b: number) => (b > 0 ? `${Math.round((a / b) * 100)}%` : "—");
+  const maxDia = Math.max(1, ...(d.dias ?? []).map((x) => Number(x.visitas)));
+  return (
+    <>
+      <section className="atalhos">
+        <div className="atalho"><b>{Number(f.visitas ?? 0).toLocaleString("pt-BR")}</b><span>visitas (navegadores)</span></div>
+        <div className="atalho"><b>{Number(f.carrinhos ?? 0).toLocaleString("pt-BR")}</b><span>montaram carrinho · {pct(Number(f.carrinhos ?? 0), Number(f.visitas ?? 0))}</span></div>
+        <div className="atalho"><b>{pedidos.toLocaleString("pt-BR")}</b><span>pedidos ({f.pedidos_clientes ?? 0} de clientes, {f.pedidos_visitantes ?? 0} de visitantes) · {pct(pedidos, Number(f.carrinhos ?? 0))} dos carrinhos</span></div>
+        <div className="atalho"><b>{Number(f.cadastros ?? 0)}</b><span>cadastros novos</span></div>
+      </section>
+      <p className="suave pequeno" style={{ margin: 0 }}>Visitas e carrinhos começaram a ser contados em 18/10/2026. Quem monta carrinho e não envia aparece em Vendas → Carrinhos parados.</p>
+      {(d.dias ?? []).length > 0 && (
+        <section className="painel">
+          <h2 style={{ margin: 0 }}>Visitas por dia</h2>
+          <div className="grafico-barras">{(d.dias ?? []).map((x) => (
+            <div key={String(x.dia)} className="lin"><span>{new Date(x.dia).toLocaleDateString("pt-BR", { timeZone: "UTC", day: "2-digit", month: "2-digit" })}</span>
+              <Barra percentual={(Number(x.visitas) / maxDia) * 100} /><span className="num">{x.visitas} · {x.carrinhos} carr.</span></div>
+          ))}</div>
+        </section>
+      )}
+      <div className="grade-2">
+        <section className="painel">
+          <h2 style={{ margin: 0 }}>O que mais procuram</h2>
+          {(d.buscas ?? []).length === 0 ? <div className="vazio">Nenhuma busca no período.</div> : (
+            <div className="tabela"><table><thead><tr><th>Busca</th><th className="num">Vezes</th><th className="num">Achou</th></tr></thead>
+              <tbody>{(d.buscas ?? []).map((x) => <tr key={x.termo}><td>{x.termo}</td><td className="num">{x.n}</td><td className="num">{x.res}</td></tr>)}</tbody></table></div>
+          )}
+        </section>
+        <section className="painel">
+          <h2 style={{ margin: 0 }}>Procuraram e não acharam</h2>
+          <p className="suave pequeno" style={{ margin: 0 }}>Produto que talvez valha comprar, ou nome que o cliente usa e não está no cadastro.</p>
+          {(d.semResultado ?? []).length === 0 ? <div className="vazio">Nada por aqui.</div> : (
+            <div className="tabela"><table><thead><tr><th>Busca</th><th className="num">Vezes</th></tr></thead>
+              <tbody>{(d.semResultado ?? []).map((x) => <tr key={x.termo}><td>{x.termo}</td><td className="num">{x.n}</td></tr>)}</tbody></table></div>
+          )}
+        </section>
+      </div>
+      <section className="painel">
+        <h2 style={{ margin: 0 }}>Mais colocados no carrinho</h2>
+        {(d.maisCarrinho ?? []).length === 0 ? <div className="vazio">Nenhum ainda.</div> : (
+          <div className="tabela"><table><thead><tr><th>Produto</th><th className="num">Navegadores</th></tr></thead>
+            <tbody>{(d.maisCarrinho ?? []).map((x) => <tr key={x.id}><td><Link href={`/produtos/${x.id}`}>{x.nome}</Link></td><td className="num">{x.n}</td></tr>)}</tbody></table></div>
+        )}
+      </section>
+    </>
+  );
 }
 
 function Envios({ d, de, ate }: { d: Dados; de: string; ate: string }) {

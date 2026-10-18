@@ -36,6 +36,7 @@ export default async function MinhaConta({ searchParams }: { searchParams: Promi
   const u = await exigirUsuario();
   const f = await searchParams;
   const email = await comUsuario(u.id, async (c) => String((await c.query("select email from app.usuarios where id = $1", [u.id])).rows[0]?.email ?? ""));
+  const slug = u.vendedora_id ? await comUsuario(u.id, async (c) => (await c.query("select slug from app.vendedoras where id = $1", [u.vendedora_id])).rows[0]?.slug as string | null) : null;
   return (
     <>
       <section>
@@ -43,6 +44,13 @@ export default async function MinhaConta({ searchParams }: { searchParams: Promi
         <p className="suave" style={{ margin: 0 }}>{u.nome} · {email} · {PERFIS[u.perfil]}</p>
       </section>
       <Avisos ok={f.ok} erro={f.erro} />
+      {slug && (
+        <section className="painel">
+          <h2 style={{ margin: 0 }}>Seu link de vendas</h2>
+          <p style={{ margin: 0 }}><b>distribuidoravirtualcosmeticos.com/loja/v/{slug}</b></p>
+          <p className="suave pequeno" style={{ margin: 0 }}>Mande este link nos seus status e conversas. Quem entra por ele fala com você no WhatsApp, e o cadastro e o pedido do site vão para a sua carteira.</p>
+        </section>
+      )}
       <form action={trocarSenha} className="painel campos" style={{ maxWidth: 520 }}>
         <h2 className="largo">Trocar senha</h2>
         <input type="email" name="email" value={email} autoComplete="username" readOnly hidden />

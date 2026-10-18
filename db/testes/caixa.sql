@@ -48,4 +48,35 @@ select teste.ok((select variante from app.grupos_publicos() where produto_id = :
 select app.definir_grupos(format('[{"produto_id":"%s","grupo":"","variante":"Rosa"}]', :'PROD2')::jsonb);
 select teste.ok((select grupo is null and variante is null from app.produtos where id = :'PROD2'), 'Grupo vazio desfaz o agrupamento');
 reset role;
+
+\echo '== Vendas do site: link da vendedora, compre junto, desconto por quantidade, eventos =='
+reset role;
+update app.vendedoras set slug = 'keila' where id = '00000000-0000-0000-0000-0000000000a1';
+select teste.ok((select nome from app.vendedora_do_link('KEILA')) = 'Keila', 'Link da vendedora acha a Keila');
+select teste.ok((select count(*) from app.compre_junto(array[:'PROD2'::uuid], 6)) >= 0, 'Compre junto responde');
+update app.clientes set portal_ativo = true where id = '00000000-0000-0000-0000-0000000000c1';
+insert into app.portal_sessoes (token_hash, cliente_id, expira_em) values ('sessao-desc', '00000000-0000-0000-0000-0000000000c1', now() + interval '1 day');
+set role vc_app;
+select teste.como(:'KEILA');
+select teste.falha($$select app.salvar_desconto_quantidade(null, '', 5, 10, '', true)$$, 'Só gerente', 'Vendedora não cria desconto');
+select teste.como(:'GERENTE');
+select app.salvar_desconto_quantidade(null, '', 5, 10, '', true);
+select teste.como('');
+select app.portal_criar_pedido('sessao-desc', format('[{"produto_id":"%s","quantidade":6}]', :'PROD2')::jsonb) as ped_desc \gset
+reset role;
+select (select valor_total from app.pedidos where id = :'ped_desc') as antes \gset
+set role vc_app;
+select teste.como('');
+select teste.ok(app.portal_aplicar_desconto_quantidade('sessao-desc', :'ped_desc') > 0, 'Levando 6 (mínimo 5) o pedido ganha o desconto');
+reset role;
+select teste.ok((select valor_total from app.pedidos where id = :'ped_desc') < cast(:'antes' as numeric), 'Total cai com o desconto (preço em Gs arredondado)');
+select teste.ok((select descricao ilike '%por quantidade%' from app.pedido_itens where pedido_id = :'ped_desc' limit 1), 'Item mostra o desconto por quantidade');
+set role vc_app;
+select teste.como('');
+select teste.ok(app.portal_aplicar_desconto_quantidade('outra-sessao', :'ped_desc') = 0, 'Outro cliente não mexe no pedido');
+select app.registrar_evento_site('visita', 'nav-1', null, null, null, null, 'cd-foz');
+select app.registrar_evento_site('busca', 'nav-1', 'sessao-desc', null, 'shampoo', 3, 'cd-foz');
+select teste.ok((select count(*) from app.portal_reposicao('sessao-desc')) >= 1, 'Lista de reposição traz o que o cliente comprou');
+reset role;
+select teste.ok((select count(*) from app.eventos_site where sessao = 'nav-1') = 2, 'Eventos do site registrados');
 \echo '== Testes do caixa passaram =='

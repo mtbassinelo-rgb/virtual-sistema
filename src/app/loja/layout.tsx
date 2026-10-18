@@ -6,6 +6,7 @@ import { TEXTOS, idiomaAtual, textosCarrinho } from "@/lib/idioma";
 import { LINHAS, interno, linhaDe, marcaDe } from "@/lib/vitrine";
 import { BotaoCarrinho, Carrinho } from "./carrinho";
 import { ehPrincipal, unidadeLoja } from "@/lib/unidade";
+import { vendedoraDoLink } from "@/lib/vendedora-link";
 import { FecharMenus, MenuSite } from "./menu-site";
 import "./loja.css";
 
@@ -13,7 +14,21 @@ export const metadata = {
   title: { default: "Virtual Cosméticos · Distribuidora direto de fábrica em Foz do Iguaçu", template: "%s · Virtual Cosméticos" },
   description: "Distribuidora de cosméticos direto de fábrica em Foz do Iguaçu. Atacado para salões, perfumarias e revendedores: matizadores, kits capilares, corpo e banho, maquiagem e unhas.",
   robots: { index: true, follow: true },
+  openGraph: {
+    title: "Virtual Cosméticos · Distribuidora de cosméticos em Foz do Iguaçu",
+    description: "Atacado de cosméticos para salões, perfumarias e revendedores: matizadores, kits capilares, corpo e banho, maquiagem e unhas.",
+    images: [{ url: "/marca/logo.png" }], type: "website", locale: "pt_BR",
+  },
 };
+
+// Dados da empresa para o Google (aparece com nome, logo, cidade e redes sociais)
+const DADOS_EMPRESA = JSON.stringify({
+  "@context": "https://schema.org", "@type": "Store", name: "Virtual Cosméticos", url: "https://distribuidoravirtualcosmeticos.com/loja",
+  logo: "https://distribuidoravirtualcosmeticos.com/marca/logo.png", image: "https://distribuidoravirtualcosmeticos.com/marca/logo.png",
+  description: "Distribuidora de cosméticos direto de fábrica em Foz do Iguaçu. Atacado para salões, perfumarias e revendedores.",
+  address: { "@type": "PostalAddress", addressLocality: "Foz do Iguaçu", addressRegion: "PR", addressCountry: "BR" },
+  sameAs: ["https://www.instagram.com/distribuidoravirtualcosmeticos", "https://www.facebook.com/share/1BHjxdgnRH/"],
+});
 
 const INSTAGRAM = "https://www.instagram.com/distribuidoravirtualcosmeticos";
 const FACEBOOK = "https://www.facebook.com/share/1BHjxdgnRH/";
@@ -40,7 +55,10 @@ export default async function LayoutLoja({ children }: { children: React.ReactNo
   const idioma = await idiomaAtual();
   const t = TEXTOS[idioma];
   // Português: WhatsApp principal. Espanhol (clientes em guaranis): WhatsApp de vendas em Gs.
-  const numero = c?.vendedora_whatsapp
+  const vend = c ? null : await vendedoraDoLink();
+  const descontos = (await pool.query("select * from app.descontos_quantidade_ativos()")).rows
+    .map((d) => ({ marca: d.marca, min_qtd: Number(d.min_qtd), desconto_pct: Number(d.desconto_pct), pais: d.pais }));
+  const numero = c?.vendedora_whatsapp ?? vend?.whatsapp
     ?? String((await pool.query("select app.whatsapp_empresa($1) as w", [idioma === "es" ? "GS" : "BRL"])).rows[0]?.w ?? "");
   const zap = linkWhatsApp(numero, t.zapMsg);
   // Menu de categorias e marcas, com a quantidade de produtos de cada uma
@@ -57,11 +75,12 @@ export default async function LayoutLoja({ children }: { children: React.ReactNo
 
   return (
     <div className="loja" lang={idioma === "es" ? "es" : "pt-BR"}>
+      {principal && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: DADOS_EMPRESA }} />}
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
       <link rel="stylesheet" precedence="default"
             href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Figtree:wght@400;500;600;700&display=swap" />
-      <Carrinho cliente={c ? { nome: c.nome, vendedora: c.vendedora, moeda: c.moeda } : null} t={textosCarrinho(t, c)} unidade={unidade.codigo}>
+      <Carrinho cliente={c ? { nome: c.nome, vendedora: c.vendedora, moeda: c.moeda } : null} t={textosCarrinho(t, c)} unidade={unidade.codigo} descontos={descontos}>
         <div className="fixo">
         <header className="topo">
           <div className="in topo-in">
@@ -77,7 +96,7 @@ export default async function LayoutLoja({ children }: { children: React.ReactNo
               { titulo: t.marcas, links: [...marcas.slice().sort((a, b) => b[1] - a[1]).slice(0, 12).map(([m, n]) => ({ href: `/loja?marca=${encodeURIComponent(m)}#catalogo`, texto: m, qtd: n })),
                 { href: "/loja/marcas", texto: t.verTodasMarcas }] },
               { titulo: c ? c.nome : t.clientes, links: c
-                ? [{ href: "/loja/conta", texto: t.minhaConta }, { href: "/loja/pedidos", texto: t.meusPedidos }, { href: "/loja/sair", texto: t.sair }]
+                ? [{ href: "/loja/conta", texto: t.minhaConta }, { href: "/loja/reposicao", texto: t.reposicao }, { href: "/loja/pedidos", texto: t.meusPedidos }, { href: "/loja/sair", texto: t.sair }]
                 : [{ href: "/loja/cadastro", texto: t.querSerCliente }, { href: "/loja/acesso", texto: t.jaSouCliente }] },
               { linha: true, links: [{ href: `/loja/idioma?l=${t.idiomaCodigo}`, texto: t.idioma }, { href: INSTAGRAM, texto: "Instagram" }, { href: FACEBOOK, texto: "Facebook" }] },
             ]} />

@@ -57,3 +57,11 @@ export async function marcarVisto(fd: FormData) {
   }
   voltar(erro, "Marcado como visto.");
 }
+
+/** "Chegou": a vendedora avisou o cliente pelo WhatsApp que o produto voltou ao estoque. */
+export async function marcarAvisado(fd: FormData) {
+  const u = await exigirUsuario();
+  const id = String(fd.get("id") ?? "");
+  if (/^[0-9a-f-]{36}$/i.test(id)) await comUsuario(u.id, (c) => c.query("select app.marcar_procura_avisada($1)", [id]));
+  revalidatePath("/procuras");
+}

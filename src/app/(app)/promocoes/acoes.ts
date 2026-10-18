@@ -43,3 +43,11 @@ export async function encerrarPromocao(fd: FormData) {
   await executar("Promoção encerrada.", (uid) =>
     comUsuario(uid, (c) => c.query("update app.promocoes set status = 'encerrada' where id = $1 and status in ('proposta','aprovada')", [texto(fd, "id")])));
 }
+
+/** Desconto por quantidade: levando N caixas da marca (ou de qualquer marca), X% de desconto no pedido do site. */
+export async function salvarDescontoQuantidade(fd: FormData) {
+  const id = texto(fd, "id");
+  await executar(id ? "Desconto por quantidade atualizado." : "Desconto por quantidade criado: já aparece no carrinho dos clientes.", (uid) =>
+    comUsuario(uid, (c) => c.query("select app.salvar_desconto_quantidade(nullif($1,'')::uuid, $2, $3, $4, $5, $6)",
+      [id, texto(fd, "marca"), numero(fd, "min_qtd"), numero(fd, "desconto_pct"), texto(fd, "pais"), texto(fd, "ativo") !== "0"])));
+}

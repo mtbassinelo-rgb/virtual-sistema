@@ -20,7 +20,7 @@ teste.{$DOMINIO} {
 	# Site da loja de Ciudad del Este (mesmos produtos, estoque da loja)
 	@cde path /cde /cde/
 	redir @cde /loja/cde
-	@cliente path /loja /loja/* /_next/* /marca/* /fotos/* /icon.png /favicon.ico
+	@cliente path /loja /loja/* /_next/* /marca/* /fotos/* /icon.png /favicon.ico /robots.txt /sitemap.xml
 	handle @cliente {
 		reverse_proxy vc-app-producao:3000
 	}

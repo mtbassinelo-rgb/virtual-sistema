@@ -2,7 +2,7 @@ import { exigirUsuario, ehGestao } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
 import { data, hojeISO } from "@/lib/formato";
 import { Avisos, Selo } from "../avisos";
-import { decidirPromocao, encerrarPromocao, proporPromocao } from "./acoes";
+import { decidirPromocao, encerrarPromocao, proporPromocao, salvarDescontoQuantidade } from "./acoes";
 
 export const metadata = { title: "Promoções" };
 
@@ -26,6 +26,8 @@ export default async function Promocoes({ searchParams }: { searchParams: Promis
       `select * from app.v_giro where situacao in ('parado','baixo') order by situacao, cobertura_dias desc nulls first limit 60`)).rows,
     produtos: (await c.query("select id, codigo, nome from app.produtos where ativo order by nome")).rows,
     parametros: (await c.query("select chave, valor from app.parametros")).rows as { chave: string; valor: string }[],
+    descontos: (await c.query("select * from app.descontos_quantidade order by ativo desc, marca nulls first, min_qtd")).rows,
+    marcas: (await c.query("select distinct marca from app.produtos where ativo and marca is not null order by 1")).rows.map((x) => x.marca as string),
   }));
   const par = Object.fromEntries(d.parametros.map((x) => [x.chave, Number(x.valor)]));
 
@@ -39,6 +41,36 @@ export default async function Promocoes({ searchParams }: { searchParams: Promis
         </div>
       </section>
       <Avisos ok={f.ok} erro={f.erro} />
+
+      <section className="painel">
+        <h2 style={{ margin: 0 }}>Desconto por quantidade</h2>
+        <p className="suave pequeno" style={{ margin: 0 }}>Ex.: levando 10 caixas de MAYCRENE, 5% de desconto. O carrinho do cliente mostra "leve mais N caixas e ganhe X%" e o desconto entra sozinho no pedido feito pelo site. Produto já em promoção não leva o desconto de novo.</p>
+        {d.descontos.length > 0 && (
+          <div className="tabela"><table>
+            <thead><tr><th>Marca</th><th className="num">A partir de</th><th className="num">Desconto</th><th>País</th><th>Situação</th>{gestao && <th></th>}</tr></thead>
+            <tbody>{d.descontos.map((x) => (
+              <tr key={x.id}>
+                <td>{x.marca ?? "Qualquer marca"}</td><td className="num">{x.min_qtd} caixas</td><td className="num">{Number(x.desconto_pct)}%</td>
+                <td>{x.pais === "PY" ? "Paraguai" : x.pais === "BR" ? "Brasil" : "Os dois"}</td>
+                <td><Selo cor={x.ativo ? "ok" : ""}>{x.ativo ? "ativo" : "pausado"}</Selo></td>
+                {gestao && <td><form action={salvarDescontoQuantidade}>
+                  <input type="hidden" name="id" value={x.id} /><input type="hidden" name="marca" value={x.marca ?? ""} /><input type="hidden" name="min_qtd" value={x.min_qtd} />
+                  <input type="hidden" name="desconto_pct" value={x.desconto_pct} /><input type="hidden" name="pais" value={x.pais ?? ""} /><input type="hidden" name="ativo" value={x.ativo ? "0" : "1"} />
+                  <button className="discreto">{x.ativo ? "Pausar" : "Reativar"}</button></form></td>}
+              </tr>
+            ))}</tbody>
+          </table></div>
+        )}
+        {gestao && (
+          <form action={salvarDescontoQuantidade} className="campos">
+            <label>Marca<select name="marca" defaultValue=""><option value="">Qualquer marca</option>{d.marcas.map((m) => <option key={m} value={m}>{m}</option>)}</select></label>
+            <label>A partir de (caixas)<input name="min_qtd" inputMode="numeric" required placeholder="10" /></label>
+            <label>Desconto (%)<input name="desconto_pct" inputMode="decimal" required placeholder="5" /></label>
+            <label>País<select name="pais" defaultValue=""><option value="">Os dois</option><option value="PY">Paraguai</option><option value="BR">Brasil</option></select></label>
+            <button className="principal">Criar desconto</button>
+          </form>
+        )}
+      </section>
 
       <section className="painel">
         <h2>Promoções</h2>

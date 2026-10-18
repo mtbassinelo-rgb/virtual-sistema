@@ -18,7 +18,7 @@ export default async function Equipe({ searchParams }: { searchParams: Promise<{
   if (!ehGestao(u)) return <div className="painel">Só gerente ou dono cuida da equipe. Para trocar a sua senha, use Minha conta.</div>;
   const d = await comUsuario(u.id, async (c) => ({
     pessoas: (await c.query("select * from app.equipe()")).rows as Pessoa[],
-    vendedoras: (await c.query("select id, nome from app.vendedoras where nome <> 'Marketplace' order by nome")).rows as { id: string; nome: string }[],
+    vendedoras: (await c.query("select id, nome, slug from app.vendedoras where nome <> 'Marketplace' order by nome")).rows as { id: string; nome: string; slug: string | null }[],
     depositos: (await c.query("select id, nome from app.depositos where ativo order by tipo, nome")).rows as { id: string; nome: string }[],
     vinculos: (await c.query("select vendedora_id, deposito_id, padrao from app.vendedora_depositos")).rows as { vendedora_id: string; deposito_id: string; padrao: boolean }[],
   }));
@@ -73,7 +73,7 @@ export default async function Equipe({ searchParams }: { searchParams: Promise<{
             const form = `un-${v.id}`;
             return (
               <tr key={v.id}>
-                <td><b>{v.nome}</b><form id={form} action={salvarUnidadesVendedora}><input type="hidden" name="vendedora_id" value={v.id} /></form></td>
+                <td><b>{v.nome}</b>{v.slug && <div className="pequeno suave">Link de vendas: distribuidoravirtualcosmeticos.com/loja/v/{v.slug}</div>}<form id={form} action={salvarUnidadesVendedora}><input type="hidden" name="vendedora_id" value={v.id} /></form></td>
                 {d.depositos.map((x) => {
                   const vin = meus.find((m) => m.deposito_id === x.id);
                   return (

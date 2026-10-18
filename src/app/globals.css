@@ -263,3 +263,24 @@ button.discreto:hover { color: var(--erro); border-color: transparent; }
 .grupo-sugerido ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .grupo-sugerido li { display: grid; grid-template-columns: 170px minmax(0, 1fr) auto; gap: 8px; align-items: center; }
 .grupo-sugerido li input { padding: 4px 8px; }
+
+/* Catálogo para enviar (impressão / PDF) */
+.marcas-catalogo { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 4px 12px; }
+.catalogo-impresso { background: #fff; color: #222; padding: 18px; border-radius: 8px; border: 1px solid var(--linha); }
+.cat-capa { display: flex; align-items: center; gap: 18px; border-bottom: 3px solid #6b2387; padding-bottom: 12px; margin-bottom: 12px; }
+.cat-capa b { display: block; font-size: 1.4rem; color: #6b2387; } .cat-capa span { color: #666; }
+.cat-marca h2 { color: #6b2387; border-bottom: 1px solid #ddd; padding-bottom: 4px; margin: 18px 0 10px; break-after: avoid; }
+.cat-grade { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.cat-item { border: 1px solid #e5e5e5; border-radius: 8px; padding: 8px; break-inside: avoid; display: flex; flex-direction: column; gap: 4px; }
+.cat-item img { width: 100%; aspect-ratio: 1; object-fit: contain; background: #fff; }
+.cat-semfoto { width: 100%; aspect-ratio: 1; display: grid; place-items: center; background: #f3eafa; color: #6b2387; font-weight: 700; font-size: .8rem; text-align: center; }
+.cat-nome { font-size: .78rem; font-weight: 600; line-height: 1.25; }
+.cat-cx { font-size: .7rem; color: #777; }
+.cat-preco { font-size: .9rem; font-weight: 800; color: #6b2387; } .cat-preco small { font-weight: 500; color: #666; font-size: .7rem; }
+.cat-rodape { margin-top: 16px; font-size: .75rem; color: #777; text-align: center; }
+@media print {
+  .lateral, .barra-topo, .nao-imprimir, .menu-fundo, .abrir-menu { display: none !important; }
+  .casca { display: block !important; } main.conteudo { padding: 0 !important; max-width: none !important; }
+  .catalogo-impresso { border: 0; padding: 0; }
+  body { background: #fff !important; }
+}

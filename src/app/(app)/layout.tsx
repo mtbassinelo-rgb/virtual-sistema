@@ -24,8 +24,9 @@ export default async function AreaInterna({ children }: { children: React.ReactN
            ${gestao ? `(select count(*) from app.procuras where visto_em is null)::int` : "0"} as procuras,
            ${gestao ? `(select count(*) from app.fotos_catalogo where status = 'pendente')::int` : "0"} as fotos,
            (select count(*) from app.produtos p where p.ativo and not exists (select 1 from app.precos z where z.produto_id = p.id))::int as sem_preco,
-           (select count(*) from app.carrinhos_parados() where avisado_em is null)::int as carrinhos
-  `)).rows[0] as { pedidos_abertos: number; contas_vencidas: number; procuras: number; fotos: number; sem_preco: number; carrinhos: number }).catch(() => ({ pedidos_abertos: 0, contas_vencidas: 0, procuras: 0, fotos: 0, sem_preco: 0, carrinhos: 0 }));
+           (select count(*) from app.carrinhos_parados() where avisado_em is null)::int as carrinhos,
+           (select count(*) from app.procuras_chegaram())::int as chegaram
+  `)).rows[0] as { pedidos_abertos: number; contas_vencidas: number; procuras: number; fotos: number; sem_preco: number; carrinhos: number; chegaram: number }).catch(() => ({ pedidos_abertos: 0, contas_vencidas: 0, procuras: 0, fotos: 0, sem_preco: 0, carrinhos: 0, chegaram: 0 }));
 
   const grupos: GrupoMenu[] = [
     gestao
@@ -39,7 +40,8 @@ export default async function AreaInterna({ children }: { children: React.ReactN
       { href: "/clientes/carrinhos", texto: "Carrinhos parados", contador: n.carrinhos, dica: "Clientes que montaram carrinho e não enviaram" },
       { href: "/metas", texto: "Metas" },
       { href: "/promocoes", texto: "Promoções" },
-      ...(gestao ? [] : [{ href: "/procuras", texto: "Cliente pediu e não temos" }]),
+      ...(gestao ? [] : [{ href: "/procuras", texto: "Cliente pediu e não temos", contador: n.chegaram, dica: "Produtos que chegaram: avisar o cliente" }]),
+      { href: "/catalogo", texto: "Catálogo para enviar", dica: "Catálogo por marca com fotos e preços, para salvar em PDF e mandar no WhatsApp" },
     ] },
     { id: "produtos", titulo: "Produtos", icone: "produtos", itens: [
       { href: "/produtos", texto: "Todos os produtos" },
@@ -67,7 +69,8 @@ export default async function AreaInterna({ children }: { children: React.ReactN
       ...(gestao ? [
         { href: "/relatorios?aba=lucro", texto: "Lucro e rankings" },
         { href: "/relatorios?aba=envios", texto: "Envios ao Paraguai" },
-        { href: "/procuras", texto: "Procurados sem estoque", contador: n.procuras, dica: "Pedidos de produtos esgotados ainda não vistos" },
+        { href: "/procuras", texto: "Procurados sem estoque", contador: n.procuras + n.chegaram, dica: "Pedidos de produtos esgotados ainda não vistos e os que chegaram" },
+        { href: "/relatorios?aba=site", texto: "Funil do site", dica: "Visitas, carrinhos, pedidos e o que os clientes procuram" },
       ] : []),
     ] },
     gestao

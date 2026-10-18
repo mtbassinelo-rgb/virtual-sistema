@@ -3,7 +3,8 @@ import { exigirUsuario, ehGestao } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
 import { data, dataHora } from "@/lib/formato";
 import { Avisos, Selo } from "../avisos";
-import { marcarVisto, registrarProcura } from "./acoes";
+import { marcarAvisado, marcarVisto, registrarProcura } from "./acoes";
+import { linkWhatsApp } from "@/lib/formato";
 
 export const metadata = { title: "Procurados sem estoque" };
 
@@ -23,6 +24,7 @@ export default async function Procuras({ searchParams }: { searchParams: Promise
          from app.procuras q left join app.produtos p on p.id = q.produto_id
          left join app.clientes c on c.id = q.cliente_id left join app.usuarios u on u.id = q.criado_por
         order by q.criado_em desc limit 50`)).rows,
+    chegaram: (await c.query("select * from app.procuras_chegaram()")).rows as { id: string; produto: string; quantidade: string | null; cliente: string | null; whatsapp: string | null; vendedora: string | null; criado_em: string; estoque: string }[],
     produtos: (await c.query("select codigo, nome from app.produtos where ativo order by nome limit 3000")).rows,
     clientes: (await c.query("select id, nome from app.clientes where mesclado_em is null order by nome limit 2000")).rows,
   }));
@@ -40,6 +42,32 @@ export default async function Procuras({ searchParams }: { searchParams: Promise
           <Link key={n} className={`botao${n === dias ? " principal" : ""}`} href={`/procuras?dias=${n}`}>{n === 365 ? "1 ano" : `${n} dias`}</Link>))}</nav>}
       </section>
       <Avisos ok={f.ok} erro={f.erro} />
+
+      {d.chegaram.length > 0 && (
+        <section className="painel" style={{ borderColor: "#8fd3a6" }}>
+          <h2 style={{ margin: 0 }}>Chegou! Avise o cliente ({d.chegaram.length})</h2>
+          <p className="suave pequeno" style={{ margin: 0 }}>Estes clientes pediram um produto que estava esgotado e agora tem estoque. Clique no WhatsApp: a mensagem já vai escrita. Depois marque como avisado.</p>
+          <div className="tabela"><table>
+            <thead><tr><th>Produto</th><th>Cliente</th><th>Pediu em</th><th className="num">Estoque</th><th></th></tr></thead>
+            <tbody>{d.chegaram.map((x) => {
+              const msg = `Olá${x.cliente ? `, ${x.cliente.split(" ")[0]}` : ""}! Chegou o ${x.produto} que você pediu${x.quantidade ? ` (${Number(x.quantidade)} un.)` : ""}. Quer que eu separe para você?`;
+              const zap = x.whatsapp ? linkWhatsApp(x.whatsapp, msg) : null;
+              return (
+                <tr key={x.id}>
+                  <td>{x.produto}</td>
+                  <td>{x.cliente ?? "—"}{x.vendedora && <div className="pequeno suave">{x.vendedora}</div>}</td>
+                  <td>{data(x.criado_em)}</td>
+                  <td className="num">{Number(x.estoque).toLocaleString("pt-BR")}</td>
+                  <td className="linha" style={{ flexWrap: "nowrap" }}>
+                    {zap ? <a className="botao whatsapp" href={zap} target="_blank" rel="noopener noreferrer">WhatsApp</a> : <span className="suave pequeno">sem WhatsApp</span>}
+                    <form action={marcarAvisado}><input type="hidden" name="id" value={x.id} /><button className="discreto">Avisado</button></form>
+                  </td>
+                </tr>
+              );
+            })}</tbody>
+          </table></div>
+        </section>
+      )}
 
       <section className="painel">
         <h2>Registrar pedido de produto que não temos</h2>
