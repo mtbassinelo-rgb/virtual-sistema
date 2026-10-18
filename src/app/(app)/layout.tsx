@@ -47,7 +47,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
         { href: "/produtos/fotos", texto: "Fotos do catálogo", contador: n.fotos, dica: "Fotos esperando conferência" },
         { href: "/estoque/precos", texto: "Preços por planilha" },
       ] : []),
-      { href: "/produtos?filtro=sem-foto", texto: "Sem foto" },
+      ...(gestao ? [{ href: "/produtos/fotos-faltando", texto: "Buscar fotos", dica: "Produtos sem foto: procure no Google e arraste a foto aprovada" }] : [{ href: "/produtos?filtro=sem-foto", texto: "Sem foto" }]),
       { href: "/produtos?filtro=inativos", texto: "Inativos" },
     ] },
     { id: "estoque", titulo: "Estoque", icone: "estoque", itens: [

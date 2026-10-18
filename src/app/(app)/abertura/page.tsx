@@ -73,7 +73,7 @@ export default async function Abertura({ searchParams }: { searchParams: Promise
         <a className="atalho" href="#precos"><b>{comCat.length}</b><span>com preço sugerido pela planilha</span></a>
         <Link className="atalho" href="/produtos/precos-rapido?mostrar=sem-preco"><b>{semCat.length}</b><span>sem categoria: preencher à mão</span></Link>
         <a className="atalho" href="#estoque"><b>{d.prov.length}</b><span>com estoque provisório de 240</span></a>
-        <Link className="atalho" href="/produtos?filtro=sem-foto"><b>{d.semFoto}</b><span>sem foto</span></Link>
+        <Link className="atalho" href="/produtos/fotos-faltando"><b>{d.semFoto}</b><span>sem foto</span></Link>
       </section>
 
       <section className="painel" id="precos">

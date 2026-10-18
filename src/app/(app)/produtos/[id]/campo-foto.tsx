@@ -8,7 +8,22 @@ import { enviarFotoProduto } from "../acoes";
  * Foto do produto: arraste a imagem, cole (Ctrl+V), clique para escolher ou informe o link.
  * Produto já cadastrado: a foto é salva na hora. Produto novo: vai junto quando clicar em Criar.
  */
-export function CampoFoto({ produtoId, fotoAtual, nome }: { produtoId: string | null; fotoAtual: string | null; nome: string }) {
+/** Link de imagem do Google (imgres?imgurl=…) aponta para a foto original. */
+function linkDireto(l: string): string {
+  try { const u = new URL(l); const d = u.searchParams.get("imgurl") || u.searchParams.get("mediaurl"); if (d) return d; } catch { /* segue */ }
+  return l;
+}
+
+/** Imagem arrastada do Google às vezes vem embutida no próprio link (data:image/…). */
+function arquivoDeDataUrl(d: string): File | null {
+  const m = /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/i.exec(d.trim());
+  if (!m) return null;
+  const bin = atob(m[2]); const b = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i);
+  return new File([b], `foto.${m[1].split("/")[1].replace("jpeg", "jpg")}`, { type: m[1].toLowerCase() });
+}
+
+export function CampoFoto({ produtoId, fotoAtual, nome, compacto }: { produtoId: string | null; fotoAtual: string | null; nome: string; compacto?: boolean }) {
   const router = useRouter();
   const arquivo = useRef<HTMLInputElement>(null);
   const [previa, setPrevia] = useState<string | null>(fotoAtual);
@@ -49,7 +64,9 @@ export function CampoFoto({ produtoId, fotoAtual, nome }: { produtoId: string | 
   }
 
   function usarLink(l: string) {
-    const v = l.trim();
+    const dados = arquivoDeDataUrl(l);
+    if (dados) { setLink(""); return usarArquivo(dados); }
+    const v = linkDireto(l.trim());
     if (!/^https?:\/\//i.test(v)) { setMsg({ erro: "Cole o link completo da foto, começando com https://" }); return; }
     if (produtoId) {
       const fd = new FormData(); fd.set("foto_link", v);
@@ -66,8 +83,12 @@ export function CampoFoto({ produtoId, fotoAtual, nome }: { produtoId: string | 
     const f = e.dataTransfer.files?.[0];
     if (f) return usarArquivo(f);
     // imagem arrastada de outra aba do navegador: vem como link
+    const html = e.dataTransfer.getData("text/html");
+    const src = /<img[^>]+src="([^"]+)"/i.exec(html)?.[1]?.replace(/&amp;/g, "&");
     const url = e.dataTransfer.getData("text/uri-list") || e.dataTransfer.getData("text/plain");
-    if (url) usarLink(url.split("\n")[0]);
+    // do Google o link costuma ser a página de resultado; a imagem em si vem no HTML arrastado
+    const escolhido = url && /[?&](imgurl|mediaurl)=/.test(url) ? url : (src || url);
+    if (escolhido) usarLink(escolhido.split("\n")[0]);
   }
 
   function aoColar(e: React.ClipboardEvent) {
@@ -79,7 +100,7 @@ export function CampoFoto({ produtoId, fotoAtual, nome }: { produtoId: string | 
   }
 
   return (
-    <div className="campo-foto" onPaste={aoColar}>
+    <div className={`campo-foto ${compacto ? "compacto" : ""}`} onPaste={aoColar}>
       <div
         className={`soltar-foto ${sobre ? "sobre" : ""} ${salvando ? "salvando" : ""}`}
         role="button" tabIndex={0} aria-label="Escolher, arrastar ou colar a foto do produto"
