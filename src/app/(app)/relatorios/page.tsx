@@ -14,6 +14,9 @@ const ABAS = [
 ] as const;
 
 type Soma = { moeda: Moeda; pedidos: number; vendido: string; recebido: string; saldo: string };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Lin = Record<string, any>;
+type Dados = { totais?: Soma[]; vend?: Lin[]; meses?: Lin[]; canais?: Lin[]; itens?: Lin[]; marcas?: Lin[]; g?: Lin[]; cat?: Lin; fotos?: number };
 
 export default async function Relatorios({ searchParams }: { searchParams: Promise<{ aba?: string; de?: string; ate?: string }> }) {
   const u = await exigirUsuario();
@@ -23,7 +26,7 @@ export default async function Relatorios({ searchParams }: { searchParams: Promi
   const ate = /^\d{4}-\d{2}-\d{2}$/.test(f.ate ?? "") ? f.ate! : hojeISO();
   const url = (m: Record<string, string>) => `/relatorios?${new URLSearchParams({ aba: aba.k, de, ate, ...m })}`;
 
-  const d = await comUsuario(u.id, async (c) => {
+  const d: Dados = await comUsuario(u.id, async (c): Promise<Dados> => {
     if (aba.k === "vendas") {
       const per = `p.status_comercial <> 'cancelado' and p.data_pedido between $1::date and $2::date`;
       const totais = (await c.query(`select p.moeda, count(*)::int pedidos, sum(p.valor_total) vendido, sum(p.recebido) recebido, sum(p.saldo) saldo
@@ -70,7 +73,8 @@ export default async function Relatorios({ searchParams }: { searchParams: Promi
     return { cat, marcas, fotos };
   });
 
-  const maxMes = (moeda: string) => Math.max(1, ...((d as { meses?: { moeda: string; vendido: string }[] }).meses ?? []).filter((m) => m.moeda === moeda).map((m) => Number(m.vendido)));
+  const { totais = [], vend = [], meses = [], canais = [], itens = [], marcas = [], g = [], cat, fotos = 0 } = d;
+  const maxMes = (moeda: string) => Math.max(1, ...meses.filter((m) => m.moeda === moeda).map((m) => Number(m.vendido)));
 
   return (
     <>
@@ -99,10 +103,10 @@ export default async function Relatorios({ searchParams }: { searchParams: Promi
         </div>
       )}
 
-      {aba.k === "vendas" && "totais" in d && (
+      {aba.k === "vendas" && (
         <>
-          {d.totais.length === 0 && <div className="painel vazio">Nenhuma venda entre {data(de)} e {data(ate)}.</div>}
-          {d.totais.map((t) => (
+          {totais.length === 0 && <div className="painel vazio">Nenhuma venda entre {data(de)} e {data(ate)}.</div>}
+          {totais.map((t) => (
             <section key={t.moeda} className="indicadores">
               <div className="indicador"><span className="rotulo">Vendido ({t.moeda === "GS" ? "Gs" : "R$"})</span><span className="valor">{dinheiro(t.vendido, t.moeda)}</span></div>
               <div className="indicador"><span className="rotulo">Pedidos</span><span className="valor">{t.pedidos}</span></div>
@@ -114,9 +118,9 @@ export default async function Relatorios({ searchParams }: { searchParams: Promi
           <div className="duas-colunas">
             <section className="painel">
               <h2>Por vendedora</h2>
-              {d.vend.length === 0 ? <div className="vazio">Sem vendas no período.</div> : (
-                <div className="grafico-barras">{d.vend.map((v) => {
-                  const max = Math.max(...d.vend.filter((x) => x.moeda === v.moeda).map((x) => Number(x.vendido)), 1);
+              {vend.length === 0 ? <div className="vazio">Sem vendas no período.</div> : (
+                <div className="grafico-barras">{vend.map((v) => {
+                  const max = Math.max(...vend.filter((x) => x.moeda === v.moeda).map((x) => Number(x.vendido)), 1);
                   return (
                     <div key={v.nome + v.moeda} className="lin">
                       <span>{v.nome} <span className="suave pequeno">({v.pedidos})</span></span>
@@ -128,8 +132,8 @@ export default async function Relatorios({ searchParams }: { searchParams: Promi
             </section>
             <section className="painel">
               <h2>Por canal</h2>
-              {d.canais.length === 0 ? <div className="vazio">Sem vendas no período.</div> : (
-                <div className="tabela"><table style={{ minWidth: 0 }}><tbody>{d.canais.map((c) => (
+              {canais.length === 0 ? <div className="vazio">Sem vendas no período.</div> : (
+                <div className="tabela"><table style={{ minWidth: 0 }}><tbody>{canais.map((c) => (
                   <tr key={c.canal + c.moeda}><td>{c.canal}</td><td className="num">{c.pedidos} ped.</td><td className="num">{dinheiro(c.vendido, c.moeda)}</td></tr>
                 ))}</tbody></table></div>
               )}
@@ -138,7 +142,7 @@ export default async function Relatorios({ searchParams }: { searchParams: Promi
           <section className="painel">
             <h2>Últimos 6 meses</h2>
             {["GS", "BRL"].map((m) => {
-              const lin = d.meses.filter((x) => x.moeda === m);
+              const lin = meses.filter((x) => x.moeda === m);
               if (!lin.length) return null;
               return (
                 <div key={m} className="grafico-barras">
@@ -157,14 +161,14 @@ export default async function Relatorios({ searchParams }: { searchParams: Promi
         </>
       )}
 
-      {aba.k === "produtos" && "itens" in d && (
+      {aba.k === "produtos" && (
         <div className="duas-colunas">
           <section className="painel">
             <h2>Produtos mais vendidos</h2>
-            {d.itens.length === 0 ? <div className="vazio">Nenhum item vendido no período.</div> : (
+            {itens.length === 0 ? <div className="vazio">Nenhum item vendido no período.</div> : (
               <div className="tabela"><table>
                 <thead><tr><th>#</th><th>Produto</th><th>Qtd.</th><th>Pedidos</th><th>Total</th></tr></thead>
-                <tbody>{d.itens.map((i, n) => (
+                <tbody>{itens.map((i, n) => (
                   <tr key={(i.id ?? i.nome) + i.moeda}>
                     <td className="num suave">{n + 1}</td>
                     <td>{i.id ? <Link href={`/produtos/${i.id}`}>{i.nome}</Link> : i.nome}<div className="pequeno suave">{i.marca ?? ""}</div></td>
@@ -177,10 +181,10 @@ export default async function Relatorios({ searchParams }: { searchParams: Promi
           </section>
           <section className="painel">
             <h2>Por marca (peças)</h2>
-            <div className="grafico-barras">{d.marcas.map((m) => (
+            <div className="grafico-barras">{marcas.map((m) => (
               <div key={m.marca} className="lin">
                 <span>{m.marca}</span>
-                <Barra percentual={(Number(m.qtd) / Math.max(1, Number(d.marcas[0]?.qtd ?? 1))) * 100} />
+                <Barra percentual={(Number(m.qtd) / Math.max(1, Number(marcas[0]?.qtd ?? 1))) * 100} />
                 <span className="num">{Number(m.qtd).toLocaleString("pt-BR")}</span>
               </div>))}
             </div>
@@ -188,13 +192,13 @@ export default async function Relatorios({ searchParams }: { searchParams: Promi
         </div>
       )}
 
-      {aba.k === "estoque" && "g" in d && (
+      {aba.k === "estoque" && (
         <section className="painel">
           <p className="suave pequeno" style={{ margin: 0 }}>Baixo: acaba em poucos dias no ritmo atual. Esgotado: saldo zero. Parado: tem estoque mas quase não vende. Os números usam as vendas enviadas ou entregues.</p>
-          {d.g.length === 0 ? <div className="vazio">Nada acabando nem parado. Tudo certo.</div> : (
+          {g.length === 0 ? <div className="vazio">Nada acabando nem parado. Tudo certo.</div> : (
             <div className="tabela"><table>
               <thead><tr><th>Situação</th><th>Produto</th><th>Depósito</th><th>Saldo</th><th>Vendido 30 dias</th><th>Dura</th><th>Última venda</th></tr></thead>
-              <tbody>{d.g.map((x) => (
+              <tbody>{g.map((x) => (
                 <tr key={x.produto_id + x.deposito}>
                   <td><Selo cor={x.situacao === "baixo" ? "aviso" : x.situacao === "esgotado" ? "erro" : ""}>{x.situacao}</Selo></td>
                   <td><Link href={`/produtos/${x.produto_id}`}>{x.produto}</Link><div className="pequeno suave">{x.codigo}</div></td>
@@ -209,22 +213,22 @@ export default async function Relatorios({ searchParams }: { searchParams: Promi
         </section>
       )}
 
-      {aba.k === "catalogo" && "cat" in d && (
+      {aba.k === "catalogo" && cat && (
         <>
           <section className="atalhos">
-            <Link className="atalho" href="/produtos/precos-rapido?mostrar=sem-preco"><b>{d.cat.sem_preco}</b><span>sem nenhum preço · arrumar agora</span></Link>
-            <Link className="atalho" href="/produtos/precos-rapido?mostrar=incompleto"><b>{Math.max(d.cat.sem_gs, d.cat.sem_brl)}</b><span>falta preço em Gs ({d.cat.sem_gs}) ou em R$ ({d.cat.sem_brl})</span></Link>
-            <Link className="atalho" href="/produtos?filtro=sem-foto"><b>{d.cat.sem_foto}</b><span>sem foto</span></Link>
-            <Link className="atalho" href="/produtos/precos-rapido?mostrar=sem-caixa"><b>{d.cat.sem_caixa}</b><span>sem peças por caixa</span></Link>
-            {d.fotos > 0 && <Link className="atalho" href="/produtos/fotos"><b>{d.fotos}</b><span>fotos do catálogo para conferir</span></Link>}
-            <Link className="atalho" href="/produtos?filtro=inativos"><b>{d.cat.inativos}</b><span>inativos (não aparecem na loja)</span></Link>
+            <Link className="atalho" href="/produtos/precos-rapido?mostrar=sem-preco"><b>{cat.sem_preco}</b><span>sem nenhum preço · arrumar agora</span></Link>
+            <Link className="atalho" href="/produtos/precos-rapido?mostrar=incompleto"><b>{Math.max(cat.sem_gs, cat.sem_brl)}</b><span>falta preço em Gs ({cat.sem_gs}) ou em R$ ({cat.sem_brl})</span></Link>
+            <Link className="atalho" href="/produtos?filtro=sem-foto"><b>{cat.sem_foto}</b><span>sem foto</span></Link>
+            <Link className="atalho" href="/produtos/precos-rapido?mostrar=sem-caixa"><b>{cat.sem_caixa}</b><span>sem peças por caixa</span></Link>
+            {fotos > 0 && <Link className="atalho" href="/produtos/fotos"><b>{fotos}</b><span>fotos do catálogo para conferir</span></Link>}
+            <Link className="atalho" href="/produtos?filtro=inativos"><b>{cat.inativos}</b><span>inativos (não aparecem na loja)</span></Link>
           </section>
           <section className="painel">
             <h2>Por marca</h2>
-            <p className="suave pequeno" style={{ margin: 0 }}>{d.cat.ativos} produtos ativos. Clique na marca para preencher os preços que faltam.</p>
+            <p className="suave pequeno" style={{ margin: 0 }}>{cat.ativos} produtos ativos. Clique na marca para preencher os preços que faltam.</p>
             <div className="tabela"><table>
               <thead><tr><th>Marca</th><th>Ativos</th><th>Sem preço</th><th>Sem foto</th><th>Pronto para vender</th></tr></thead>
-              <tbody>{d.marcas.map((m) => {
+              <tbody>{marcas.map((m) => {
                 const ok = Math.max(0, 100 - (m.sem_preco / Math.max(1, m.total)) * 100);
                 return (
                   <tr key={m.marca}>
