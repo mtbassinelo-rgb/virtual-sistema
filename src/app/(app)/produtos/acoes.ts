@@ -221,46 +221,58 @@ function valorDigitado(s: string): number | null {
   return n;
 }
 
-/** Tabela de produtos: salva de uma vez preços, peças por caixa e estoque mínimo alterados (só gerente ou dono). */
-export async function salvarGradeProdutos(fd: FormData) {
+/**
+ * Tabela de produtos: salva de uma vez preços, preço promocional, peças por caixa e estoque mínimo alterados
+ * (só gerente ou dono). Com desfazer=1, preço em branco tira o preço lançado hoje (volta o anterior).
+ */
+export async function salvarGradeProdutos(fd: FormData): Promise<{ ok?: string; erro?: string }> {
   const u = await exigirUsuario();
-  const v = texto(fd, "volta");
-  const volta = /^\/produtos(\?[\w=&%.+-]*)?$/.test(v) ? v : "/produtos";
-  let q: string;
+  const desfazer = texto(fd, "desfazer") === "1";
   try {
     if (!ehGestao(u)) throw new Error("Só gerente ou dono altera preços, caixa e estoque mínimo.");
     const precos: { id: string; tabela: string; valor: number }[] = [];
+    const remover: { id: string; tabela: string }[] = [];
+    const promos: { id: string; pais: string; valor: number | null }[] = [];
     const caixas: { id: string; unidades: string }[] = [];
     const minimos: { id: string; minimo: string }[] = [];
     for (const [k, val] of fd.entries()) {
       const s = String(val);
       let m = /^p:([0-9a-f-]{36}):(py_normal|py_vip|br_normal|br_vip)$/i.exec(k);
-      if (m) { const n = valorDigitado(s); if (n != null) precos.push({ id: m[1], tabela: m[2], valor: n }); continue; }
+      if (m) {
+        const n = valorDigitado(s);
+        if (n != null) precos.push({ id: m[1], tabela: m[2], valor: n });
+        else if (desfazer) remover.push({ id: m[1], tabela: m[2] });
+        continue;
+      }
+      m = /^promo:([0-9a-f-]{36}):(PY|BR)$/.exec(k);
+      if (m) { promos.push({ id: m[1], pais: m[2], valor: valorDigitado(s) }); continue; }
       m = /^caixa:([0-9a-f-]{36})$/i.exec(k);
       if (m) { caixas.push({ id: m[1], unidades: s.replace(/\D/g, "") }); continue; }
       m = /^min:([0-9a-f-]{36})$/i.exec(k);
       if (m) minimos.push({ id: m[1], minimo: s.replace(/\D/g, "") });
     }
-    if (!precos.length && !caixas.length && !minimos.length) throw new Error("Nenhuma alteração para salvar.");
+    if (!precos.length && !remover.length && !promos.length && !caixas.length && !minimos.length) throw new Error("Nenhuma alteração para salvar.");
     const r = await comUsuario(u.id, async (c) => {
       const ids = [...new Set([...precos, ...caixas].map((x) => x.id))];
       const cod = new Map((await c.query("select id::text, codigo from app.produtos where id = any($1::uuid[])", [ids])).rows.map((x) => [x.id, x.codigo]));
-      let nc = 0, np = 0, nm = 0;
+      let nc = 0, np = 0, nm = 0, npr = 0;
       if (caixas.length) nc = Number((await c.query("select app.definir_caixas($1::jsonb) as n",
         [JSON.stringify(caixas.filter((x) => cod.has(x.id)).map((x) => ({ codigo: cod.get(x.id), unidades: x.unidades })))])).rows[0].n);
       if (precos.length) np = Number((await c.query("select app.importar_precos($1::jsonb) as r",
         [JSON.stringify(precos.filter((p) => cod.has(p.id)).map((p) => ({ codigo: cod.get(p.id), tabela: p.tabela, valor: p.valor })))])).rows[0].r.alterados);
+      for (const x of remover) if ((await c.query("select app.remover_preco_de_hoje($1, $2) as ok", [x.id, x.tabela])).rows[0].ok) np++;
       if (minimos.length) nm = Number((await c.query("select app.definir_estoque_minimo($1::jsonb) as n", [JSON.stringify(minimos)])).rows[0].n);
-      return { nc, np, nm };
+      // promoção depois dos preços: o desconto é calculado sobre o preço normal já atualizado
+      for (const x of promos) { await c.query("select app.definir_preco_promocional($1, $2::app.pais, $3)", [x.id, x.pais, x.valor]); npr++; }
+      return { nc, np, nm, npr };
     });
-    const partes = [r.np && `${r.np} preço(s)`, r.nc && `${r.nc} caixa(s)`, r.nm && `${r.nm} estoque(s) mínimo(s)`].filter(Boolean);
-    q = "ok=" + encodeURIComponent(partes.length ? `Salvo: ${partes.join(", ")}.` : "Nada mudou.");
+    revalidatePath("/produtos");
+    revalidatePath("/loja");
+    const partes = [r.np && `${r.np} preço(s)`, r.npr && `${r.npr} preço(s) promocional(is)`, r.nc && `${r.nc} caixa(s)`, r.nm && `${r.nm} estoque(s) mínimo(s)`].filter(Boolean);
+    return { ok: partes.length ? `${desfazer ? "Desfeito" : "Salvo"}: ${partes.join(", ")}.` : "Nada mudou." };
   } catch (e) {
-    q = "erro=" + encodeURIComponent(mensagemErro(e));
+    return { erro: mensagemErro(e) };
   }
-  revalidatePath("/produtos");
-  revalidatePath("/loja");
-  redirect(`${volta}${volta.includes("?") ? "&" : "?"}${q}`);
 }
 
 /** Botão A/D da lista: ativa ou desativa um produto no site na hora. */
@@ -279,7 +291,7 @@ export async function alternarAtivo(id: string, ativar: boolean): Promise<{ erro
 }
 
 /** Botão E da lista: exclui o produto. Quem já teve pedido ou estoque fica inativo em vez de apagado. */
-export async function excluirProduto(id: string): Promise<{ erro?: string; msg?: string }> {
+export async function excluirProduto(id: string): Promise<{ erro?: string; msg?: string; desativado?: boolean }> {
   const u = await exigirUsuario();
   try {
     if (!ehGestao(u)) throw new Error("Só gerente ou dono exclui produtos.");
@@ -289,7 +301,8 @@ export async function excluirProduto(id: string): Promise<{ erro?: string; msg?:
     for (const f of r.fotos) await rm(path.join(pastaFotos(), path.basename(f)), { force: true });
     revalidatePath("/produtos");
     revalidatePath("/loja");
-    return { msg: r.excluidos ? "Produto excluído." : "Esse produto já tem pedido ou movimento de estoque, então não pode ser apagado: ficou desativado." };
+    return r.excluidos ? { msg: "Produto excluído." }
+      : { msg: "Esse produto já tem pedido ou movimento de estoque, então não pode ser apagado: ficou desativado.", desativado: true };
   } catch (e) {
     return { erro: mensagemErro(e) };
   }

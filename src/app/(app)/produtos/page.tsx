@@ -13,7 +13,7 @@ const POR_PAGINA = 60;
 const MOSTRAR: [string, string][] = [
   ["", "Ativos"], ["abaixo-minimo", "Abaixo do estoque mínimo"], ["sem-estoque", "Sem estoque"], ["com-estoque", "Com estoque"],
   ["sem-minimo", "Sem estoque mínimo"], ["sem-preco", "Sem preço"], ["sem-preco-gs", "Sem preço em Gs"], ["sem-preco-br", "Sem preço em R$"],
-  ["sem-foto", "Sem foto"], ["sem-caixa", "Sem peças por caixa"], ["inativos", "Inativos"], ["todos", "Todos"],
+  ["em-promocao", "Em promoção"], ["sem-foto", "Sem foto"], ["sem-caixa", "Sem peças por caixa"], ["inativos", "Inativos"], ["todos", "Todos"],
 ];
 const ORDEM: Record<string, [string, string]> = {
   "": ["Nome (A-Z)", "p.nome"],
@@ -48,6 +48,7 @@ export default async function Produtos({ searchParams }: { searchParams: Promise
     "sem-preco-gs": "x.py_normal is null",
     "sem-preco-br": "x.br_normal is null",
     "sem-foto": "p.foto is null",
+    "em-promocao": "exists (select 1 from app.promocoes pr where pr.produto_id = p.id and pr.status = 'aprovada' and current_date between pr.inicio and pr.fim)",
     "sem-caixa": "p.unidades_caixa is null",
   };
   if (f.filtro && filtros[f.filtro]) cond.push(filtros[f.filtro]);
@@ -56,6 +57,10 @@ export default async function Produtos({ searchParams }: { searchParams: Promise
 
   const precos = ["py_normal", "py_vip", "br_normal", "br_vip"].map((t) =>
     `(select valor from app.precos z where z.produto_id = p.id and z.tabela = '${t}' and z.vigente_desde <= current_date order by vigente_desde desc limit 1) as ${t}`).join(", ");
+  const promo = (pais: string, tabela: string, moeda: string) =>
+    `(select app.arredondar_preco(x.${tabela} * (1 - pr.desconto_pct / 100), '${moeda}') from app.promocoes pr
+       where pr.produto_id = p.id and pr.pais = '${pais}' and pr.status = 'aprovada' and current_date between pr.inicio and pr.fim
+       order by pr.criada_em desc limit 1)`;
   const d = await comUsuario(u.id, async (c) => {
     const base = `from app.produtos p
       cross join lateral (select ${precos}) x
@@ -64,7 +69,9 @@ export default async function Produtos({ searchParams }: { searchParams: Promise
       where ${cond.join(" and ")}`;
     const total = Number((await c.query(`select count(*) n ${base}`, par)).rows[0].n);
     const lista = (await c.query(`select p.id, p.codigo, p.nome, p.marca, p.foto, p.tipo, p.ativo, p.codigo_provisorio, p.unidades_caixa,
-        p.estoque_minimo, s.saldo, x.* ${base} order by ${ordem[1]} limit ${POR_PAGINA} offset ${(pagina - 1) * POR_PAGINA}`, par)).rows as LinhaProduto[];
+        p.estoque_minimo, s.saldo, x.*, ${promo("PY", "py_normal", "GS")} as promo_py, ${promo("BR", "br_normal", "BRL")} as promo_br,
+        (select max(pr.fim) from app.promocoes pr where pr.produto_id = p.id and pr.status = 'aprovada' and current_date between pr.inicio and pr.fim)::text as promo_fim
+        ${base} order by ${ordem[1]} limit ${POR_PAGINA} offset ${(pagina - 1) * POR_PAGINA}`, par)).rows as LinhaProduto[];
     const marcas = (await c.query("select marca, count(*)::int n from app.produtos where ativo and marca is not null group by marca order by marca")).rows as { marca: string; n: number }[];
     const abaixo = Number((await c.query("select count(*) n from app.v_abaixo_minimo")).rows[0].n);
     const fotosPendentes = gestao ? Number((await c.query("select count(*) n from app.fotos_catalogo where status = 'pendente'")).rows[0].n) : 0;
@@ -84,7 +91,7 @@ export default async function Produtos({ searchParams }: { searchParams: Promise
       <section className="cabecalho-pagina">
         <div>
           <h1>Produtos</h1>
-          <p>{d.total.toLocaleString("pt-BR")} produto(s){gestao ? ". Mude preço, caixa ou estoque mínimo direto na tabela e clique em Salvar; marque vários para ativar, inativar ou excluir de uma vez." : "."}</p>
+          <p>{d.total.toLocaleString("pt-BR")} produto(s){gestao ? ". Mude preço, preço promocional, caixa ou estoque mínimo direto na tabela e salve (dá para desfazer); marque vários para ativar, inativar ou excluir de uma vez." : "."}</p>
         </div>
         {gestao && (
           <div className="linha">
@@ -144,7 +151,7 @@ export default async function Produtos({ searchParams }: { searchParams: Promise
       )}
       {d.lista.length === 0
         ? <div className="painel vazio">Nenhum produto com esse filtro.</div>
-        : <TabelaProdutos linhas={d.lista} gestao={gestao} acao={salvarGradeProdutos} volta={volta} />}
+        : <TabelaProdutos linhas={d.lista} gestao={gestao} acao={salvarGradeProdutos} />}
       {paginas > 1 && (
         <div className="linha" style={{ justifyContent: "center" }}>
           {pagina > 1 && <a className="botao" href={url({ pagina: pagina - 1 })}>Anterior</a>}

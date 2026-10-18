@@ -146,4 +146,22 @@ select app.bloquear_portal(:'JULISA');
 select teste.como('');
 select teste.ok((select count(*) from app.portal_perfil('sessao-1')) = 0, 'Acesso bloqueado derruba a sessão do cliente');
 reset role;
+
+\echo '== Preço promocional pela lista =='
+set role vc_app;
+select teste.como(:'KEILA');
+select teste.falha($$select app.definir_preco_promocional('00000000-0000-0000-0000-0000000000b2', 'PY', 15000)$$, 'Só gerente', 'Vendedora não define preço promocional');
+select teste.como(:'GERENTE');
+select teste.falha($$select app.definir_preco_promocional('00000000-0000-0000-0000-0000000000b2', 'PY', 18000)$$, 'menor que o normal', 'Promo precisa ser abaixo do preço normal');
+select teste.falha($$select app.definir_preco_promocional('00000000-0000-0000-0000-0000000000b2', 'BR', 5)$$, 'preço normal', 'Sem preço normal não tem promo');
+select teste.ok(app.definir_preco_promocional('00000000-0000-0000-0000-0000000000b2', 'PY', 15300) = 10, 'Promo de 15.300 sobre 17.000 = 10% de desconto');
+select teste.ok(exists (select 1 from app.promocoes where produto_id = '00000000-0000-0000-0000-0000000000b2' and pais = 'PY' and desconto_pct = 10 and status = 'aprovada' and inicio = current_date), 'Promo da lista já entra aprovada');
+select app.definir_preco_promocional('00000000-0000-0000-0000-0000000000b2', 'PY', 13600);
+select teste.ok((select count(*) from app.promocoes where produto_id = '00000000-0000-0000-0000-0000000000b2' and pais = 'PY' and status = 'aprovada') = 1, 'Novo preço promocional substitui o anterior');
+select app.definir_preco_promocional('00000000-0000-0000-0000-0000000000b2', 'PY', null);
+select teste.ok(not exists (select 1 from app.promocoes where produto_id = '00000000-0000-0000-0000-0000000000b2' and status = 'aprovada'), 'Apagar o preço promocional encerra a promo');
+select app.importar_precos('[{"codigo":"RHE-011","tabela":"py_normal","valor":19000}]');
+select teste.ok(app.remover_preco_de_hoje('00000000-0000-0000-0000-0000000000b2', 'py_normal'), 'Desfazer tira o preço de hoje');
+select teste.ok((select valor from app.precos where produto_id = '00000000-0000-0000-0000-0000000000b2' and tabela = 'py_normal' order by vigente_desde desc limit 1) = 17000, 'E volta a valer o preço anterior');
+reset role;
 \echo '== Testes da área de atacado passaram =='
