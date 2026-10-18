@@ -63,7 +63,7 @@ insert into regra (m, n, k) values
 ('RHEN+UKS','MOUSSE','RHE-011'),('RHEN+UKS','SABONETE L[ÍI]QUIDO','RHE-012'),('RHEN+UKS','PROTETOR T[ÉE]RMICO|SPRAY','RHE-010'),
 ('RHEN+UKS','BUMBUM|MICONA','RHE-009'),('RHEN+UKS','^GEL |GEL ','RHE-008'),('RHEN+UKS','HIDRATANTE','RHE-003'),
 -- Soul / Babasoul
-('SOUL','KIT CAPILAR.*SOS|SOS ABSOLUTO|MIX DE SILICONE','SOU-016'),('SOUL','KIT GLOW','SOU-018'),('SOUL','KIT CAPILAR|KIT ','SOU-015'),
+('SOUL','KIT.*(SOS|SILICONE)','SOU-016'),('SOUL','KIT GLOW','SOU-018'),('SOUL','KIT CAPILAR|KIT ','SOU-015'),
 ('SOUL','GEL SEXY','SOU-010'),('SOUL','PERFUME DE CALCINHA','SOU-029'),('SOUL','DESODORANTE [ÍI]NTIMO','SOU-031'),
 ('SOUL','SABONETE [ÍI]NTIMO','SOU-001'),('SOUL','SABONETE FACIAL','SOU-002'),('SOUL','SABONETE CORPORAL','SOU-003'),
 ('SOUL','MICELAR|T[ÔO]NICO','SOU-004'),('SOUL','BABAMALLOW','SOU-007'),('SOUL','GEL HIDRATANTE.*280|GEL HID.*280','SOU-008'),
@@ -106,19 +106,19 @@ insert into regra (m, n, k) values
 ('SUPER PODERES','INTELIGENTE','SUP-014'),('SUPER PODERES','BLINDAGEM','SUP-018'),('SUPER PODERES','SABONETE','SUP-013'),('SUPER PODERES','MOUSSE','SUP-015'),
 ('SUPER PODERES','PERFUME CAPILAR','SUP-016'),('SUPER PODERES','DESODORANTE','SUP-017'),('SUPER PODERES','ESCOVA','SUP-019'),('SUPER PODERES','SPLASH','SUP-020'),
 -- Sexy Fantasy
-('FANTASY','PHERO','SEX-001'),('FANTASY|SEXY FANTA','GARGANTA','SEX-002'),('FANTASY','C[ÁA]PSULA','SEX-004'),('FANTASY','GOTAS','SEX-005'),('FANTASY','GEL','SEX-003'),
+('FANTASY','PHERO','SEX-001'),('FANTASY|SEXY FANTA','GARGANTA','SEX-002'),('FANTASY','C[ÁA]PSULA','SEX-004'),('FANTASY','GOTAS','SEX-005'),('FANTASY','^GEL (?!.*2 ?G\b)','SEX-003'),
 -- Nelo
 ('NELO','HIDRATANTE','NEL-001'),('NELO','SABONETE','NEL-002'),('NELO','ESFOLIANTE','NEL-003'),('NELO','SPLASH','NEL-004'),
 -- Magic Color
 ('MAGIC COLOR','100 ?ML','MAG-001'),('MAGIC COLOR','300 ?ML','MAG-002'),('MAGIC COLOR','500 ?ML','MAG-003'),
 -- Zap
-('ZAP','ALISAMENTO.*(PRETO|ORGANIC|ORG[ÂA]NICA).*480','ZAP-001'),('ZAP','ALISAMENTO.*(PRETO|ORGANIC|ORG[ÂA]NICA).*1 ?L','ZAP-002'),
+('ZAP','ALISAMENTO.*PRETO.*480','ZAP-001'),('ZAP','ALISAMENTO.*PRETO.*1 ?L','ZAP-002'),
 ('ZAP','ALISAMENTO.*VERDE.*480','ZAP-003'),('ZAP','ALISAMENTO.*VERDE','ZAP-004'),('ZAP','ALISAMENTO.*AZUL.*480','ZAP-005'),('ZAP','(ALISAMENTO|ALL TIME).*AZUL|BLUE','ZAP-006'),
 ('ZAP','60 SEG','ZAP-007'),('ZAP','BLINTOX','ZAP-008'),('ZAP','ZTOX.*MATIZ','ZAP-010'),('ZAP','ZTOX','ZAP-009'),('ZAP','[ÚU]NICA','ZAP-011'),
 ('ZAP','VERNIZ','ZAP-012'),('ZAP','SOS','ZAP-014'),('ZAP','KIT .*(SHAMPOO|CONDICIONADOR)','ZAP-015'),('ZAP','M[ÁA]SCARA ME LEVA','ZAP-013'),
 -- Bonequinha / Maria Escandalosa / Arfanzi
 ('BONEQUINHA|ESCANDALOSA|ARFANZI','HIALUR|HIALOLISO','BON-016'),('BONEQUINHA|ESCANDALOSA|ARFANZI','QUERO BRILHO','BON-017'),
-('BONEQUINHA|ESCANDALOSA','JAPONES.*300','BON-008'),('BONEQUINHA|ESCANDALOSA','JAPONES','BON-007'),('BONEQUINHA|ESCANDALOSA','BOTOX WHITE','BON-009'),
+('BONEQUINHA|ESCANDALOSA','(KIT|ALISAMENTO).*JAPONES.*300','BON-008'),('BONEQUINHA|ESCANDALOSA','(KIT|ALISAMENTO).*JAPONES','BON-007'),('BONEQUINHA|ESCANDALOSA','BOTOX WHITE','BON-009'),
 ('BONEQUINHA|ESCANDALOSA','MTOX.*WHITE|MTOX WHITE','BON-003'),('BONEQUINHA|ESCANDALOSA','VIOLET','BON-004'),('BONEQUINHA|ESCANDALOSA','BLACK.*250','BON-010'),
 ('BONEQUINHA|ESCANDALOSA','BLACK','BON-011'),('BONEQUINHA|ESCANDALOSA','VERNIZ','BON-012'),('BONEQUINHA|ESCANDALOSA','SOS NO CHUVEIRO','BON-013'),
 ('BONEQUINHA|ESCANDALOSA','RED','BON-014'),('BONEQUINHA|ESCANDALOSA','RESGATE','BON-015'),
@@ -133,10 +133,13 @@ select p.id, p.codigo, p.nome, p.marca, (select r.k from regra r
   from app.produtos p
  where p.ativo and p.tipo = 'simples'
    and not exists (select 1 from app.precos z where z.produto_id = p.id)
-   and upper(p.nome) !~ '^BOX |^EXPOSITOR|ETIQUETA|CAIXA DE PAPEL|CARRETINHA';
+   and upper(p.nome) !~ '^BOX |^EXPOSITOR|ETIQUETA|CAIXA DE PAPEL|CARRETINHA|^(KIT )?[0-9]+ ';
 
 select coalesce(k,'(sem regra)') k, count(*) n, left(string_agg(left(nome,45), ' ; ' order by nome), 140) exemplos from alvo group by 1 order by 1;
 select 'TOTAL', count(*), count(k) from alvo;
+create temp table pacote as select id, nome from app.produtos
+ where ativo and upper(nome) ~ '^(KIT )?[0-9]+ ' and upper(coalesce(marca,'')||' '||nome) !~ 'BIO INST|MARY LIFE|BEBEL';
+select 'PACOTE', left(nome,70) from pacote;
 
 \if :aplicar
 update app.usuarios set ativo = true where email = 'sistema@importacao.local';
@@ -147,5 +150,6 @@ select app.importar_precos(jsonb_agg(x)) from (
     from alvo a join cat c on c.k = a.k
     cross join lateral (values ('py_normal', c.pyn), ('py_vip', c.pyv), ('br_normal', c.gold), ('br_vip', c.plat)) t(tab, v)
    where t.v is not null) s;
+select app.produtos_em_lote(array(select id from pacote), 'inativar');
 update app.usuarios set ativo = false where email = 'sistema@importacao.local';
 \endif
