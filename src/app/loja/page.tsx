@@ -19,7 +19,7 @@ type Preco = {
   ultima_compra: string | null; destaque: "promocao" | "recompra" | "sugestao" | null;
 };
 type Extra = { produto_id: string; vendidos_90d: string; promo_pct: string | null; promo_fim: string | null; destaque: boolean };
-type Produto = Publico & { linha: string; marcaNome: string | null; p?: Preco; x?: Extra };
+type Produto = Publico & { linha: string; marcaNome: string | null; p?: Preco; x?: Extra; grupo?: string | null; variante?: string | null; variantes?: Produto[] };
 
 const POR_PAGINA = 60;
 const sem = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -52,8 +52,10 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
   const extras = new Map<string, Extra>();
   for (const r of (await pool.query("select * from app.vitrine_extras()")).rows as Extra[]) extras.set(r.produto_id, r);
 
+  const grupos = new Map<string, { grupo: string; variante: string | null }>(
+    ((await pool.query("select * from app.grupos_publicos()")).rows as { produto_id: string; grupo: string; variante: string | null }[]).map((g) => [g.produto_id, g]));
   let todos: Produto[] = publicos.filter((p) => !interno(p.nome)).map((p) => ({
-    ...p, linha: p.tipo === "kit" ? "kits" : linhaDe(p.nome), marcaNome: marcaDe(p.nome, p.marca), p: precos.get(p.produto_id), x: extras.get(p.produto_id),
+    ...p, grupo: grupos.get(p.produto_id)?.grupo ?? null, variante: grupos.get(p.produto_id)?.variante ?? null, linha: p.tipo === "kit" ? "kits" : linhaDe(p.nome), marcaNome: marcaDe(p.nome, p.marca), p: precos.get(p.produto_id), x: extras.get(p.produto_id),
   }));
   const contagem = new Map<string, number>();
   for (const p of todos) contagem.set(p.linha, (contagem.get(p.linha) ?? 0) + 1);
@@ -83,6 +85,23 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
   const peso = (p: Produto) => p.p?.destaque === "promocao" ? 0 : p.p?.destaque === "recompra" ? 1 : (p.p ? p.p.disponibilidade !== "indisponivel" : p.tem_estoque) ? 2 : 3;
   todos.sort((a, b) => peso(a) - peso(b) || a.nome.localeCompare(b.nome, "pt-BR"));
 
+  // fragrâncias do mesmo produto viram um cartão só (o cliente abre e escolhe cada uma)
+  const exibidos: Produto[] = [];
+  const porGrupo = new Map<string, Produto>();
+  for (const p of todos) {
+    if (!p.grupo) { exibidos.push(p); continue; }
+    const k = `${p.marca ?? ""}|${p.grupo}`;
+    const g = porGrupo.get(k);
+    if (g) { g.variantes!.push(p); continue; }
+    const novo: Produto = { ...p, produto_id: `grupo:${k}`, nome: p.grupo, variantes: [p] };
+    porGrupo.set(k, novo); exibidos.push(novo);
+  }
+  for (let i = 0; i < exibidos.length; i++) {
+    const g = exibidos[i];
+    if (g.variantes?.length === 1) exibidos[i] = g.variantes[0];
+    else if (g.variantes) { g.foto = g.variantes.find((v) => v.foto)?.foto ?? null; g.variantes.sort((a, b) => (a.variante ?? a.nome).localeCompare(b.variante ?? b.nome, "pt-BR")); }
+  }
+  todos = exibidos;
   const total = todos.length;
   const paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
   const pagina = Math.min(paginas, Math.max(1, Number(f.pagina) || 1));
@@ -245,6 +264,7 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
 }
 
 function Cartao({ p, moeda, cliente, t, vendeUnidade }: { p: Produto; moeda: Moeda; cliente: boolean; t: Textos; vendeUnidade: boolean }) {
+  if (p.variantes) return <CartaoGrupo p={p} moeda={moeda} cliente={cliente} t={t} vendeUnidade={vendeUnidade} />;
   const cor = corRotulo(p.nome, p.linha);
   const pr = p.p;
   const semEstoque = esgotado(p, cliente);
@@ -301,6 +321,48 @@ function Comprar({ p, item, vendeUnidade, t, rotulo }: { p: Produto; item: Retur
   );
 }
 
+/** Produto com várias fragrâncias: um cartão; ao abrir, cada fragrância tem a sua quantidade. */
+function CartaoGrupo({ p, moeda, cliente, t, vendeUnidade, linha }: { p: Produto; moeda: Moeda; cliente: boolean; t: Textos; vendeUnidade: boolean; linha?: boolean }) {
+  const vs = p.variantes!;
+  const cor = corRotulo(p.nome, p.linha);
+  const esgotados = vs.every((v) => esgotado(v, cliente));
+  const promo = Math.max(0, ...vs.map((v) => Number(v.p?.desconto_pct ?? v.x?.promo_pct ?? 0)));
+  const precos = vs.map((v) => v.p ? Number(v.p.preco) * (v.unidades_caixa || 1) : null).filter((x): x is number => x != null);
+  const menor = precos.length ? Math.min(...precos) : null;
+  return (
+    <article className={`cartao cartao-grupo ${linha ? "em-lista" : ""}`}>
+      <div className="rotulo" style={{ background: cor.fundo, color: cor.tinta }}>
+        {p.foto ? <img src={p.foto} alt="" loading="lazy" /> : <span className="rotulo-nome">{p.marcaNome ?? t.linhas[p.linha]}</span>}
+        {promo > 0 && <span className="etiqueta-promo">−{promo}%</span>}
+        {esgotados && <span className="etiqueta-esgotado">{t.esgotado}</span>}
+      </div>
+      <div className="cartao-corpo">
+        <h3>{p.nome}</h3>
+        <div className="caixa-info">{t.fragrancias(vs.length)}{p.unidades_caixa ? ` · ${t.caixaCom(p.unidades_caixa)}` : ""}</div>
+        {cliente && menor != null && <div className="precos"><div className="preco"><small>{t.aPartirDe}</small> {dinheiro(menor, moeda)} <small>{p.unidades_caixa ? t.porCaixa : t.porUnidade}</small></div></div>}
+        <details className="variantes">
+          <summary>{t.escolherFragrancia(vs.length)}</summary>
+          <ul>{vs.map((v) => {
+            const esg = esgotado(v, cliente);
+            const pv = v.p ? Number(v.p.preco) * (v.unidades_caixa || 1) : null;
+            return (
+              <li key={v.produto_id}>
+                <div className="var-info">
+                  <b>{v.variante ?? v.nome}</b>
+                  {esg ? <span className="etiqueta-mini esgotado">{t.esgotado}</span>
+                    : v.p?.disponibilidade === "ultimas" ? <span className="etiqueta-mini">{t.ultimas}</span> : null}
+                  {cliente && pv != null && pv !== menor && <span className="var-preco">{dinheiro(pv, moeda)}</span>}
+                </div>
+                <Comprar p={v} item={itemCarrinho(v, esg)} vendeUnidade={vendeUnidade} t={t} rotulo={esg ? t.pedirEncomenda : t.adicionar} />
+              </li>
+            );
+          })}</ul>
+        </details>
+      </div>
+    </article>
+  );
+}
+
 /** Sem estoque em lugar nenhum: aparece "Esgotado" e o botão vira "Pedir por encomenda". */
 function esgotado(p: Produto, cliente: boolean): boolean {
   if (cliente && p.p) return p.p.disponibilidade === "indisponivel" && !p.p.disponivel_abastecedor;
@@ -332,6 +394,7 @@ function Precos({ p, moeda, cliente, t }: { p: Produto; moeda: Moeda; cliente: b
 
 /** Linha do catálogo em lista: mais produtos por tela, como um catálogo impresso. */
 function LinhaCatalogo({ p, moeda, cliente, t, vendeUnidade }: { p: Produto; moeda: Moeda; cliente: boolean; t: Textos; vendeUnidade: boolean }) {
+  if (p.variantes) return <CartaoGrupo p={p} moeda={moeda} cliente={cliente} t={t} vendeUnidade={vendeUnidade} linha />;
   const cor = corRotulo(p.nome, p.linha);
   const pr = p.p;
   const promo = pr?.desconto_pct ?? p.x?.promo_pct;

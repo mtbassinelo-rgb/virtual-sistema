@@ -256,3 +256,10 @@ button.discreto:hover { color: var(--erro); border-color: transparent; }
 .troco { background: #e3f6e8; color: #17703a; padding: 4px 10px; border-radius: 999px; }
 .fechar-caixa small { color: var(--suave); }
 .linha-destaque td { background: var(--marca-suave); }
+
+/* Fragrâncias agrupadas */
+.grupos-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 12px; }
+.grupo-sugerido { border: 1px solid var(--linha); border-radius: 8px; padding: 10px 12px; margin: 0; min-width: 0; }
+.grupo-sugerido ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.grupo-sugerido li { display: grid; grid-template-columns: 170px minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.grupo-sugerido li input { padding: 4px 8px; }

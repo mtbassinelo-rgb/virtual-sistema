@@ -479,3 +479,19 @@
 .comprar-duplo > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; }
 .comprar-duplo > div > span { font-size: .78rem; color: var(--apagado); font-weight: 600; }
 .marca-unidade { font-style: normal; margin-left: 6px; font-size: .62em; font-weight: 800; letter-spacing: .04em; padding: 2px 7px; border-radius: 999px; background: var(--roxo); color: #fff; vertical-align: middle; }
+
+/* Produto com várias fragrâncias: abre a lista e escolhe a quantidade de cada uma */
+.variantes { border-top: 1px solid var(--linha-l); margin-top: 4px; padding-top: 6px; }
+.variantes > summary { cursor: pointer; list-style: none; font-weight: 700; color: var(--roxo); font-size: .86rem; padding: 8px 10px; border-radius: 10px; background: var(--roxo-claro, #f3eafa); text-align: center; }
+.variantes > summary::-webkit-details-marker { display: none; }
+.variantes > summary::after { content: " ▾"; }
+.variantes[open] > summary::after { content: " ▴"; }
+.variantes ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; max-height: 420px; overflow-y: auto; }
+.variantes li { display: flex; flex-direction: column; gap: 4px; padding-bottom: 8px; border-bottom: 1px dashed var(--linha-l); }
+.variantes li:last-child { border-bottom: 0; }
+.var-info { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: .84rem; }
+.var-info b { font-weight: 600; color: var(--roxo-tinta); }
+.var-preco { margin-left: auto; font-size: .8rem; color: var(--apagado); }
+.cartao-grupo.em-lista { flex-direction: row; }
+.cartao-grupo.em-lista .rotulo { width: 120px; min-width: 120px; aspect-ratio: auto; }
+.catalogo-lista .cartao-grupo { margin: 8px 0; }

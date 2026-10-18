@@ -37,4 +37,15 @@ select teste.falha(format($$select app.fechar_caixa(%L, 60000, 0, '')$$, :'caixa
 select teste.ok((app.fechar_caixa(:'caixa', 70000, 0, null)->>'diferenca_gs')::numeric = 0, 'Fechamento sem diferença');
 select teste.falha(format($$select app.movimento_caixa(%L, 'reforco', 'GS', 1000, 'troco')$$, :'caixa'), 'já foi fechado', 'Caixa fechado não aceita lançamento');
 reset role;
+
+\echo '== Grupos de fragrância =='
+set role vc_app;
+select teste.como(:'KEILA');
+select teste.falha(format($$select app.definir_grupos('[{"produto_id":"%s","grupo":"X","variante":"Y"}]')$$, :'PROD2'), 'Só gerente', 'Vendedora não agrupa produtos');
+select teste.como(:'GERENTE');
+select teste.ok(app.definir_grupos(format('[{"produto_id":"%s","grupo":"MOUSSE RHENUKS","variante":"Rosa"}]', :'PROD2')::jsonb) = 1, 'Gerente agrupa');
+select teste.ok((select variante from app.grupos_publicos() where produto_id = :'PROD2') = 'Rosa', 'Site enxerga o grupo e a fragrância');
+select app.definir_grupos(format('[{"produto_id":"%s","grupo":"","variante":"Rosa"}]', :'PROD2')::jsonb);
+select teste.ok((select grupo is null and variante is null from app.produtos where id = :'PROD2'), 'Grupo vazio desfaz o agrupamento');
+reset role;
 \echo '== Testes do caixa passaram =='
