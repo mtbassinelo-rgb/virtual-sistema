@@ -22,6 +22,7 @@ const PROMOS = [{ k: "promo_py", pais: "PY", t: "Promo Gs", gs: true }, { k: "pr
 const editavel = (v: string | null, gs: boolean) => v == null ? "" : gs ? String(Math.round(Number(v))) : Number(v).toFixed(2).replace(".", ",");
 const exibir = (v: string | null, gs: boolean) => v == null ? "—" : gs ? `Gs ${Math.round(Number(v)).toLocaleString("es-PY")}` : `R$ ${Number(v).toFixed(2).replace(".", ",")}`;
 
+type Resultado = { ok?: string; erro?: string };
 type Desfazer = { texto: string; erro?: boolean; desfazer?: () => Promise<{ ok?: string; erro?: string }> };
 
 /** Lista de produtos. Gerente e dono editam direto na tabela e salvam tudo de uma vez; dá para desfazer a última ação. */
@@ -162,14 +163,17 @@ export function TabelaProdutos({ linhas, gestao, acao }: {
 function BotaoAtivo({ id, ativo, nome, avisar }: { id: string; ativo: boolean; nome: string; avisar: (d: Desfazer) => void }) {
   const router = useRouter();
   const [ocupado, iniciar] = useTransition();
-  const trocar = (para: boolean) => alternarAtivo(id, para).then((r) => r.erro ? r : { ok: `${nome}: ${para ? "ativado" : "desativado"} no site.` });
+  const trocar = async (para: boolean): Promise<Resultado> => {
+    const r = await alternarAtivo(id, para);
+    return r.erro ? { erro: r.erro } : { ok: `${nome}: ${para ? "ativado" : "desativado"} no site.` };
+  };
   return (
     <button type="button" className={`botao-ad ${ativo ? "ativo" : "inativo"}`} disabled={ocupado}
       title={ativo ? `Ativo no site. Clique para desativar` : `Desativado. Clique para ativar no site`}
       aria-label={ativo ? `Desativar ${nome}` : `Ativar ${nome}`}
       onClick={() => iniciar(async () => {
         const r = await trocar(!ativo);
-        avisar(r.erro ? { texto: r.erro, erro: true } : { texto: r.ok!, desfazer: () => trocar(ativo) });
+        avisar(r.erro ? { texto: r.erro, erro: true } : { texto: r.ok ?? "", desfazer: () => trocar(ativo) });
         router.refresh();
       })}>
       {ocupado ? "…" : ativo ? "A" : "D"}
@@ -188,8 +192,8 @@ function BotaoExcluir({ id, nome, avisar }: { id: string; nome: string; avisar: 
         iniciar(async () => {
           const r = await excluirProduto(id);
           if (r.erro) avisar({ texto: r.erro, erro: true });
-          else if (r.desativado) avisar({ texto: r.msg!, desfazer: () => alternarAtivo(id, true).then((x) => x.erro ? x : { ok: `${nome} ativado de novo.` }) });
-          else avisar({ texto: r.msg! });
+          else if (r.desativado) avisar({ texto: r.msg ?? "", desfazer: async (): Promise<Resultado> => { const x = await alternarAtivo(id, true); return x.erro ? { erro: x.erro } : { ok: `${nome} ativado de novo.` }; } });
+          else avisar({ texto: r.msg ?? "" });
           router.refresh();
         });
       }}>
