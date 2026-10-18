@@ -90,6 +90,7 @@ export default async function Hoje() {
       </section>
 
       <nav className="atalhos" aria-label="Atalhos">
+        {gestao && <Link className="atalho" href="/abertura"><b>Abertura da loja</b><span>Preços, estoque e fotos que faltam</span></Link>}
         <Link className="atalho" href="/pedidos/novo"><b>Novo pedido</b><span>Lançar um pedido de cliente</span></Link>
         <Link className="atalho" href="/clientes"><b>Clientes</b><span>Cadastro, crédito e acesso à loja</span></Link>
         {gestao && <Link className="atalho" href="/produtos/precos-rapido"><b>Editar preços</b><span>Preencher e ajustar preços na tabela</span></Link>}

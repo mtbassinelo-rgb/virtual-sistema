@@ -25,7 +25,9 @@ export default async function AreaInterna({ children }: { children: React.ReactN
   `)).rows[0] as { pedidos_abertos: number; contas_vencidas: number; procuras: number; fotos: number; sem_preco: number }).catch(() => ({ pedidos_abertos: 0, contas_vencidas: 0, procuras: 0, fotos: 0, sem_preco: 0 }));
 
   const grupos: GrupoMenu[] = [
-    { id: "inicio", titulo: "Início", icone: "inicio", itens: [{ href: "/", texto: "Início" }] },
+    gestao
+      ? { id: "inicio", titulo: "Início", icone: "inicio", itens: [{ href: "/", texto: "Painel do dia" }, { href: "/abertura", texto: "Abertura da loja", dica: "O que falta para os clientes comprarem pelo site" }] }
+      : { id: "inicio", titulo: "Início", icone: "inicio", itens: [{ href: "/", texto: "Início" }] },
     { id: "vendas", titulo: "Vendas", icone: "vendas", itens: [
       { href: "/pedidos", texto: "Pedidos", contador: n.pedidos_abertos, dica: "Pedidos abertos: em separação ou aguardando" },
       { href: "/pedidos/novo", texto: "Novo pedido" },
