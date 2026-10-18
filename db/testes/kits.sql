@@ -98,3 +98,13 @@ select teste.como(:'GERENTE');
 select teste.ok((select count(*) from app.estoque_pendencias where resolvida_em is null) >= 2, 'Gerente vê as pendências');
 reset role;
 \echo '== Testes de kits e marketplace passaram =='
+
+\echo '== Marcas padronizadas =='
+reset role;
+insert into app.produtos (codigo, nome, marca) values ('T-MARCA-1', 'Shampoo Teste', '  MAYCRENE ');
+select teste.ok((select marca from app.produtos where codigo = 'T-MARCA-1') = 'MAYCRENE', 'Espaços somem e a marca fica em maiúsculas');
+update app.produtos set marca = 'phállebeauty' where codigo = 'T-MARCA-1';
+select teste.ok((select marca from app.produtos where codigo = 'T-MARCA-1') = 'PHALLEBEAUTY', 'Acento e caixa não criam marca nova');
+update app.produtos set marca = 'Marca Nova Qualquer' where codigo = 'T-MARCA-1';
+select teste.ok((select marca from app.produtos where codigo = 'T-MARCA-1') = 'MARCA NOVA QUALQUER', 'Marca nova também fica em maiúsculas');
+delete from app.produtos where codigo = 'T-MARCA-1';
