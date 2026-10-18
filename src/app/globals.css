@@ -1,42 +1,33 @@
 /* Virtual Cosméticos · tema do sistema interno */
+/* Sempre claro: o sistema não segue o modo escuro do computador. */
 :root {
-  --bg: #f6f4f7; --superficie: #ffffff; --afundado: #efebf1; --linha: #ddd6e1;
-  --texto: #231b28; --suave: #6b5f72;
-  --marca: #822aa1; --marca-texto: #ffffff; --marca-suave: #f1e6f6;
-  --ok: #1f7a5a; --ok-suave: #e1f2ea; --aviso: #9a5b00; --aviso-suave: #fbefd9;
-  --erro: #b0303a; --erro-suave: #f8e1e3; --info: #2f5f8f; --info-suave: #e2ecf6;
-  --fonte: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --bg: #f3f4f6; --superficie: #ffffff; --afundado: #f5f6f8; --linha: #e2e5ea;
+  --texto: #1c2430; --suave: #5e6875;
+  --marca: #6b2387; --marca-texto: #ffffff; --marca-suave: #f4eef7;
+  --ok: #1d7550; --ok-suave: #e6f4ec; --aviso: #8a5300; --aviso-suave: #fdf3e1;
+  --erro: #b42331; --erro-suave: #fbe9eb; --info: #26588a; --info-suave: #e8f0f8;
+  --fonte: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
   --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
   color-scheme: light;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #17131a; --superficie: #211b25; --afundado: #1b161e; --linha: #3a3140;
-    --texto: #efe8f2; --suave: #a898ad;
-    --marca: #c98be3; --marca-texto: #1d0a27; --marca-suave: #34203f;
-    --ok: #5fcf9f; --ok-suave: #173329; --aviso: #f0b05a; --aviso-suave: #3a2b14;
-    --erro: #f07a82; --erro-suave: #3d1c20; --info: #84b4e6; --info-suave: #1b2a3a;
-    color-scheme: dark;
-  }
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; }
 body { background: var(--bg); color: var(--texto); font-family: var(--fonte); font-size: 14px; line-height: 1.5; }
 a { color: var(--marca); }
 h1, h2, h3 { margin: 0; line-height: 1.25; text-wrap: balance; }
-h1 { font-size: 1.35rem; } h2 { font-size: 1.1rem; } h3 { font-size: .95rem; }
+h1 { font-size: 1.4rem; font-weight: 650; letter-spacing: -.01em; } h2 { font-size: 1.05rem; font-weight: 650; } h3 { font-size: .95rem; font-weight: 600; }
 
 .topo { background: var(--superficie); border-bottom: 1px solid var(--linha); position: sticky; top: 0; z-index: 5; }
 .topo-interno { max-width: 1240px; margin: 0 auto; padding: 10px max(16px, env(safe-area-inset-left)); display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
 .marca { font-weight: 700; color: var(--texto); text-decoration: none; }
-.marca small { display: block; font-weight: 400; color: var(--suave); font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; }
+.marca small { display: block; font-weight: 400; color: var(--suave); font-size: .75rem; }
 .menu { display: flex; gap: 4px; overflow-x: auto; flex: 1; min-width: 0; }
 .menu a { padding: 6px 12px; border-radius: 8px; color: var(--suave); text-decoration: none; white-space: nowrap; font-weight: 500; }
 .menu a:hover { background: var(--afundado); color: var(--texto); }
 .quem { display: flex; gap: 8px; align-items: center; color: var(--suave); font-size: .85rem; }
 
 main.conteudo { max-width: 1240px; width: 100%; margin: 0 auto; padding: 22px max(16px, env(safe-area-inset-left)) 48px; display: flex; flex-direction: column; gap: 20px; }
-.painel { background: var(--superficie); border: 1px solid var(--linha); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.painel { background: var(--superficie); border: 1px solid var(--linha); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .linha { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
 .entre { justify-content: space-between; }
 .suave { color: var(--suave); }
@@ -47,14 +38,14 @@ main.conteudo { max-width: 1240px; width: 100%; margin: 0 auto; padding: 22px ma
 @media (max-width: 860px) { .duas-colunas { grid-template-columns: minmax(0, 1fr); } }
 
 .indicadores { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
-.indicador { background: var(--superficie); border: 1px solid var(--linha); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 2px; }
-.indicador .rotulo { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--suave); }
+.indicador { background: var(--superficie); border: 1px solid var(--linha); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 2px; }
+.indicador .rotulo { font-size: .8rem; color: var(--suave); }
 .indicador .valor { font-size: 1.3rem; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 
-.tabela { overflow-x: auto; border: 1px solid var(--linha); border-radius: 10px; background: var(--superficie); }
+.tabela { overflow-x: auto; border: 1px solid var(--linha); border-radius: 8px; background: var(--superficie); }
 table { border-collapse: collapse; width: 100%; min-width: 640px; }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--linha); vertical-align: top; }
-th { font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; color: var(--suave); background: var(--afundado); }
+th { font-size: .78rem; font-weight: 600; color: var(--suave); background: var(--afundado); }
 tr:last-child td { border-bottom: none; }
 td a { font-weight: 600; }
 
@@ -113,11 +104,11 @@ button.discreto:hover { color: var(--erro); border-color: transparent; }
 .kit-linhas { display: grid; gap: 6px; }
 
 /* ---------- Casca do sistema: menu lateral + barra do topo ---------- */
-:root { --lateral: #2b1236; --lateral-texto: #e9dcef; --lateral-suave: #b49cbf; --lateral-ativo: #4a2160; --lateral-destaque: #e9b8ff; }
+:root { --lateral: #ffffff; --lateral-texto: #1c2430; --lateral-suave: #5e6875; --lateral-ativo: #f4eef7; --lateral-destaque: #6b2387; }
 .casca { display: grid; grid-template-columns: 248px minmax(0, 1fr); min-height: 100vh; }
-.lateral { background: var(--lateral); color: var(--lateral-texto); position: sticky; top: 0; height: 100vh; overflow-y: auto; display: flex; flex-direction: column; padding: 14px 10px; gap: 10px; }
-.marca-lateral { display: flex; gap: 10px; align-items: center; color: #fff; text-decoration: none; font-weight: 700; padding: 4px 8px 12px; border-bottom: 1px solid rgba(255,255,255,.08); }
-.marca-lateral img { border-radius: 8px; background: #fff; }
+.lateral { background: var(--lateral); color: var(--lateral-texto); border-right: 1px solid var(--linha); position: sticky; top: 0; height: 100vh; overflow-y: auto; display: flex; flex-direction: column; padding: 14px 10px; gap: 10px; }
+.marca-lateral { display: flex; gap: 10px; align-items: center; color: var(--texto); text-decoration: none; font-weight: 700; padding: 4px 8px 12px; border-bottom: 1px solid var(--linha); }
+.marca-lateral img { border-radius: 8px; }
 .marca-lateral small { display: block; font-weight: 400; color: var(--lateral-suave); font-size: .75rem; }
 .menu-lateral { display: flex; flex-direction: column; gap: 2px; }
 .menu-lateral svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
@@ -125,17 +116,17 @@ button.discreto:hover { color: var(--erro); border-color: transparent; }
 .menu-lateral summary::-webkit-details-marker { display: none; }
 .menu-lateral summary::after { content: ""; margin-left: auto; width: 7px; height: 7px; border-right: 1.8px solid var(--lateral-suave); border-bottom: 1.8px solid var(--lateral-suave); transform: rotate(-45deg); transition: transform .15s; }
 .menu-lateral details[open] > summary::after { transform: rotate(45deg); }
-.menu-lateral summary:hover, .menu-lateral .grupo-unico:hover { background: rgba(255,255,255,.06); }
-.menu-lateral summary.atual, .menu-lateral .grupo-unico.atual { color: #fff; }
-.menu-lateral .grupo-unico.atual { background: var(--lateral-ativo); }
+.menu-lateral summary:hover, .menu-lateral .grupo-unico:hover { background: var(--afundado); }
+.menu-lateral summary.atual, .menu-lateral .grupo-unico.atual { color: var(--marca); }
+.menu-lateral .grupo-unico.atual { background: var(--lateral-ativo); box-shadow: inset 3px 0 0 var(--lateral-destaque); }
 .menu-lateral ul { list-style: none; margin: 2px 0 8px; padding: 0 0 0 28px; display: flex; flex-direction: column; gap: 1px; }
 .menu-lateral ul a { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border-radius: 8px; color: var(--lateral-suave); text-decoration: none; font-size: .9rem; }
-.menu-lateral ul a:hover { color: #fff; background: rgba(255,255,255,.06); }
-.menu-lateral ul a.atual { color: #fff; background: var(--lateral-ativo); box-shadow: inset 3px 0 0 var(--lateral-destaque); }
-.contador { font-size: .72rem; font-weight: 700; min-width: 22px; text-align: center; padding: 1px 7px; border-radius: 999px; background: var(--lateral-destaque); color: var(--lateral); }
-.lateral-rodape { margin-top: auto; padding: 10px; border-top: 1px solid rgba(255,255,255,.08); font-size: .85rem; }
+.menu-lateral ul a:hover { color: var(--texto); background: var(--afundado); }
+.menu-lateral ul a.atual { color: var(--marca); font-weight: 600; background: var(--lateral-ativo); box-shadow: inset 3px 0 0 var(--lateral-destaque); }
+.contador { font-size: .72rem; font-weight: 700; min-width: 22px; text-align: center; padding: 1px 7px; border-radius: 999px; background: var(--marca); color: #fff; }
+.lateral-rodape { margin-top: auto; padding: 10px; border-top: 1px solid var(--linha); font-size: .85rem; }
 .lateral-rodape a { color: var(--lateral-suave); text-decoration: none; }
-.lateral-rodape a:hover { color: #fff; }
+.lateral-rodape a:hover { color: var(--marca); }
 .abrir-menu { display: none; }
 .menu-fundo { display: none; }
 
@@ -151,11 +142,11 @@ button.discreto:hover { color: var(--erro); border-color: transparent; }
 
 @media (max-width: 900px) {
   .casca { grid-template-columns: minmax(0, 1fr); }
-  .lateral { position: sticky; top: 0; height: auto; z-index: 8; flex-direction: row; align-items: center; justify-content: space-between; padding: 8px 12px; overflow: visible; }
+  .lateral { position: sticky; top: 0; height: auto; z-index: 8; border-right: none; border-bottom: 1px solid var(--linha); flex-direction: row; align-items: center; justify-content: space-between; padding: 8px 12px; overflow: visible; }
   .marca-lateral { border: none; padding: 0; }
   .marca-lateral small, .lateral-rodape { display: none; }
-  .abrir-menu { display: inline-flex; background: transparent; color: #fff; border-color: rgba(255,255,255,.25); }
-  .menu-lateral { display: none; position: fixed; top: 0; left: 0; bottom: 0; width: min(300px, 86vw); background: var(--lateral); padding: 16px 10px; overflow-y: auto; z-index: 20; }
+  .abrir-menu { display: inline-flex; }
+  .menu-lateral { display: none; position: fixed; top: 0; left: 0; bottom: 0; width: min(300px, 86vw); background: var(--lateral); border-right: 1px solid var(--linha); padding: 16px 10px; overflow-y: auto; z-index: 20; }
   .menu-lateral.aberto { display: flex; }
   .menu-fundo { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 19; }
   .barra-topo { top: 52px; }
@@ -172,8 +163,9 @@ button.discreto:hover { color: var(--erro); border-color: transparent; }
 .abas a { padding: 8px 14px; text-decoration: none; color: var(--suave); font-weight: 600; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
 .abas a[aria-current="page"] { color: var(--marca); border-bottom-color: var(--marca); }
 .atalhos { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
-.atalho { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--linha); background: var(--superficie); text-decoration: none; color: var(--texto); }
-.atalho b { color: var(--marca); }
+.atalho { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border-radius: 8px; border: 1px solid var(--linha); background: var(--superficie); text-decoration: none; color: var(--texto); }
+.atalho b { color: var(--texto); font-weight: 600; }
+.atalho:hover b { color: var(--marca); }
 .atalho span { font-size: .82rem; color: var(--suave); }
 .atalho:hover { border-color: var(--marca); }
 .grafico-barras { display: flex; flex-direction: column; gap: 6px; }
