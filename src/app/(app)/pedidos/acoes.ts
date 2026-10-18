@@ -1,6 +1,6 @@
 "use server";
 
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { revalidatePath } from "next/cache";
@@ -153,43 +153,63 @@ export async function criarPedido(fd: FormData) {
   try {
     const cliente = texto(fd, "cliente_id");
     if (!cliente) throw new Error("Escolha o cliente.");
-    const itens: { produto: string; qtd: number }[] = [];
-    for (let i = 0; i < 10; i++) {
+    const itens: { produto_id: string; quantidade?: number; caixas?: number }[] = [];
+    for (let i = 0; i < 12; i++) {
       const produto = texto(fd, `produto_${i}`);
+      const cx = numero(fd, `cx_${i}`);
       const qtd = numero(fd, `qtd_${i}`);
-      if (produto && qtd && qtd > 0) itens.push({ produto, qtd });
+      if (!produto) continue;
+      if (qtd && qtd > 0) itens.push({ produto_id: produto, quantidade: qtd });
+      else if (cx && cx > 0) itens.push({ produto_id: produto, caixas: cx });
     }
-    if (itens.length === 0) throw new Error("Inclua pelo menos um produto com quantidade.");
-    id = await comUsuario(u.id, async (c) => {
-      const cli = (await c.query("select id, vendedora_id, moeda from app.clientes where id = $1", [cliente])).rows[0];
-      if (!cli) throw new Error("Cliente não encontrado.");
-      const ped = (await c.query(
-        `insert into app.pedidos (origem, canal, cliente_id, vendedora_id, data_pedido, moeda, valor_total,
-                                  previsao_envio, deposito_id, observacoes, criado_por)
-         values ('manual', 'direto', $1, $2, current_date, $3, 0, nullif($4,'')::date, nullif($5,'')::uuid, nullif($6,''), app.uid())
-         returning id`,
-        [cli.id, cli.vendedora_id, cli.moeda, texto(fd, "previsao_envio"), texto(fd, "deposito_id"), texto(fd, "observacoes")],
-      )).rows[0].id as string;
-      let total = 0;
-      for (const it of itens) {
-        const pr = (await c.query(
-          `select p.codigo, p.nome, x.valor, x.tabela from app.produtos p
-             left join lateral app.preco_para_cliente($1, p.id) x on true where p.id = $2`, [cli.id, it.produto])).rows[0];
-        if (!pr?.valor) throw new Error(`Produto ${pr?.codigo ?? ""} sem preço na tabela deste cliente.`);
-        await c.query(
-          `insert into app.pedido_itens (pedido_id, produto_id, codigo, descricao, quantidade, preco_unitario, tabela_preco)
-           values ($1, $2, $3, $4, $5, $6, $7)`, [ped, it.produto, pr.codigo, pr.nome, it.qtd, pr.valor, pr.tabela]);
-        total += it.qtd * Number(pr.valor);
-      }
-      await c.query("update app.pedidos set valor_total = $2 where id = $1", [ped, Math.round(total * 100) / 100]);
-      return ped;
-    });
+    if (itens.length === 0) throw new Error("Inclua pelo menos um produto com caixas ou peças.");
+    const moeda = ["GS", "BRL"].includes(texto(fd, "moeda")) ? texto(fd, "moeda") : null;
+    id = await comUsuario(u.id, async (c) => (await c.query(
+      `select app.criar_pedido_vendedora($1, $2::app.moeda, nullif($3,'')::uuid, nullif($4,'')::date, $5, $6::jsonb, $7) as id`,
+      [cliente, moeda, texto(fd, "deposito_id"), texto(fd, "previsao_envio"), texto(fd, "observacoes"), JSON.stringify(itens),
+       texto(fd, "para_cliente") === "1"])).rows[0].id as string);
   } catch (e) {
     erro = mensagemErro(e);
   }
   if (erro || !id) redirect(`/pedidos/novo?erro=${encodeURIComponent(erro ?? "Não foi possível criar o pedido.")}`);
   revalidatePath("/pedidos");
+  if (texto(fd, "para_cliente") === "1") {
+    let token: string | null = null;
+    try { token = await novoLinkPedido(u.id, id); } catch { token = null; }
+    redirect(`/pedidos/${id}?ok=${encodeURIComponent("Pedido criado. Envie o link para o cliente confirmar.")}${token ? "&link=" + token : ""}`);
+  }
   redirect(`/pedidos/${id}?ok=${encodeURIComponent("Pedido criado.")}`);
+}
+
+/** Cria o link do pedido para o cliente (só o hash fica no banco) e devolve o token. */
+async function novoLinkPedido(uid: string, pedido: string): Promise<string> {
+  const token = randomBytes(24).toString("base64url");
+  const hash = createHash("sha256").update(token).digest("hex");
+  await comUsuario(uid, (c) => c.query("select app.gerar_link_pedido($1, $2)", [pedido, hash]));
+  return token;
+}
+
+export async function gerarLinkPedido(fd: FormData) {
+  const u = await exigirUsuario();
+  const pedido = texto(fd, "pedido_id");
+  let token: string | null = null;
+  let erro: string | null = null;
+  try {
+    token = await novoLinkPedido(u.id, pedido);
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  revalidatePath(`/pedidos/${pedido}`);
+  redirect(`/pedidos/${pedido}?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Link novo gerado: o anterior deixou de valer.") + "&link=" + token}`);
+}
+
+/** Volumes (caixas de envio) do pedido: usado no resumo semanal do passeiro. */
+export async function definirVolumes(fd: FormData) {
+  const pedido = texto(fd, "pedido_id");
+  await executar(pedido, "Volumes do envio salvos.", async (uid) => {
+    const v = numero(fd, "volumes");
+    await comUsuario(uid, (c) => c.query("select app.definir_volumes($1, $2)", [pedido, v === null ? null : Math.trunc(v)]));
+  });
 }
 
 export async function decidirPedidoPortal(fd: FormData) {

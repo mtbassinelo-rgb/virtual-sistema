@@ -28,6 +28,7 @@ const ICONES: Record<string, React.ReactNode> = {
   estoque: <path d="M3 8h18v12H3zM7 8V5h10v3M8 13h8" />,
   relatorios: <path d="M5 20V10M10 20V4M15 20v-7M20 20v-4" />,
   site: <path d="M3 5h18v14H3zM3 9h18M7 7h.01M10 7h.01" />,
+  financeiro: <path d="M3 7h18v12H3zM3 11h18M7 15h3M16 4H6" />,
   admin: <path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z" />,
 };
 

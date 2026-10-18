@@ -52,6 +52,32 @@ for (const [email, quem] of [["gerente@teste.local", "Gerente"], ["keila@teste.l
   if (quem === "Keila") ok(outro.status === 404, "Keila não abre pedido da Yessica");
   else ok(outro.status === 200, "Gerente abre pedido de qualquer vendedora");
 }
+for (const tela of [`/pedidos/${pedidoKeila}/resumo`, "/comissoes", "/comissoes?mes=2026-01", "/procuras", "/procuras?dias=365"]) {
+  for (const email of ["gerente@teste.local", "keila@teste.local"]) {
+    const r = await abrir(tela, await sessao(email));
+    ok(r.status === 200 && !r.html.includes("Application error"), `${email}: ${tela} abre`);
+  }
+}
+for (const tela of ["/produtos/kits", "/produtos/kits?marca=Maycrene", "/despesas", "/despesas?ver=todas", "/parametros", "/relatorios?aba=lucro", "/relatorios?aba=resultado", "/relatorios?aba=envios"]) {
+  const r = await abrir(tela, await sessao("gerente@teste.local"));
+  ok(r.status === 200 && !r.html.includes("Application error"), `Gerente: ${tela} abre`);
+}
+for (const tela of ["/despesas", "/parametros"]) {
+  const r = await abrir(tela, await sessao("keila@teste.local"));
+  ok([302, 303, 307, 308].includes(r.status) || !r.html.includes("Lançar conta"), `Vendedora não vê ${tela}`);
+}
+ok((await fetch(base + "/comissoes/planilha", { headers: { cookie: await sessao("keila@teste.local") } })).status === 403,
+  "Vendedora não baixa a planilha de comissões");
+ok((await abrir("/loja/pedido/token-que-nao-existe-123456")).html.includes("inv"), "Link de pedido inválido é recusado");
+{
+  const token = randomBytes(24).toString("base64url");
+  await db.query("insert into app.pedido_links (token_hash, pedido_id, expira_em) values ($1, $2, now() + interval '1 day')",
+    [createHash("sha256").update(token).digest("hex"), pedidoKeila]);
+  const r = await abrir(`/loja/pedido/${token}`);
+  ok(r.status === 200 && !r.html.includes("Application error") && !r.html.includes("Link inválido") && !r.html.includes("Link inválido"),
+    "Cliente abre o pedido pelo link, sem login");
+}
+
 for (const tela of ["/promocoes", "/estoque/importar", "/estoque/precos", "/produtos", "/produtos/novo", "/produtos?filtro=sem-foto", "/site"]) {
   const r = await abrir(tela, await sessao("gerente@teste.local"));
   ok(r.status === 200 && !r.html.includes("Application error"), `Gerente: ${tela} abre`);

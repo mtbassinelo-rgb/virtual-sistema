@@ -126,3 +126,28 @@ export async function enviarCarrinho(_: RespostaCarrinho, fd: FormData): Promise
     return { erro: mensagemErro(e) };
   }
 }
+
+export type RespostaProcura = { ok?: string; erro?: string };
+
+/** "Quero este produto" num produto esgotado: registra a procura e avisa o gerente. */
+export async function registrarProcura(_: RespostaProcura, fd: FormData): Promise<RespostaProcura> {
+  const es = (await idiomaAtual()) === "es";
+  const produto = texto(fd, "produto_id");
+  if (!/^[0-9a-f-]{36}$/i.test(produto)) return { erro: es ? "Producto no encontrado." : "Produto não encontrado." };
+  const t = await tokenCliente();
+  const cliente = t ? await clienteAtual() : null;
+  const q = numero(fd, "quantidade");
+  try {
+    const nova = (await pool.query("select app.registrar_procura_site($1, $2, $3, $4, $5) as nova",
+      [produto, q && q > 0 ? Math.floor(q) : null, texto(fd, "nome"), texto(fd, "whatsapp"), cliente ? sha256(t!) : null])).rows[0].nova;
+    if (nova) {
+      const nome = (await pool.query("select nome from app.produtos where id = $1", [produto])).rows[0]?.nome ?? "";
+      const quem = cliente ? `${cliente.nome} (cliente de ${cliente.vendedora})` : `${texto(fd, "nome")} · WhatsApp ${texto(fd, "whatsapp")}`;
+      await avisarEquipe(`Produto procurado sem estoque: ${nome}`,
+        `${quem} quer: ${nome}${q ? ` (${q} un.)` : ""}.\nVeja todos em Relatórios → Procurados sem estoque, para as próximas compras.`);
+    }
+  } catch (e) {
+    return { erro: mensagemErro(e) };
+  }
+  return { ok: es ? "¡Listo! Le avisamos cuando llegue." : "Pronto! Avisamos quando chegar." };
+}

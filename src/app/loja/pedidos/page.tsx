@@ -9,6 +9,7 @@ import { idiomaAtual } from "@/lib/idioma";
 export const metadata = { title: "Meus pedidos" };
 
 const ETAPAS: Record<string, { texto: string; cor: string }> = {
+  aguardando_cliente: { texto: "Esperando você confirmar as caixas", cor: "aviso" },
   aguardando_vendedora: { texto: "Aguardando confirmação da vendedora", cor: "aviso" },
   em_separacao: { texto: "Em separação: conferindo as quantidades", cor: "info" },
   aguardando_pagamento: { texto: "Total confirmado: aguardando pagamento", cor: "marca" },

@@ -1,0 +1,175 @@
+-- Testes da gestão comercial: moeda no pedido, estoque, link para o cliente, lucro, comissão,
+-- despesas, resultado do mês e envios ao Paraguai. Rodar depois dos outros testes.
+\set QUIET on
+reset role;
+\set DONO     '00000000-0000-0000-0000-000000000001'
+\set GERENTE  '00000000-0000-0000-0000-000000000002'
+\set KEILA    '00000000-0000-0000-0000-000000000003'
+\set YESSICA  '00000000-0000-0000-0000-000000000004'
+\set CONSULTA '00000000-0000-0000-0000-000000000005'
+\set VKEILA   '00000000-0000-0000-0000-0000000000a1'
+\set G1  '00000000-0000-0000-0000-00000000ab01'
+\set G2  '00000000-0000-0000-0000-00000000ab02'
+\set DG  '00000000-0000-0000-0000-00000000ab10'
+\set CG  '00000000-0000-0000-0000-00000000ab20'
+
+-- ---------- Dados (como administrador do banco) ----------
+insert into app.produtos (id, codigo, nome, marca, custo, unidades_caixa) values
+  (:'G1', 'GES-001', 'Escova Teste', 'Fonte Teste', 5, 12),
+  (:'G2', 'GES-002', 'Pente Teste', 'Fonte Teste', null, null);
+insert into app.precos (produto_id, tabela, valor, vigente_desde) values
+  (:'G1', 'py_normal', 13000, current_date - 1), (:'G1', 'br_normal', 9, current_date - 1),
+  (:'G2', 'py_normal', 5000, current_date - 1);
+insert into app.depositos (id, codigo, nome, pais, tipo) values (:'DG', 'teste-gestao', 'Depósito Gestão', 'PY', 'loja');
+insert into app.vendedora_depositos values (:'VKEILA', :'DG', false);
+select app._lancar(:'DG', :'G1', 'entrada_compra', 100, 'teste', 'gestao', null);
+select app._lancar(:'DG', :'G2', 'entrada_compra', 10, 'teste', 'gestao', null);
+insert into app.clientes (id, nome, vendedora_id, whatsapp) values (:'CG', 'Cliente Gestão', :'VKEILA', '595981111111');
+
+\echo '== Pedido da vendedora: moeda escolhida e estoque =='
+set role vc_app;
+select teste.como(:'KEILA');
+select set_config('teste.p1', app.criar_pedido_vendedora(:'CG', 'GS', :'DG', current_date + 2, 'teste',
+  jsonb_build_array(jsonb_build_object('produto_id', :'G1', 'quantidade', 24)), false)::text, false);
+select teste.ok((select valor_total = 312000 and moeda = 'GS' and status_comercial = 'em_separacao' from app.pedidos
+                  where id = current_setting('teste.p1')::uuid), 'Pedido em Gs com o preço da tabela py_normal (24 × 13.000)');
+select teste.ok((select custo_unitario_brl = 5 and cambio_custo = 1300 from app.pedido_itens where pedido_id = current_setting('teste.p1')::uuid),
+  'O custo e o câmbio ficam congelados no item');
+
+select set_config('teste.p2', app.criar_pedido_vendedora(:'CG', 'BRL', :'DG', null, null,
+  jsonb_build_array(jsonb_build_object('produto_id', :'G1', 'caixas', 2)), false)::text, false);
+select teste.ok((select p.moeda = 'BRL' and i.tabela_preco = 'br_normal' and i.quantidade = 24 and p.valor_total = 216
+                   from app.pedidos p join app.pedido_itens i on i.pedido_id = p.id where p.id = current_setting('teste.p2')::uuid),
+  'Vendedora vende em R$ para cliente do Paraguai; 2 caixas = 24 peças');
+select teste.ok((select cambio_custo is null from app.pedido_itens where pedido_id = current_setting('teste.p2')::uuid),
+  'Pedido em R$ não usa câmbio');
+
+select teste.falha($$select app.criar_pedido_vendedora('00000000-0000-0000-0000-00000000ab20', 'GS', '00000000-0000-0000-0000-00000000ab10',
+  null, null, '[{"produto_id": "00000000-0000-0000-0000-00000000ab02", "quantidade": 11}]', false)$$,
+  'Estoque insuficiente', 'Não vende mais do que o estoque disponível');
+select teste.falha($$select app.criar_pedido_vendedora('00000000-0000-0000-0000-00000000ab20', 'BRL', '00000000-0000-0000-0000-00000000ab10',
+  null, null, '[{"produto_id": "00000000-0000-0000-0000-00000000ab02", "quantidade": 1}]', false)$$,
+  'não tem preço em R$', 'Produto sem preço na moeda escolhida é barrado');
+
+update app.pedido_itens set custo_unitario_brl = 0.01 where pedido_id = current_setting('teste.p1')::uuid;
+select teste.ok((select custo_unitario_brl = 5 from app.pedido_itens where pedido_id = current_setting('teste.p1')::uuid),
+  'A vendedora não altera o custo do item');
+
+select teste.como(:'YESSICA');
+select teste.falha($$select app.criar_pedido_vendedora('00000000-0000-0000-0000-00000000ab20', 'GS', null, null, null,
+  '[{"produto_id": "00000000-0000-0000-0000-00000000ab01", "quantidade": 1}]', false)$$,
+  'Cliente não encontrado', 'Vendedora não cria pedido para cliente de outra');
+
+\echo '== Pedido enviado ao cliente por link =='
+select teste.como(:'KEILA');
+select set_config('teste.p3', app.criar_pedido_vendedora(:'CG', 'GS', :'DG', null, null,
+  jsonb_build_array(jsonb_build_object('produto_id', :'G1', 'quantidade', 12), jsonb_build_object('produto_id', :'G2', 'quantidade', 2)), true)::text, false);
+select teste.ok((select status_comercial = 'aguardando_cliente' from app.pedidos where id = current_setting('teste.p3')::uuid),
+  'Pedido para o cliente confirmar fica aguardando o cliente');
+select teste.ok((select count(*) from app.v_itens_lucro where pedido_id = current_setting('teste.p3')::uuid) = 0,
+  'Pedido não confirmado não entra no lucro');
+select set_config('teste.i1', (select id from app.pedido_itens where pedido_id = current_setting('teste.p3')::uuid and produto_id = :'G1')::text, false);
+select set_config('teste.i2', (select id from app.pedido_itens where pedido_id = current_setting('teste.p3')::uuid and produto_id = :'G2')::text, false);
+select app.gerar_link_pedido(current_setting('teste.p3')::uuid, repeat('a', 64));
+select app.gerar_link_pedido(current_setting('teste.p3')::uuid, repeat('b', 64));
+select teste.como(:'YESSICA');
+select teste.falha(format($$select app.gerar_link_pedido(%L, %L)$$, current_setting('teste.p3'), repeat('c', 64)),
+  'sem permissão', 'Outra vendedora não gera link do pedido');
+select teste.como('');
+select teste.ok((select situacao from app.link_pedido(repeat('a', 64))) = 'substituido', 'Link antigo fica substituído pelo novo');
+select teste.ok((select situacao = 'aberto' and cliente = 'Cliente Gestão' and jsonb_array_length(itens) = 2 from app.link_pedido(repeat('b', 64))),
+  'Cliente abre o pedido pelo link, sem login');
+select teste.falha($$select app.confirmar_link_pedido(repeat('a', 64), '[]')$$, 'Link inválido', 'Link substituído não confirma');
+select teste.falha(format($$select app.confirmar_link_pedido(%L, %L)$$, repeat('b', 64),
+  jsonb_build_array(jsonb_build_object('item_id', current_setting('teste.i2'), 'quantidade', 50))),
+  'No momento temos', 'Cliente não aumenta além do estoque');
+select app.confirmar_link_pedido(repeat('b', 64),
+  jsonb_build_array(jsonb_build_object('item_id', current_setting('teste.i1'), 'quantidade', 24),
+                    jsonb_build_object('item_id', current_setting('teste.i2'), 'quantidade', 0)),
+  'Pode mandar amanhã');
+reset role;
+select teste.ok((select status_comercial = 'em_separacao' and valor_total = 312000 and observacoes like '%Pode mandar amanhã%'
+                   from app.pedidos where id = current_setting('teste.p3')::uuid),
+  'Cliente confirmou: 2 caixas da escova, tirou o pente, pedido foi para separação');
+select teste.ok((select situacao from app.link_pedido(repeat('b', 64))) = 'confirmado', 'Link fica marcado como confirmado');
+set role vc_app;
+select teste.falha($$select app.confirmar_link_pedido(repeat('b', 64), '[]')$$, 'já foi confirmado', 'Não confirma duas vezes');
+
+\echo '== Lucro e comissão =='
+select teste.como(:'KEILA');
+select teste.ok((select lucro = 156000 and custo = 156000 from app.v_itens_lucro where pedido_id = current_setting('teste.p1')::uuid),
+  'Lucro do item: 312.000 − 24 × R$ 5 × 1.300');
+select teste.falha($$insert into app.comissao_regras (vendedora_id, vigente_desde, percentual, base)
+  values ('00000000-0000-0000-0000-0000000000a1', current_date, 50, 'vendido')$$, 'row-level security', 'Vendedora não define a própria comissão');
+select teste.como(:'GERENTE');
+insert into app.comissao_regras (vendedora_id, vigente_desde, percentual, base) values (:'VKEILA', current_date, 5, 'lucro');
+select teste.ok((select vigente_desde = date_trunc('month', current_date)::date and definido_por = :'GERENTE'::uuid
+                   from app.comissao_regras where vendedora_id = :'VKEILA'), 'Regra vale desde o início do mês e registra quem definiu');
+select teste.ok((select comissao = round(greatest((select coalesce(sum(lucro), 0) from app.v_itens_lucro
+                                                    where vendedora_id = :'VKEILA' and moeda = 'GS'
+                                                      and data_pedido >= date_trunc('month', current_date)), 0) * 0.05, 0)
+                   from app.comissoes(current_date) where vendedora_id = :'VKEILA' and moeda = 'GS'),
+  'Comissão de 5% sobre o lucro do mês');
+select teste.como(:'KEILA');
+select teste.ok((select count(*) from app.comissoes(current_date) where vendedora_id <> :'VKEILA') = 0, 'Vendedora só vê a própria comissão');
+select teste.ok((select base = 'lucro' from app.comissoes(current_date) where moeda = 'GS'), 'Vendedora vê a regra dela');
+select teste.como(:'YESSICA');
+select teste.ok((select count(*) from app.comissao_regras) = 0, 'Outra vendedora não vê a regra da Keila');
+
+\echo '== Despesas e contas a pagar =='
+select teste.como(:'KEILA');
+select teste.falha($$insert into app.despesas (categoria, descricao, moeda, valor) values ('aluguel', 'x', 'GS', 1)$$,
+  'row-level security', 'Vendedora não lança despesa');
+select teste.ok((select count(*) from app.despesas) = 0, 'Vendedora não vê despesas');
+select teste.como(:'GERENTE');
+insert into app.despesas (id, categoria, descricao, fornecedor, moeda, valor, vencimento) values
+  ('00000000-0000-0000-0000-00000000ab31', 'aluguel', 'Aluguel do depósito', 'Imobiliária', 'GS', 3000000, current_date - 1),
+  ('00000000-0000-0000-0000-00000000ab32', 'mercadoria', 'Pedido Fonte Teste', 'Fonte Teste', 'BRL', 6705, current_date + 3),
+  ('00000000-0000-0000-0000-00000000ab33', 'passeiro', 'Passeiro semana', 'Passeiro', 'GS', 800000, current_date);
+select teste.ok((select situacao = 'vencida' and competencia = date_trunc('month', current_date - 1)::date and criado_por = :'GERENTE'::uuid
+                   from app.v_despesas where id = '00000000-0000-0000-0000-00000000ab31'), 'Conta vencida aparece como vencida');
+select teste.ok((select situacao from app.v_despesas where id = '00000000-0000-0000-0000-00000000ab32') = 'vence_7_dias', 'Conta a vencer na semana');
+update app.despesas set pago_em = current_date where id = '00000000-0000-0000-0000-00000000ab33';
+select teste.ok((select valor_pago = 800000 and situacao = 'paga' from app.v_despesas where id = '00000000-0000-0000-0000-00000000ab33'),
+  'Pagar sem informar o valor usa o valor da conta');
+delete from app.despesas where id = '00000000-0000-0000-0000-00000000ab33';
+select teste.ok((select count(*) from app.despesas where id = '00000000-0000-0000-0000-00000000ab33') = 1, 'Despesa paga não é apagada');
+select teste.como(:'CONSULTA');
+select teste.ok((select count(*) from app.despesas) >= 3, 'Consulta vê as despesas');
+update app.despesas set valor = 1 where categoria = 'aluguel';
+select teste.ok((select valor from app.despesas where id = '00000000-0000-0000-0000-00000000ab31') = 3000000, 'Consulta não altera despesas');
+
+\echo '== Resultado do mês =='
+select teste.como(:'GERENTE');
+select teste.ok((select despesas = 3800000 from app.resultado_mensal(current_date, current_date) where moeda = 'GS')
+  or date_trunc('month', current_date - 1) <> date_trunc('month', current_date),
+  'Despesas operacionais do mês em Gs (aluguel + passeiro)');
+select teste.ok((select despesas = 0 from app.resultado_mensal(current_date, current_date) where moeda = 'BRL'),
+  'Compra de mercadoria não entra como despesa no resultado');
+select teste.ok((select resultado = lucro_bruto - despesas from app.resultado_mensal(current_date, current_date) where moeda = 'GS'),
+  'Resultado = lucro bruto − despesas');
+
+\echo '== Volumes e envios ao Paraguai =='
+select teste.como(:'KEILA');
+select app.definir_volumes(current_setting('teste.p1')::uuid, 3);
+select teste.como(:'YESSICA');
+select teste.falha(format($$select app.definir_volumes(%L, 9)$$, current_setting('teste.p1')), 'Sem permissão', 'Outra vendedora não altera volumes');
+reset role;
+update app.pedidos set status_comercial = 'enviado', enviado_em = current_date where id = current_setting('teste.p1')::uuid;
+update app.parametros set valor = 50000 where chave = 'passeiro_custo_volume';
+set role vc_app;
+select teste.como(:'GERENTE');
+select teste.ok((select volumes >= 3 and caixas_fechadas >= 2 and pecas >= 24 and custo_estimado = volumes * 50000 and passeiro_pago >= 800000
+                   from app.envios_paraguai(current_date - 7, current_date) where semana = date_trunc('week', current_date)::date),
+  'Resumo da semana: volumes, caixas fechadas, peças, custo estimado e passeiro pago');
+
+\echo '== Parâmetros =='
+update app.parametros set valor = 1250 where chave = 'cambio_custo_gs';
+select teste.ok(app.param('cambio_custo_gs') = 1250, 'Gerente configura o câmbio do lucro');
+select teste.ok((select custo_unitario_brl = 5 and cambio_custo = 1300 from app.pedido_itens where pedido_id = current_setting('teste.p1')::uuid),
+  'Mudar o câmbio não mexe no lucro das vendas já feitas');
+select teste.como(:'KEILA');
+update app.parametros set valor = 1 where chave = 'cambio_custo_gs';
+select teste.ok(app.param('cambio_custo_gs') = 1250, 'Vendedora não altera parâmetros');
+reset role;
+\echo 'Testes de gestão comercial passaram.'

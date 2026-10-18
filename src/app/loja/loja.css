@@ -447,3 +447,21 @@
 .extrato th { font-size: .76rem; color: var(--apagado); font-weight: 600; }
 .extrato tr.pagamento td { color: #0b5d2a; }
 .area-cli .selo.erro { background: #fbe4e7; color: #7a1020; }
+
+/* Link de pedido enviado pelo WhatsApp: cliente confirma as caixas */
+.link-pedido table { width: 100%; border-collapse: collapse; }
+.link-pedido th, .link-pedido td { padding: 8px 6px; border-bottom: 1px solid #eee; text-align: left; vertical-align: middle; }
+.link-pedido td.num { text-align: right; white-space: nowrap; }
+.link-pedido input[type=number] { padding: 8px; font-size: 1rem; }
+.link-pedido .tabela { overflow-x: auto; }
+.link-pedido .linha { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+/* "Quero este produto" nos esgotados */
+.quero-produto { margin-top: 8px; font-size: .88rem; }
+.quero-produto summary { cursor: pointer; color: var(--roxo); font-weight: 600; list-style: none; }
+.quero-produto summary::-webkit-details-marker { display: none; }
+.quero-produto summary::before { content: "🔔 "; }
+.quero-produto form { display: grid; gap: 8px; margin-top: 8px; }
+.quero-produto label { display: grid; gap: 4px; font-size: .85rem; }
+.quero-produto input { padding: 8px 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; }
+.quero-ok { margin-top: 8px; font-size: .85rem; color: #0b5d2a; font-weight: 600; }

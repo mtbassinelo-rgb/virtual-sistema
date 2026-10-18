@@ -109,6 +109,7 @@ export function analisar(linhas: LinhaBling[]) {
     semPreco: linhas.filter((l) => !l.preco),
     pareceKit: linhas.filter((l) => /\bkits?\b/i.test(l.nome)),
     comEstoque: linhas.filter((l) => (l.estoque ?? 0) > 0),
+    zerados: linhas.filter((l) => l.estoque === 0),
     unidades: linhas.reduce((s, l) => s + Math.max(0, l.estoque ?? 0), 0),
   };
 }

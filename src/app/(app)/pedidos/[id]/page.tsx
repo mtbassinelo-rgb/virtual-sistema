@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
+import { urlPortal } from "@/lib/portal";
 import { exigirUsuario, ehGestao, podeEscrever } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
 import {
@@ -9,13 +11,13 @@ import {
 import { Avisos, Selo } from "../../avisos";
 import {
   anexarComprovante, atualizarPedido, avancarEntrega, conferirPagamento, conferirSeparacao, confirmarTotal, decidirPedidoPortal,
-  reconhecerBling, recusarPagamento, registrarAtendimento, registrarPagamento,
+  reconhecerBling, recusarPagamento, registrarAtendimento, registrarPagamento, gerarLinkPedido, definirVolumes,
 } from "../acoes";
 
 export const metadata = { title: "Pedido" };
 
 export default async function Pedido({ params, searchParams }: {
-  params: Promise<{ id: string }>; searchParams: Promise<{ ok?: string; erro?: string }>;
+  params: Promise<{ id: string }>; searchParams: Promise<{ ok?: string; erro?: string; link?: string }>;
 }) {
   const u = await exigirUsuario();
   const { id } = await params;
@@ -33,7 +35,7 @@ export default async function Pedido({ params, searchParams }: {
          from app.pedido_itens i left join app.depositos d on d.id = i.deposito_origem_id
         where i.pedido_id = $1 order by i.codigo, d.nome`, [id])).rows;
     const fluxo = (await c.query(
-      `select separacao_conferida_em, total_confirmado_em, conta_pagamento, app.pode_operar_deposito(deposito_id) as opera,
+      `select volumes, separacao_conferida_em, total_confirmado_em, conta_pagamento, app.pode_operar_deposito(deposito_id) as opera,
               chegou_em, local_retirada, (select nome from app.depositos where id = deposito_id) as deposito_nome
          from app.pedidos where id = $1`, [id])).rows[0];
     const indisponiveis = (await c.query(
@@ -91,6 +93,15 @@ export default async function Pedido({ params, searchParams }: {
     : null;
   const whatsTotal = msgTotal ? linkWhatsApp(cliente?.whatsapp ?? cliente?.telefone, msgTotal) : null;
   const portal = p.origem === "portal";
+  const h = await headers();
+  const linkCliente = avisos.link && /^[A-Za-z0-9_-]{20,64}$/.test(avisos.link)
+    ? `${urlPortal(h.get("x-forwarded-host") ?? h.get("host"), h.get("x-forwarded-proto"))}/loja/pedido/${avisos.link}` : null;
+  const msgLink = linkCliente
+    ? `Olá ${cliente?.nome ?? ""}! Aqui é a ${p.vendedora_nome}, da Virtual Cosméticos. Montei o seu pedido:\n` +
+      d.itens.map((i) => `• ${Number(i.quantidade)}× ${i.descricao}`).join("\n") +
+      `\nTotal: ${dinheiro(p.valor_total, moeda)}\nConfira e confirme as caixas por este link: ${linkCliente}`
+    : null;
+  const whatsLink = msgLink ? linkWhatsApp(cliente?.whatsapp ?? cliente?.telefone, msgLink) : null;
   const itensBling: { codigo?: string; descricao?: string; quantidade?: number; valor?: number }[] =
     d.bling && Array.isArray(d.bling.itens) ? d.bling.itens : [];
 
@@ -112,11 +123,35 @@ export default async function Pedido({ params, searchParams }: {
         </div>
         <div className="linha">
           {cliente && <Link className="botao" href={`/clientes/${cliente.id}`}>Ficha do cliente</Link>}
+          <Link className="botao" href={`/pedidos/${p.id}/resumo`}>Resumo para o cliente</Link>
           {whats && <a className="botao whatsapp" href={whats} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
         </div>
       </section>
 
       <Avisos ok={avisos.ok} erro={avisos.erro} />
+
+      {p.status_comercial === "aguardando_cliente" && (
+        <section className="painel" style={{ borderColor: "var(--marca)" }}>
+          <h2>Aguardando o cliente confirmar</h2>
+          <p className="suave">Mande o link ao cliente. Ele confere o pedido, ajusta as caixas e confirma; aí o pedido vai para a separação.
+            Cada link novo cancela o anterior.</p>
+          {linkCliente && (
+            <div className="aviso-caixa ok campos">
+              <label className="largo">Link do pedido (copie ou envie pelo WhatsApp)<input readOnly value={linkCliente} /></label>
+              {whatsLink
+                ? <a className="botao whatsapp" href={whatsLink} target="_blank" rel="noopener noreferrer">Enviar pelo WhatsApp</a>
+                : <span className="pequeno suave">O cliente não tem WhatsApp cadastrado: copie o link acima.</span>}
+              <span className="pequeno suave">Este link só aparece agora. Se perder, gere outro.</span>
+            </div>
+          )}
+          {escrever && (
+            <form action={gerarLinkPedido}>
+              <input type="hidden" name="pedido_id" value={p.id} />
+              <button className={linkCliente ? "" : "principal"}>{linkCliente ? "Gerar outro link" : "Gerar link para o cliente"}</button>
+            </form>
+          )}
+        </section>
+      )}
 
       {escrever && p.status_comercial === "aguardando_aprovacao" && (
         <section className="painel" style={{ borderColor: "var(--marca)" }}>
@@ -181,6 +216,16 @@ export default async function Pedido({ params, searchParams }: {
             <li key={k}>{x.descricao}: faltou {Number(x.quantidade_faltou)} de {Number(x.quantidade_pedida)}</li>))}
           </ul>
         </div>
+      )}
+      {(escrever || fluxo?.opera) && ["em_separacao", "enviado", "aguardando_retirada", "entregue"].includes(p.status_comercial) && (
+        <form action={definirVolumes} className="painel linha">
+          <input type="hidden" name="pedido_id" value={p.id} />
+          <label>Volumes do envio (caixas que saem)
+            <input name="volumes" type="number" min={0} max={10000} defaultValue={fluxo?.volumes ?? ""} style={{ width: 110 }} />
+          </label>
+          <button>Salvar volumes</button>
+          <span className="pequeno suave">Usado no resumo semanal de envios e no custo do passeiro.</span>
+        </form>
       )}
       {p.origem !== "bling" && (escrever || fluxo?.opera) && ["em_separacao", "enviado", "aguardando_retirada"].includes(p.status_comercial)
         && (fluxo?.separacao_conferida_em) && (

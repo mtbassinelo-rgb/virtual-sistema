@@ -84,7 +84,11 @@ export default async function Produto({ params, searchParams }: {
             <label>Peças por caixa<input name="unidades_caixa" defaultValue={p?.unidades_caixa ?? ""} disabled={!pode} inputMode="numeric" placeholder="Ex.: 12" /></label>
             <label>Custo (R$)<input name="custo" defaultValue={p?.custo != null ? Number(p.custo).toFixed(2).replace(".", ",") : ""} disabled={!pode} inputMode="decimal" /></label>
             <label style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <input type="checkbox" name="ativo" defaultChecked={p ? p.ativo : true} disabled={!pode} style={{ width: "auto" }} /> Ativo (aparece no site)
+              <input type="checkbox" name="ativo" defaultChecked={p ? p.ativo : true} disabled={!pode} style={{ width: "auto" }} /> Ativo (vende no sistema)
+            </label>
+            <label style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <input type="checkbox" name="mostrar_no_site" defaultChecked={p ? p.mostrar_no_site !== false : true} disabled={!pode} style={{ width: "auto" }} /> Mostrar no site
+              <span className="pequeno suave">(desligue nos produtos vendidos só em kit)</span>
             </label>
             <label style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <input type="checkbox" name="destaque" defaultChecked={p ? p.destaque : false} disabled={!pode} style={{ width: "auto" }} /> Destaque no site

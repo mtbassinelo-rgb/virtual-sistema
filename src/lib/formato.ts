@@ -27,6 +27,7 @@ export function hojeISO(somarDias = 0): string {
 }
 
 export const STATUS_COMERCIAL: Record<string, string> = {
+  aguardando_cliente: "Aguardando o cliente confirmar",
   aguardando_aprovacao: "Aguardando aprovação",
   em_separacao: "Em separação",
   enviado: "Em transporte",
@@ -95,6 +96,32 @@ export const STATUS_TRANSFERENCIA: Record<string, string> = {
   recebida_com_divergencia: "Recebida com divergência",
   cancelada: "Cancelada",
 };
+
+export const SITUACAO_DESPESA: Record<string, { texto: string; cor: string }> = {
+  vencida: { texto: "Vencida", cor: "erro" },
+  vence_hoje: { texto: "Vence hoje", cor: "aviso" },
+  vence_7_dias: { texto: "Vence em até 7 dias", cor: "aviso" },
+  a_vencer: { texto: "A vencer", cor: "info" },
+  sem_vencimento: { texto: "Sem vencimento", cor: "" },
+  paga: { texto: "Paga", cor: "ok" },
+};
+
+export const BASE_COMISSAO: Record<string, string> = {
+  vendido: "sobre o vendido",
+  recebido: "sobre o recebido (pago e conferido)",
+  lucro: "sobre o lucro",
+};
+
+/** "2026-10" → "outubro de 2026" */
+export function nomeMes(mes: string): string {
+  return new Date(mes.slice(0, 7) + "-15T12:00:00").toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+}
+
+/** Percentual com uma casa: 0.256 → "25,6%" */
+export function pct(v: number | string | null | undefined): string {
+  if (v === null || v === undefined || v === "" || !Number.isFinite(Number(v))) return "—";
+  return (Number(v) * 100).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + "%";
+}
 
 export const PERFIS: Record<string, string> = {
   dono: "Dono",
