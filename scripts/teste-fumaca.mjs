@@ -43,7 +43,7 @@ const clienteKeila = (await db.query(
 
 for (const [email, quem] of [["gerente@teste.local", "Gerente"], ["keila@teste.local", "Keila"]]) {
   const cookie = await sessao(email);
-  for (const tela of ["/", "/pedidos", "/pedidos?pagamento=aguardando", "/pedidos/novo", `/pedidos/${pedidoKeila}`,
+  for (const tela of ["/", "/pedidos", "/pedidos?pagamento=aguardando", "/pedidos/novo", "/caixa", "/estoque/inventario", `/pedidos/${pedidoKeila}`,
                       "/clientes", `/clientes/${clienteKeila}`, "/metas", "/estoque"]) {
     const r = await abrir(tela, cookie);
     ok(r.status === 200 && !r.html.includes("Application error"), `${quem}: ${tela} abre`);
