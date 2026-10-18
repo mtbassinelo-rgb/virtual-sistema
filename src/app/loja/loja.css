@@ -465,3 +465,8 @@
 .quero-produto label { display: grid; gap: 4px; font-size: .85rem; }
 .quero-produto input { padding: 8px 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; }
 .quero-ok { margin-top: 8px; font-size: .85rem; color: #0b5d2a; font-weight: 600; }
+
+/* Banner dentro da área do cliente: mais baixo e com cantos */
+.banners-compacta { border-radius: 16px; overflow: hidden; margin: 4px 0; }
+.banners-compacta .banner { min-height: clamp(170px, 22vw, 260px); }
+.banners-compacta .banner-texto h2 { font-size: clamp(1.2rem, 2.6vw, 1.8rem); }

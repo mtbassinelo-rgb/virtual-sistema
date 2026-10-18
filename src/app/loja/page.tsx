@@ -6,6 +6,8 @@ import { LINHAS, corRotulo, interno, linhaDe, marcaDe, nomeCurto } from "@/lib/v
 import { Quantidade } from "./carrinho";
 import { QueroProduto } from "./quero-produto";
 import { TEXTOS, idiomaAtual, type Textos } from "@/lib/idioma";
+import { bannersPadrao, type Banner } from "@/lib/banners-padrao";
+import { FaixaBanners } from "./banners";
 
 export const metadata = { title: { absolute: "Virtual Cosméticos · Atacado de cosméticos para salões e revendas" } };
 
@@ -26,8 +28,9 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
   const cliente = await clienteAtual();
   const idioma = await idiomaAtual();
   const t = TEXTOS[idioma];
-  const banners = (await pool.query("select * from app.banners_ativos($1)", [idioma])).rows as
-    { id: string; titulo: string; subtitulo: string | null; imagem: string | null; link: string | null }[];
+  const proprios = (await pool.query("select * from app.banners_ativos($1)", [idioma])).rows as Banner[];
+  // sem banner cadastrado pela equipe, a loja usa os banners prontos (marcas e atacado)
+  const banners = proprios.length ? proprios : bannersPadrao(idioma, Boolean(cliente));
   const token = cliente ? await tokenCliente() : null;
 
   const publicos = (await pool.query("select * from app.vitrine_publica()")).rows as Publico[];
@@ -93,28 +96,7 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
 
   return (
     <>
-      {!filtrando && banners.length > 0 && (
-        <section className="banners" aria-label={t.destaques}>
-          <div className="banners-trilho">
-            {banners.map((b) => {
-              const conteudo = (
-                <>
-                  {b.imagem && <img src={b.imagem} alt="" />}
-                  {!b.imagem && <img className="banner-icone" src="/marca/icone.png" alt="" />}
-                  <div className="banner-texto">
-                    <h2>{b.titulo}</h2>
-                    {b.subtitulo && <p>{b.subtitulo}</p>}
-                    {b.link && <span className="banner-acao">{t.verAgora}</span>}
-                  </div>
-                </>
-              );
-              return b.link
-                ? <a key={b.id} href={b.link} className={`banner ${b.imagem ? "com-imagem" : ""}`}>{conteudo}</a>
-                : <div key={b.id} className={`banner ${b.imagem ? "com-imagem" : ""}`}>{conteudo}</div>;
-            })}
-          </div>
-        </section>
-      )}
+      {!filtrando && banners.length > 0 && <FaixaBanners banners={banners} rotulo={t.destaques} acao={t.verAgora} />}
 
       {!filtrando && !cliente && banners.length === 0 && (
         <section className="abertura">

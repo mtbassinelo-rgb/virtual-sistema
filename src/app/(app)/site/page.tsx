@@ -58,7 +58,7 @@ export default async function Site({ searchParams }: { searchParams: Promise<{ o
       <section className="painel">
         <h2>Banners do início</h2>
         <p className="pequeno suave">Aparecem no topo da página inicial, na ordem abaixo (dá para deslizar entre eles). Imagem larga, de preferência 1600 × 600.</p>
-        {d.banners.length === 0 && <p className="suave">Nenhum banner. Sem banners, o site mostra a abertura com a cartela de matizadores.</p>}
+        {d.banners.length === 0 && <p className="suave">Nenhum banner cadastrado. Enquanto isso, a loja e a área do cliente mostram 4 banners prontos: kits Maycrene, atacado por caixa, Mary Life e Rhenuks. Ao cadastrar o primeiro banner, os prontos saem.</p>}
         {d.banners.map((b) => (
           <div key={b.id} className="painel linha" style={{ background: "var(--afundado)", alignItems: "flex-start" }}>
             {b.imagem ? <img src={b.imagem} alt="" style={{ width: 200, aspectRatio: "16/6", objectFit: "cover", borderRadius: 8 }} />
