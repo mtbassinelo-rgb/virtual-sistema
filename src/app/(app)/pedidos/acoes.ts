@@ -251,3 +251,12 @@ export async function avancarEntrega(fd: FormData) {
     await comUsuario(uid, (c) => c.query("select app.avancar_entrega($1, $2, nullif($3,''))", [pedido, etapa, texto(fd, "local")]));
   });
 }
+
+/** Gerente libera (ou não) o desconto por quantidade que o pedido do site atingiu. */
+export async function decidirDescontoQuantidade(fd: FormData) {
+  const pedido = texto(fd, "pedido_id");
+  const liberar = texto(fd, "liberar") === "1";
+  await executar(pedido, liberar ? "Desconto liberado: os preços do pedido já estão com o desconto." : "Desconto não liberado: o pedido segue com o preço normal.", async (uid) => {
+    await comUsuario(uid, (c) => c.query("select app.decidir_desconto_quantidade($1, $2)", [pedido, liberar]));
+  });
+}

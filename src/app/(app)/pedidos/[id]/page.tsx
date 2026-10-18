@@ -11,7 +11,7 @@ import {
 import { Avisos, Selo } from "../../avisos";
 import {
   anexarComprovante, atualizarPedido, avancarEntrega, conferirPagamento, conferirSeparacao, confirmarTotal, decidirPedidoPortal,
-  reconhecerBling, recusarPagamento, registrarAtendimento, registrarPagamento, gerarLinkPedido, definirVolumes,
+  reconhecerBling, recusarPagamento, registrarAtendimento, registrarPagamento, gerarLinkPedido, definirVolumes, decidirDescontoQuantidade,
 } from "../acoes";
 
 export const metadata = { title: "Pedido" };
@@ -129,6 +129,20 @@ export default async function Pedido({ params, searchParams }: {
       </section>
 
       <Avisos ok={avisos.ok} erro={avisos.erro} />
+
+      {p.desconto_qtd_status === "pendente" && (
+        <section className="painel" style={{ borderColor: "#e0b04a", background: "#fffaf0" }}>
+          <h2 style={{ margin: 0 }}>Desconto por quantidade esperando liberação: {Number(p.desconto_qtd_pct)}%</h2>
+          <p className="suave" style={{ margin: 0 }}>O cliente atingiu a faixa de desconto por quantidade no site. O desconto só entra no pedido se o gerente liberar; até lá os preços estão normais.</p>
+          {gestao ? (
+            <div className="linha">
+              <form action={decidirDescontoQuantidade}><input type="hidden" name="pedido_id" value={p.id} /><input type="hidden" name="liberar" value="1" /><button className="principal">Liberar {Number(p.desconto_qtd_pct)}% de desconto</button></form>
+              <form action={decidirDescontoQuantidade}><input type="hidden" name="pedido_id" value={p.id} /><input type="hidden" name="liberar" value="0" /><button>Não liberar</button></form>
+            </div>
+          ) : <p className="pequeno" style={{ margin: 0 }}>Peça ao gerente para liberar antes de confirmar o total ao cliente.</p>}
+        </section>
+      )}
+      {p.desconto_qtd_status === "aprovado" && <div className="aviso-caixa ok">Desconto por quantidade de {Number(p.desconto_qtd_pct)}% liberado pelo gerente.</div>}
 
       {p.status_comercial === "aguardando_cliente" && (
         <section className="painel" style={{ borderColor: "var(--marca)" }}>

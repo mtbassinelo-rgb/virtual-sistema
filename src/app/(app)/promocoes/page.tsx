@@ -44,7 +44,7 @@ export default async function Promocoes({ searchParams }: { searchParams: Promis
 
       <section className="painel">
         <h2 style={{ margin: 0 }}>Desconto por quantidade</h2>
-        <p className="suave pequeno" style={{ margin: 0 }}>Ex.: levando 10 caixas de MAYCRENE, 5% de desconto. O carrinho do cliente mostra "leve mais N caixas e ganhe X%" e o desconto entra sozinho no pedido feito pelo site. Produto já em promoção não leva o desconto de novo.</p>
+        <p className="suave pequeno" style={{ margin: 0 }}>Ex.: levando 10 caixas de MAYCRENE, 5% de desconto. O carrinho do cliente mostra "leve mais N caixas e o pedido pode ganhar X%". O desconto <b>só entra com a liberação do gerente</b>: o pedido que atinge a faixa aparece em Vendas → Descontos a liberar. Produto já em promoção não leva o desconto de novo.</p>
         {d.descontos.length > 0 && (
           <div className="tabela"><table>
             <thead><tr><th>Marca</th><th className="num">A partir de</th><th className="num">Desconto</th><th>País</th><th>Situação</th>{gestao && <th></th>}</tr></thead>

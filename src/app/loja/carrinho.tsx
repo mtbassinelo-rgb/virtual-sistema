@@ -191,10 +191,10 @@ function Gaveta({ cliente }: { cliente: ClienteCarrinho }) {
               <ul className="g-descontos">{progresso.map((p) => (
                 <li key={p.marca} className={p.atingido ? "ok" : ""}>
                   {p.atingido
-                    ? <>✓ <b>{p.atingido}% de desconto</b> em {p.nomeMarca} por quantidade{p.proximo ? ` · leve mais ${p.faltam} para ${p.proximo}%` : ""}</>
-                    : <>Leve mais <b>{p.faltam}</b> {p.faltam === 1 ? "caixa" : "caixas"} de {p.nomeMarca} e ganhe <b>{p.proximo}% de desconto</b></>}
+                    ? <>✓ Seu pedido de {p.nomeMarca} pode ganhar <b>{p.atingido}% de desconto</b> por quantidade{p.proximo ? ` · leve mais ${p.faltam} para ${p.proximo}%` : ""}</>
+                    : <>Leve mais <b>{p.faltam}</b> {p.faltam === 1 ? "caixa" : "caixas"} de {p.nomeMarca} e o pedido pode ganhar <b>{p.proximo}% de desconto</b></>}
                 </li>
-              ))}</ul>
+              ))}<li className="g-descontos-nota">Desconto sujeito à liberação do gerente ao confirmar o pedido.</li></ul>
             )}
             <CompreJunto itens={itens} cliente={cliente} definir={definir} />
             <form action={acao} className="gaveta-envio">

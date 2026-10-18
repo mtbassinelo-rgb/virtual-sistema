@@ -25,8 +25,9 @@ export default async function AreaInterna({ children }: { children: React.ReactN
            ${gestao ? `(select count(*) from app.fotos_catalogo where status = 'pendente')::int` : "0"} as fotos,
            (select count(*) from app.produtos p where p.ativo and not exists (select 1 from app.precos z where z.produto_id = p.id))::int as sem_preco,
            (select count(*) from app.carrinhos_parados() where avisado_em is null)::int as carrinhos,
-           (select count(*) from app.procuras_chegaram())::int as chegaram
-  `)).rows[0] as { pedidos_abertos: number; contas_vencidas: number; procuras: number; fotos: number; sem_preco: number; carrinhos: number; chegaram: number }).catch(() => ({ pedidos_abertos: 0, contas_vencidas: 0, procuras: 0, fotos: 0, sem_preco: 0, carrinhos: 0, chegaram: 0 }));
+           (select count(*) from app.procuras_chegaram())::int as chegaram,
+           (select count(*) from app.pedidos where desconto_qtd_status = 'pendente' and status_comercial <> 'cancelado')::int as descontos
+  `)).rows[0] as { pedidos_abertos: number; contas_vencidas: number; procuras: number; fotos: number; sem_preco: number; carrinhos: number; chegaram: number; descontos: number }).catch(() => ({ pedidos_abertos: 0, contas_vencidas: 0, procuras: 0, fotos: 0, sem_preco: 0, carrinhos: 0, chegaram: 0, descontos: 0 }));
 
   const grupos: GrupoMenu[] = [
     gestao
@@ -35,6 +36,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
     { id: "vendas", titulo: "Vendas", icone: "vendas", itens: [
       { href: "/pedidos", texto: "Pedidos", contador: n.pedidos_abertos, dica: "Pedidos abertos: em separação ou aguardando" },
       { href: "/pedidos/novo", texto: "Novo pedido" },
+      ...(gestao ? [{ href: "/pedidos?desconto=pendente", texto: "Descontos a liberar", contador: n.descontos, dica: "Pedidos do site que atingiram o desconto por quantidade: o gerente libera ou não" }] : []),
       { href: "/caixa", texto: "Caixa do dia", dica: "Abrir e fechar o caixa, vender no balcão e receber pedidos" },
       { href: "/clientes", texto: "Clientes" },
       { href: "/clientes/carrinhos", texto: "Carrinhos parados", contador: n.carrinhos, dica: "Clientes que montaram carrinho e não enviaram" },

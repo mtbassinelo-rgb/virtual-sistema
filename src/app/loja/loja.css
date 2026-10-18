@@ -510,3 +510,4 @@
 .chegou a { color: inherit; font-weight: 700; }
 .reposicao { list-style: none; margin: 16px 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .reposicao li { display: grid; grid-template-columns: minmax(0, 1fr) 150px; gap: 12px; align-items: center; background: var(--papel); border: 1px solid var(--linha-l); border-radius: var(--raio-g); padding: 12px 14px; }
+.g-descontos li.g-descontos-nota { background: transparent; color: var(--apagado); padding: 0 2px; font-size: .74rem; }
