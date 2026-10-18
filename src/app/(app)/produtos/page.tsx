@@ -1,115 +1,150 @@
 import Link from "next/link";
 import { ehGestao, exigirUsuario } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
-import { dinheiro } from "@/lib/formato";
-import { Avisos, Selo } from "../avisos";
-import { produtosEmLote, salvarCaixas } from "./acoes";
-import { BarraLote, MarcarTodos } from "./lote";
+import { Avisos } from "../avisos";
+import { produtosEmLote, salvarGradeProdutos } from "./acoes";
+import { BarraLote } from "./lote";
+import { TabelaProdutos, type LinhaProduto } from "./tabela";
 
 export const metadata = { title: "Produtos" };
 
 const POR_PAGINA = 60;
 
-export default async function Produtos({ searchParams }: {
-  searchParams: Promise<{ q?: string; filtro?: string; pagina?: string; ok?: string; erro?: string }>;
-}) {
+const MOSTRAR: [string, string][] = [
+  ["", "Ativos"], ["abaixo-minimo", "Abaixo do estoque mínimo"], ["sem-estoque", "Sem estoque"], ["com-estoque", "Com estoque"],
+  ["sem-minimo", "Sem estoque mínimo"], ["sem-preco", "Sem preço"], ["sem-preco-gs", "Sem preço em Gs"], ["sem-preco-br", "Sem preço em R$"],
+  ["sem-foto", "Sem foto"], ["sem-caixa", "Sem peças por caixa"], ["inativos", "Inativos"], ["todos", "Todos"],
+];
+const ORDEM: Record<string, [string, string]> = {
+  "": ["Nome (A-Z)", "p.nome"],
+  "estoque-menor": ["Menor estoque", "s.saldo, p.nome"],
+  "estoque-maior": ["Maior estoque", "s.saldo desc, p.nome"],
+  "falta-comprar": ["Mais abaixo do mínimo", "(coalesce(p.estoque_minimo, 0) - s.saldo) desc, p.nome"],
+  marca: ["Marca", "p.marca nulls last, p.nome"],
+  codigo: ["Código", "p.codigo"],
+  "preco-maior": ["Maior preço (PY Normal)", "x.py_normal desc nulls last, p.nome"],
+};
+
+type Filtros = { q?: string; filtro?: string; marca?: string; tipo?: string; ordem?: string; pagina?: string; ok?: string; erro?: string };
+
+export default async function Produtos({ searchParams }: { searchParams: Promise<Filtros> }) {
   const u = await exigirUsuario();
+  const gestao = ehGestao(u);
   const f = await searchParams;
   const pagina = Math.max(1, Number(f.pagina) || 1);
   const par: unknown[] = [];
   const cond = ["true"];
   if (f.q) { par.push(`%${f.q}%`); cond.push(`(p.nome ilike $${par.length} or p.codigo ilike $${par.length} or p.marca ilike $${par.length} or p.gtin = $${par.length})`); }
-  if (f.filtro === "sem-foto") cond.push("p.foto is null and p.ativo");
-  if (f.filtro === "sem-preco-gs") cond.push("p.ativo and x.py_normal is null");
-  if (f.filtro === "sem-caixa") cond.push("p.ativo and p.unidades_caixa is null");
+  if (f.marca === "-") cond.push("p.marca is null");
+  else if (f.marca) { par.push(f.marca); cond.push(`p.marca = $${par.length}`); }
+  if (f.tipo === "kit") cond.push("p.tipo = 'kit'");
+  if (f.tipo === "simples") cond.push("p.tipo <> 'kit'");
+  const filtros: Record<string, string> = {
+    "abaixo-minimo": "p.estoque_minimo is not null and p.tipo <> 'kit' and s.saldo <= p.estoque_minimo",
+    "sem-estoque": "p.tipo <> 'kit' and s.saldo <= 0",
+    "com-estoque": "s.saldo > 0",
+    "sem-minimo": "p.estoque_minimo is null and p.tipo <> 'kit'",
+    "sem-preco": "x.py_normal is null and x.py_vip is null and x.br_normal is null and x.br_vip is null",
+    "sem-preco-gs": "x.py_normal is null",
+    "sem-preco-br": "x.br_normal is null",
+    "sem-foto": "p.foto is null",
+    "sem-caixa": "p.unidades_caixa is null",
+  };
+  if (f.filtro && filtros[f.filtro]) cond.push(filtros[f.filtro]);
   if (f.filtro === "inativos") cond.push("not p.ativo"); else if (f.filtro !== "todos") cond.push("p.ativo");
+  const ordem = ORDEM[f.ordem ?? ""] ?? ORDEM[""];
 
   const precos = ["py_normal", "py_vip", "br_normal", "br_vip"].map((t) =>
     `(select valor from app.precos z where z.produto_id = p.id and z.tabela = '${t}' and z.vigente_desde <= current_date order by vigente_desde desc limit 1) as ${t}`).join(", ");
   const d = await comUsuario(u.id, async (c) => {
-    const base = `from app.produtos p cross join lateral (select ${precos}) x where ${cond.join(" and ")}`;
+    const base = `from app.produtos p
+      cross join lateral (select ${precos}) x
+      cross join lateral (select coalesce(sum(es.quantidade), 0) as saldo from app.estoque_saldos es
+                            join app.depositos dp on dp.id = es.deposito_id and dp.ativo where es.produto_id = p.id) s
+      where ${cond.join(" and ")}`;
     const total = Number((await c.query(`select count(*) n ${base}`, par)).rows[0].n);
-    const lista = (await c.query(`select p.id, p.codigo, p.nome, p.marca, p.foto, p.tipo, p.ativo, p.codigo_provisorio, p.unidades_caixa, x.* ${base}
-      order by p.nome limit ${POR_PAGINA} offset ${(pagina - 1) * POR_PAGINA}`, par)).rows;
-    const fotosPendentes = ehGestao(u) ? Number((await c.query("select count(*) n from app.fotos_catalogo where status = 'pendente'")).rows[0].n) : 0;
-    return { total, lista, fotosPendentes };
+    const lista = (await c.query(`select p.id, p.codigo, p.nome, p.marca, p.foto, p.tipo, p.ativo, p.codigo_provisorio, p.unidades_caixa,
+        p.estoque_minimo, s.saldo, x.* ${base} order by ${ordem[1]} limit ${POR_PAGINA} offset ${(pagina - 1) * POR_PAGINA}`, par)).rows as LinhaProduto[];
+    const marcas = (await c.query("select marca, count(*)::int n from app.produtos where ativo and marca is not null group by marca order by marca")).rows as { marca: string; n: number }[];
+    const abaixo = Number((await c.query("select count(*) n from app.v_abaixo_minimo")).rows[0].n);
+    const fotosPendentes = gestao ? Number((await c.query("select count(*) n from app.fotos_catalogo where status = 'pendente'")).rows[0].n) : 0;
+    return { total, lista, marcas, abaixo, fotosPendentes };
   });
   const paginas = Math.max(1, Math.ceil(d.total / POR_PAGINA));
-  const fotosPendentes = d.fotosPendentes;
-  const gestao = ehGestao(u);
   const url = (mud: Record<string, string | number | undefined>) => {
     const s = new URLSearchParams();
-    for (const [k, v] of Object.entries({ q: f.q, filtro: f.filtro, ...mud })) if (v) s.set(k, String(v));
+    for (const [k, v] of Object.entries({ q: f.q, filtro: f.filtro, marca: f.marca, tipo: f.tipo, ordem: f.ordem, ...mud })) if (v) s.set(k, String(v));
     return `/produtos?${s}`;
   };
+  const volta = url({ pagina: pagina > 1 ? pagina : undefined }).replace(/\?$/, "");
+  const temFiltro = Boolean(f.q || f.filtro || f.marca || f.tipo || f.ordem);
 
   return (
     <>
-      <section className="linha entre">
-        <div><h1>Produtos</h1><div className="suave pequeno">{d.total.toLocaleString("pt-BR")} produto(s). Clique no nome para editar tudo do produto; marque vários para ativar, inativar ou excluir de uma vez.</div></div>
-        {ehGestao(u) && (
+      <section className="cabecalho-pagina">
+        <div>
+          <h1>Produtos</h1>
+          <p>{d.total.toLocaleString("pt-BR")} produto(s){gestao ? ". Mude preço, caixa ou estoque mínimo direto na tabela e clique em Salvar; marque vários para ativar, inativar ou excluir de uma vez." : "."}</p>
+        </div>
+        {gestao && (
           <div className="linha">
-            <a className="botao" href="/produtos/fotos">Fotos do catálogo{fotosPendentes > 0 ? ` (${fotosPendentes} para conferir)` : ""}</a>
-            <a className="botao" href="/produtos/precos-rapido">Editar preços rápido</a>
-            <a className="botao principal" href="/produtos/novo">Novo produto</a>
+            <Link className="botao" href="/produtos/fotos-faltando">Buscar fotos</Link>
+            <Link className="botao" href="/produtos/fotos">Fotos do catálogo{d.fotosPendentes > 0 ? ` (${d.fotosPendentes})` : ""}</Link>
+            <Link className="botao principal" href="/produtos/novo">Novo produto</Link>
           </div>
         )}
       </section>
       <Avisos ok={f.ok} erro={f.erro} />
-      <form className="painel linha" method="get">
-        <label style={{ flex: 2, minWidth: 200 }}>Buscar<input name="q" defaultValue={f.q} placeholder="Nome, código, marca ou código de barras" /></label>
-        <label style={{ flex: 1, minWidth: 160 }}>Mostrar
+
+      {d.abaixo > 0 && f.filtro !== "abaixo-minimo" && (
+        <div className="aviso-caixa linha entre">
+          <span><b>{d.abaixo} produto(s)</b> no estoque mínimo ou abaixo: hora de comprar.</span>
+          <span className="linha">
+            <Link className="botao" href="/produtos?filtro=abaixo-minimo&ordem=falta-comprar">Ver aqui</Link>
+            <Link className="botao" href="/relatorios?aba=estoque">Relatório para compra</Link>
+          </span>
+        </div>
+      )}
+
+      <form className="painel filtros" method="get">
+        <label className="filtro-busca">Buscar<input name="q" defaultValue={f.q} placeholder="Nome, código, marca ou código de barras" /></label>
+        <label>Mostrar
           <select name="filtro" defaultValue={f.filtro ?? ""}>
-            <option value="">Ativos</option>
-            <option value="sem-foto">Sem foto</option>
-            <option value="sem-preco-gs">Sem preço em Gs</option>
-            <option value="sem-caixa">Sem peças por caixa</option>
-            <option value="inativos">Inativos</option>
-            <option value="todos">Todos</option>
+            {MOSTRAR.map(([k, t]) => <option key={k} value={k}>{t}</option>)}
           </select>
         </label>
-        <button className="principal">Buscar</button>
+        <label>Marca
+          <select name="marca" defaultValue={f.marca ?? ""}>
+            <option value="">Todas</option>
+            {d.marcas.map((m) => <option key={m.marca} value={m.marca}>{m.marca} ({m.n})</option>)}
+            <option value="-">Sem marca</option>
+          </select>
+        </label>
+        <label>Tipo
+          <select name="tipo" defaultValue={f.tipo ?? ""}>
+            <option value="">Todos</option><option value="simples">Unidade</option><option value="kit">Kit</option>
+          </select>
+        </label>
+        <label>Ordenar por
+          <select name="ordem" defaultValue={f.ordem ?? ""}>
+            {Object.entries(ORDEM).map(([k, [t]]) => <option key={k} value={k}>{t}</option>)}
+          </select>
+        </label>
+        <div className="filtro-botoes">
+          <button className="principal">Filtrar</button>
+          {temFiltro && <Link className="botao" href="/produtos">Limpar</Link>}
+        </div>
       </form>
 
       {gestao && (
         <>
-          <form id="caixas" action={salvarCaixas} hidden><input type="hidden" name="volta" value={url({ pagina: pagina > 1 ? pagina : undefined }).replace(/\?$/, "")} /></form>
-          <form id="lote" action={produtosEmLote} hidden><input type="hidden" name="volta" value={url({ pagina: pagina > 1 ? pagina : undefined }).replace(/\?$/, "")} /></form>
+          <form id="lote" action={produtosEmLote} hidden><input type="hidden" name="volta" value={volta} /></form>
           <BarraLote form="lote" />
         </>
       )}
-      <div className="tabela"><table>
-        <thead><tr>{gestao && <th style={{ width: 32 }}><MarcarTodos form="lote" /></th>}<th></th><th>Código</th><th>Produto</th><th title="Peças por caixa: o site mostra o preço da caixa fechada e o da unidade">Caixa</th><th>PY Normal</th><th>PY VIP</th><th>BR Normal</th><th>BR VIP</th></tr></thead>
-        <tbody>{d.lista.map((p) => (
-          <tr key={p.id}>
-            {gestao && <td><input type="checkbox" name="ids" value={p.id} form="lote" aria-label={`Selecionar ${p.nome}`} /></td>}
-            <td style={{ width: 52 }}>
-              {p.foto ? <img src={p.foto} alt="" width={40} height={40} style={{ objectFit: "cover", borderRadius: 6, display: "block" }} />
-                : <div style={{ width: 40, height: 40, borderRadius: 6, background: "var(--afundado)" }} />}
-            </td>
-            <td className="num">{p.codigo}{p.codigo_provisorio && <div><Selo cor="aviso">provisório</Selo></div>}</td>
-            <td>
-              <Link href={`/produtos/${p.id}`}>{p.nome}</Link>
-              <div className="pequeno suave">{p.marca ?? ""} {p.tipo === "kit" && <Selo cor="info">kit</Selo>} {!p.ativo && <Selo>inativo</Selo>}</div>
-            </td>
-            <td className="num" style={{ width: 80 }}>
-              {gestao
-                ? <input name={`caixa:${p.id}`} form="caixas" defaultValue={p.unidades_caixa ?? ""} inputMode="numeric" placeholder="—" aria-label={`Peças por caixa de ${p.nome}`} style={{ width: 64 }} />
-                : (p.unidades_caixa ?? "—")}
-            </td>
-            <td className="num">{p.py_normal ? dinheiro(p.py_normal, "GS") : "—"}</td>
-            <td className="num">{p.py_vip ? dinheiro(p.py_vip, "GS") : "—"}</td>
-            <td className="num">{p.br_normal ? dinheiro(p.br_normal, "BRL") : "—"}</td>
-            <td className="num">{p.br_vip ? dinheiro(p.br_vip, "BRL") : "—"}</td>
-          </tr>))}
-        </tbody>
-      </table></div>
-      {gestao && d.lista.length > 0 && (
-        <div className="linha">
-          <button form="caixas" className="principal">Salvar peças por caixa desta página</button>
-          <span className="pequeno suave">Digite quantas peças vêm na caixa (2, 12, 40…). Em branco = vende por unidade. O preço continua sendo o da unidade: o site calcula o da caixa.</span>
-        </div>
-      )}
+      {d.lista.length === 0
+        ? <div className="painel vazio">Nenhum produto com esse filtro.</div>
+        : <TabelaProdutos linhas={d.lista} gestao={gestao} acao={salvarGradeProdutos} volta={volta} />}
       {paginas > 1 && (
         <div className="linha" style={{ justifyContent: "center" }}>
           {pagina > 1 && <a className="botao" href={url({ pagina: pagina - 1 })}>Anterior</a>}

@@ -77,4 +77,16 @@ select teste.ok(true, 'Com autorização do gerente, Keila vende também da loja
 select teste.falha(format($$insert into app.vendedora_depositos values ('00000000-0000-0000-0000-0000000000a2', %L, false)$$, :'cd'),
   'row-level security', 'Vendedora não se autoriza sozinha');
 reset role;
+
+\echo '== Estoque mínimo =='
+set role vc_app;
+select teste.como(:'KEILA');
+select teste.falha(format($$select app.definir_estoque_minimo('[{"id":"%s","minimo":"5"}]')$$, :'PROD'), 'Só gerente', 'Vendedora não define estoque mínimo');
+select teste.como(:'GERENTE');
+select teste.ok(app.definir_estoque_minimo(format('[{"id":"%s","minimo":"100000"}]', :'PROD')::jsonb) = 1, 'Gerente define o estoque mínimo');
+select teste.ok((select faltam > 0 from app.v_abaixo_minimo where produto_id = :'PROD'), 'Abaixo do mínimo aparece no relatório com quanto falta');
+select teste.ok(app.definir_estoque_minimo(format('[{"id":"%s","minimo":"0"}]', :'PROD')::jsonb) = 1, 'Mínimo pode baixar');
+select teste.ok(not exists (select 1 from app.v_abaixo_minimo where produto_id = :'PROD'), 'Com saldo acima do mínimo sai do relatório');
+select app.definir_estoque_minimo(format('[{"id":"%s","minimo":""}]', :'PROD')::jsonb);
+reset role;
 \echo '== Testes de estoque passaram =='

@@ -209,3 +209,56 @@ export async function enviarFotoProduto(fd: FormData): Promise<{ erro?: string; 
     return { erro: mensagemErro(e) };
   }
 }
+
+/** "20.000" → 20000 · "39,90" → 39.9 · vazio → null */
+function valorDigitado(s: string): number | null {
+  let t = s.replace(/\s|R\$|Gs/gi, "");
+  if (!t) return null;
+  if (t.includes(",")) t = t.replace(/\./g, "").replace(",", ".");
+  else if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, "");
+  const n = Number(t);
+  if (!Number.isFinite(n) || n <= 0) throw new Error(`Valor inválido: "${s}". Use só números, como 15000 ou 9,90.`);
+  return n;
+}
+
+/** Tabela de produtos: salva de uma vez preços, peças por caixa e estoque mínimo alterados (só gerente ou dono). */
+export async function salvarGradeProdutos(fd: FormData) {
+  const u = await exigirUsuario();
+  const v = texto(fd, "volta");
+  const volta = /^\/produtos(\?[\w=&%.+-]*)?$/.test(v) ? v : "/produtos";
+  let q: string;
+  try {
+    if (!ehGestao(u)) throw new Error("Só gerente ou dono altera preços, caixa e estoque mínimo.");
+    const precos: { id: string; tabela: string; valor: number }[] = [];
+    const caixas: { id: string; unidades: string }[] = [];
+    const minimos: { id: string; minimo: string }[] = [];
+    for (const [k, val] of fd.entries()) {
+      const s = String(val);
+      let m = /^p:([0-9a-f-]{36}):(py_normal|py_vip|br_normal|br_vip)$/i.exec(k);
+      if (m) { const n = valorDigitado(s); if (n != null) precos.push({ id: m[1], tabela: m[2], valor: n }); continue; }
+      m = /^caixa:([0-9a-f-]{36})$/i.exec(k);
+      if (m) { caixas.push({ id: m[1], unidades: s.replace(/\D/g, "") }); continue; }
+      m = /^min:([0-9a-f-]{36})$/i.exec(k);
+      if (m) minimos.push({ id: m[1], minimo: s.replace(/\D/g, "") });
+    }
+    if (!precos.length && !caixas.length && !minimos.length) throw new Error("Nenhuma alteração para salvar.");
+    const r = await comUsuario(u.id, async (c) => {
+      const ids = [...new Set([...precos, ...caixas].map((x) => x.id))];
+      const cod = new Map((await c.query("select id::text, codigo from app.produtos where id = any($1::uuid[])", [ids])).rows.map((x) => [x.id, x.codigo]));
+      let nc = 0, np = 0, nm = 0;
+      if (caixas.length) nc = Number((await c.query("select app.definir_caixas($1::jsonb) as n",
+        [JSON.stringify(caixas.filter((x) => cod.has(x.id)).map((x) => ({ codigo: cod.get(x.id), unidades: x.unidades })))])).rows[0].n);
+      if (precos.length) np = Number((await c.query("select app.importar_precos($1::jsonb) as r",
+        [JSON.stringify(precos.filter((p) => cod.has(p.id)).map((p) => ({ codigo: cod.get(p.id), tabela: p.tabela, valor: p.valor })))])).rows[0].r.alterados);
+      if (minimos.length) nm = Number((await c.query("select app.definir_estoque_minimo($1::jsonb) as n", [JSON.stringify(minimos)])).rows[0].n);
+      return { nc, np, nm };
+    });
+    const partes = [r.np && `${r.np} preço(s)`, r.nc && `${r.nc} caixa(s)`, r.nm && `${r.nm} estoque(s) mínimo(s)`].filter(Boolean);
+    q = "ok=" + encodeURIComponent(partes.length ? `Salvo: ${partes.join(", ")}.` : "Nada mudou.");
+  } catch (e) {
+    q = "erro=" + encodeURIComponent(mensagemErro(e));
+  }
+  revalidatePath("/produtos");
+  revalidatePath("/loja");
+  redirect(`${volta}${volta.includes("?") ? "&" : "?"}${q}`);
+}

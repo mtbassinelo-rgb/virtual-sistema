@@ -57,7 +57,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
     { id: "relatorios", titulo: "Relatórios", icone: "relatorios", itens: [
       { href: "/relatorios", texto: "Resumo de vendas" },
       { href: "/relatorios?aba=produtos", texto: "Mais vendidos" },
-      { href: "/relatorios?aba=estoque", texto: "Estoque baixo e parado" },
+      { href: "/relatorios?aba=estoque", texto: "Para comprar / estoque baixo" },
       { href: "/relatorios?aba=catalogo", texto: "Saúde do catálogo" },
       ...(gestao ? [
         { href: "/relatorios?aba=lucro", texto: "Lucro e rankings" },

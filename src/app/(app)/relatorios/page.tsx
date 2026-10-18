@@ -22,7 +22,7 @@ type Soma = { moeda: Moeda; pedidos: number; vendido: string; recebido: string; 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Lin = Record<string, any>;
 type Dados = {
-  totais?: Soma[]; vend?: Lin[]; meses?: Lin[]; canais?: Lin[]; itens?: Lin[]; marcas?: Lin[]; g?: Lin[]; cat?: Lin; fotos?: number;
+  totais?: Soma[]; vend?: Lin[]; meses?: Lin[]; canais?: Lin[]; itens?: Lin[]; marcas?: Lin[]; g?: Lin[]; minimo?: Lin[]; cat?: Lin; fotos?: number;
   luc?: Lin[]; rank?: Lin[]; topLucro?: Lin[]; baixaMargem?: Lin[]; poucaVenda?: Lin[]; campeoes?: Lin[]; resultado?: Lin[]; envios?: Lin[];
   porCategoria?: Lin[]; custoVolume?: number;
 };
@@ -67,7 +67,9 @@ export default async function Relatorios({ searchParams }: { searchParams: Promi
       const g = (await c.query(`select produto_id, produto, codigo, deposito, saldo, vendido_30, ultima_venda, cobertura_dias, situacao
         from app.v_giro where situacao in ('esgotado','baixo','parado') order by
         case situacao when 'baixo' then 1 when 'esgotado' then 2 else 3 end, cobertura_dias nulls last, produto limit 300`)).rows;
-      return { g };
+      const minimo = (await c.query(`select produto_id, codigo, produto, marca, fornecedor, unidades_caixa, estoque_minimo, saldo, faltam, vendido_30
+        from app.v_abaixo_minimo order by marca nulls last, faltam desc, produto`)).rows;
+      return { g, minimo };
     }
     const cat = (await c.query(`select
         count(*) filter (where ativo)::int ativos,
@@ -86,7 +88,7 @@ export default async function Relatorios({ searchParams }: { searchParams: Promi
     return { cat, marcas, fotos };
   });
 
-  const { totais = [], vend = [], meses = [], canais = [], itens = [], marcas = [], g = [], cat, fotos = 0 } = d;
+  const { totais = [], vend = [], meses = [], canais = [], itens = [], marcas = [], g = [], minimo = [], cat, fotos = 0 } = d;
   const maxMes = (moeda: string) => Math.max(1, ...meses.filter((m) => m.moeda === moeda).map((m) => Number(m.vendido)));
 
   return (
@@ -205,7 +207,33 @@ export default async function Relatorios({ searchParams }: { searchParams: Promi
         </div>
       )}
 
-      {aba.k === "estoque" && (
+      {aba.k === "estoque" && (<>
+        <section className="painel">
+          <div className="linha entre">
+            <h2 style={{ margin: 0 }}>Para comprar: no estoque mínimo ou abaixo</h2>
+            <Link className="botao" href="/produtos?filtro=sem-minimo">Definir estoque mínimo</Link>
+          </div>
+          <p className="suave pequeno" style={{ margin: 0 }}>Só aparecem produtos com estoque mínimo definido (na lista de Produtos, coluna Mínimo). “Comprar” é o que falta para voltar ao mínimo, arredondado para caixas fechadas quando o produto tem peças por caixa.</p>
+          {minimo.length === 0 ? <div className="vazio">Nenhum produto abaixo do mínimo.</div> : (
+            <div className="tabela"><table>
+              <thead><tr><th>Produto</th><th>Marca / fornecedor</th><th className="num">Estoque</th><th className="num">Mínimo</th><th className="num">Comprar</th><th className="num">Vendido 30 dias</th></tr></thead>
+              <tbody>{minimo.map((x) => {
+                const faltam = Number(x.faltam), cx = Number(x.unidades_caixa) || 0;
+                const caixas = cx > 0 ? Math.max(1, Math.ceil(faltam / cx)) : 0;
+                return (
+                  <tr key={x.produto_id}>
+                    <td><Link href={`/produtos/${x.produto_id}`}>{x.produto}</Link><div className="pequeno suave">{x.codigo}</div></td>
+                    <td>{x.marca ?? "—"}{x.fornecedor ? <div className="pequeno suave">{x.fornecedor}</div> : null}</td>
+                    <td className="num"><span className={`estoque-num ${Number(x.saldo) <= 0 ? "zerado" : "baixo"}`}>{Number(x.saldo).toLocaleString("pt-BR")}</span></td>
+                    <td className="num">{Number(x.estoque_minimo).toLocaleString("pt-BR")}</td>
+                    <td className="num"><b>{cx > 0 ? `${caixas} cx (${(caixas * cx).toLocaleString("pt-BR")} un)` : `${Math.max(faltam, 1).toLocaleString("pt-BR")} un`}</b></td>
+                    <td className="num">{Number(x.vendido_30).toLocaleString("pt-BR")}</td>
+                  </tr>
+                );
+              })}</tbody>
+            </table></div>
+          )}
+        </section>
         <section className="painel">
           <p className="suave pequeno" style={{ margin: 0 }}>Baixo: acaba em poucos dias no ritmo atual. Esgotado: saldo zero. Parado: tem estoque mas quase não vende. Os números usam as vendas enviadas ou entregues.</p>
           {g.length === 0 ? <div className="vazio">Nada acabando nem parado. Tudo certo.</div> : (
@@ -224,7 +252,7 @@ export default async function Relatorios({ searchParams }: { searchParams: Promi
             </table></div>
           )}
         </section>
-      )}
+      </>)}
 
       {aba.k === "lucro" && <Lucro d={d} de={de} ate={ate} />}
       {aba.k === "resultado" && <Resultado d={d} />}
