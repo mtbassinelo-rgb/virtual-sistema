@@ -13,7 +13,7 @@ export function bannersPadrao(idioma: Idioma, cliente: boolean): Banner[] {
       titulo: es ? "Precio mayorista por caja cerrada" : "Preço de atacado na caixa fechada",
       subtitulo: cliente
         ? (es ? "Vea el precio de la caja y de la unidad en cada producto." : "Veja o preço da caixa e da unidade em cada produto.")
-        : (es ? "Salones, perfumerías y revendedoras de Brasil y Paraguay. Pida su acceso." : "Salões, perfumarias e revendedoras do Brasil e do Paraguai. Peça o seu acesso.") },
+        : (es ? "Salones, perfumerías y revendedoras. Pida su acceso." : "Salões, perfumarias e revendedoras. Peça o seu acesso.") },
     { id: "p-marylife", imagem: "/banners/mary-life-paises.webp", link: "/loja?q=mary%20life",
       titulo: es ? "Body Splash Mary Life" : "Body Splash Mary Life",
       subtitulo: es ? "Dubái, Madrid, París, Río, Las Vegas y Tokio. Cabello y cuerpo." : "Dubai, Madri, Paris, Rio, Las Vegas e Tóquio. Cabelo e corpo." },
