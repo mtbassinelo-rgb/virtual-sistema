@@ -95,4 +95,41 @@ select teste.ok((select novos from app.v_procuras_resumo where produto is not nu
 update app.procuras set visto_em = now(), visto_por = app.uid() where produto_id = :'PX';
 select teste.ok((select novos from app.v_procuras_resumo where produto_id = :'PX') = 0, 'Gerente marca como visto');
 reset role;
+
+\echo '== Kits capilares por linha =='
+insert into app.produtos (codigo, nome, marca) values
+  ('KT-SH1', 'SHAMPOO TESTELINHA 500ML MARCATESTE', 'MarcaTeste'),
+  ('KT-CO1', 'CONDICIONADOR TESTELINHA 500ML MARCATESTE', 'MarcaTeste'),
+  ('KT-MA1', 'MÁSCARA TESTELINHA 500G MARCATESTE', 'MarcaTeste'),
+  ('KT-MA1K','MASCARA TESTELINHA 1KG MARCATESTE', 'MarcaTeste'),
+  ('KT-SH2', 'SHAMPOO MATIZADOR TESTE 400ML MARCATESTE', 'MarcaTeste'),
+  ('KT-CO2', 'CONDICIONADOR MATIZADOR TESTE 400ML MARCATESTE', 'MarcaTeste'),
+  ('KT-MA2', 'MASCARA MATIZADOR TESTE 400G MARCATESTE', 'MarcaTeste'),
+  ('KT-SH3', 'SHAMPOO SOZINHO 500ML MARCATESTE', 'MarcaTeste');
+select teste.como(:'GERENTE');
+set role vc_app;
+select teste.ok((select count(*) from app.sugerir_kits_capilares('MarcaTeste')) = 2, 'Acha as linhas com shampoo, condicionador e máscara');
+select teste.ok((select mascara from app.sugerir_kits_capilares('MarcaTeste') where linha = 'testelinha') like '%500G%',
+  'Com duas máscaras, usa a de 500 g');
+select teste.ok((select matizador from app.sugerir_kits_capilares('MarcaTeste') where linha = 'matizador teste'), 'Reconhece a linha matizadora');
+select teste.ok(app.criar_kits_capilares('MarcaTeste', array['testelinha','matizador teste'],
+  '{"normal":{"py_normal":33000,"py_vip":33000,"br_normal":36.27,"br_vip":27.2,"custo":20.4},"matizador":{"py_normal":37000,"py_vip":35000}}') = 2,
+  'Cria os dois kits');
+select teste.ok((select count(*) from app.kit_componentes k join app.produtos p on p.id = k.kit_id where p.codigo = 'KIT-KT-SH1') = 3, 'Kit com os 3 produtos');
+select teste.ok((select valor from app.precos pr join app.produtos p on p.id = pr.produto_id where p.codigo = 'KIT-KT-SH2' and tabela = 'py_normal') = 37000,
+  'Kit matizador com o preço de matizador');
+select teste.ok((select valor from app.precos pr join app.produtos p on p.id = pr.produto_id where p.codigo = 'KIT-KT-SH1' and tabela = 'py_normal') = 33000,
+  'Kit normal com o preço normal');
+select teste.ok(not exists (select 1 from app.vitrine_publica() where codigo in ('KT-SH1','KT-CO1','KT-MA1','KT-SH2','KT-CO2','KT-MA2'))
+  and exists (select 1 from app.vitrine_publica() where codigo = 'KIT-KT-SH1')
+  and exists (select 1 from app.vitrine_publica() where codigo = 'KT-MA1K')
+  and exists (select 1 from app.vitrine_publica() where codigo = 'KT-SH3'),
+  'No site: o kit aparece, os soltos do kit não; o que não entrou em kit continua');
+select teste.ok((select ativo from app.produtos where codigo = 'KT-SH1'), 'O solto continua ativo no sistema');
+select teste.ok(app.criar_kits_capilares('MarcaTeste', array['testelinha'], '{}') = 0, 'Rodar de novo não duplica o kit');
+select teste.ok(app.definir_mostrar_no_site(array[(select id from app.produtos where codigo = 'KT-SH1')], true) = 1, 'Gerente muda “Mostrar no site”');
+select teste.ok(exists (select 1 from app.vitrine_publica() where codigo = 'KT-SH1'), 'O solto volta a aparecer no site');
+select teste.como(:'KEILA');
+select teste.falha($$select app.criar_kits_capilares('MarcaTeste', array['testelinha'], '{}')$$, 'gerente', 'Vendedora não cria kits');
+reset role;
 \echo 'Testes de importação em lote e procuras passaram.'

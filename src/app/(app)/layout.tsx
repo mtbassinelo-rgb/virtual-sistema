@@ -39,6 +39,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
       ...(gestao ? [
         { href: "/produtos/precos-rapido", texto: "Editar preços rápido", contador: n.sem_preco, dica: "Produtos ativos sem nenhum preço" },
         { href: "/produtos/novo", texto: "Novo produto" },
+        { href: "/produtos/kits", texto: "Kits capilares (montar)" },
         { href: "/produtos/fotos", texto: "Fotos do catálogo", contador: n.fotos, dica: "Fotos esperando conferência" },
         { href: "/estoque/precos", texto: "Preços por planilha" },
       ] : []),

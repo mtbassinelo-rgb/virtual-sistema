@@ -58,7 +58,7 @@ for (const tela of [`/pedidos/${pedidoKeila}/resumo`, "/comissoes", "/comissoes?
     ok(r.status === 200 && !r.html.includes("Application error"), `${email}: ${tela} abre`);
   }
 }
-for (const tela of ["/despesas", "/despesas?ver=todas", "/parametros", "/relatorios?aba=lucro", "/relatorios?aba=resultado", "/relatorios?aba=envios"]) {
+for (const tela of ["/produtos/kits", "/produtos/kits?marca=Maycrene", "/despesas", "/despesas?ver=todas", "/parametros", "/relatorios?aba=lucro", "/relatorios?aba=resultado", "/relatorios?aba=envios"]) {
   const r = await abrir(tela, await sessao("gerente@teste.local"));
   ok(r.status === 200 && !r.html.includes("Application error"), `Gerente: ${tela} abre`);
 }
