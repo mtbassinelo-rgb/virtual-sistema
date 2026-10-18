@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ehGestao, exigirUsuario } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
+import { CampoFoto } from "./campo-foto";
 import { Avisos, Selo } from "../../avisos";
 import { removerFoto, salvarProduto } from "../acoes";
 
@@ -124,10 +125,10 @@ export default async function Produto({ params, searchParams }: {
             <h2>Foto</h2>
             {fotoCat ? <><img src={`/fotos-catalogo/${fotoCat.id}.webp`} alt={fotoCat.nome} style={{ width: "100%", maxWidth: 320, aspectRatio: "1", objectFit: "contain", borderRadius: 12, background: "#fff" }} />
               <p className="pequeno suave" style={{ margin: 0 }}>Foto do catálogo: entra neste produto ao criar.</p></>
+            : pode ? <CampoFoto produtoId={novo ? null : id} fotoAtual={p?.foto ?? null} nome={p?.nome ?? "Foto do produto"} />
             : p?.foto ? <img src={p.foto} alt={p.nome} style={{ width: "100%", maxWidth: 320, aspectRatio: "1", objectFit: "cover", borderRadius: 12, background: "#fff" }} />
               : <div className="vazio" style={{ background: "var(--afundado)", borderRadius: 12 }}>Sem foto: no site aparece o rótulo colorido.</div>}
-            {pode && <label>{p?.foto ? "Trocar foto" : "Enviar foto"} (JPG, PNG ou WEBP, até 5 MB)<input type="file" name="foto" accept="image/jpeg,image/png,image/webp" /></label>}
-            <p className="pequeno suave">Dica: foto quadrada, com fundo branco e o produto centralizado fica melhor no site.</p>
+            <p className="pequeno suave">JPG, PNG ou WEBP até 5 MB. {novo ? "A foto entra quando você criar o produto." : "Ao arrastar, colar ou usar o link, a foto já é salva."} Foto quadrada, com fundo branco e o produto centralizado fica melhor no site.</p>
           </section>
           {!novo && (
             <section className="painel">

@@ -9,6 +9,7 @@ import { comUsuario, mensagemErro } from "@/lib/db";
 import { numero, texto } from "@/lib/formato";
 import { copyFile } from "node:fs/promises";
 import { pastaFotos, pastaFotosCatalogo, tipoImagem } from "@/lib/arquivos";
+import { baixarFotoDoLink } from "@/lib/foto-link";
 
 const TABELAS = ["py_normal", "py_vip", "br_normal", "br_vip"] as const;
 
@@ -29,6 +30,8 @@ export async function salvarProduto(fd: FormData) {
       bytes = Buffer.from(await arq.arrayBuffer());
       ext = tipoImagem(bytes);
       if (!ext) throw new Error("A foto precisa ser JPG, PNG ou WEBP.");
+    } else if (texto(fd, "foto_link")) {
+      ({ bytes, ext } = await baixarFotoDoLink(texto(fd, "foto_link")));
     }
 
     const id = await comUsuario(u.id, async (c) => {
@@ -172,4 +175,36 @@ export async function salvarCaixas(fd: FormData) {
   revalidatePath("/produtos");
   revalidatePath("/loja");
   redirect(`${volta}${volta.includes("?") ? "&" : "?"}${q}`);
+}
+
+/** Troca a foto na hora (arrastar, colar ou link), sem precisar salvar o resto do produto. */
+export async function enviarFotoProduto(fd: FormData): Promise<{ erro?: string; foto?: string }> {
+  const u = await exigirUsuario();
+  const id = texto(fd, "id");
+  let nome: string | null = null;
+  try {
+    if (!ehGestao(u)) throw new Error("Só gerente ou dono altera fotos.");
+    if (!/^[0-9a-f-]{36}$/i.test(id)) throw new Error("Produto inválido.");
+    let bytes: Buffer, ext: "jpg" | "png" | "webp" | null;
+    const arq = fd.get("foto");
+    if (arq instanceof File && arq.size > 0) {
+      if (arq.size > 5 * 1024 * 1024) throw new Error("Foto grande demais: máximo 5 MB.");
+      bytes = Buffer.from(await arq.arrayBuffer());
+      ext = tipoImagem(bytes);
+      if (!ext) throw new Error("A foto precisa ser JPG, PNG ou WEBP.");
+    } else if (texto(fd, "foto_link")) {
+      ({ bytes, ext } = await baixarFotoDoLink(texto(fd, "foto_link")));
+    } else throw new Error("Arraste uma foto, cole uma imagem ou informe o link da foto.");
+    await mkdir(pastaFotos(), { recursive: true });
+    nome = `${id}-${Date.now()}.${ext}`;
+    await writeFile(path.join(pastaFotos(), nome), bytes);
+    const antiga = await comUsuario(u.id, async (c) => (await c.query("select app.definir_foto($1, $2) as antiga", [id, `/fotos/${nome}`])).rows[0].antiga as string | null);
+    if (antiga) await rm(path.join(pastaFotos(), path.basename(antiga)), { force: true });
+    revalidatePath("/produtos");
+    revalidatePath("/loja");
+    return { foto: `/fotos/${nome}` };
+  } catch (e) {
+    if (nome) await rm(path.join(pastaFotos(), nome), { force: true });
+    return { erro: mensagemErro(e) };
+  }
 }

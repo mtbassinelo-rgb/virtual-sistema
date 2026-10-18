@@ -185,3 +185,14 @@ button.discreto:hover { color: var(--erro); border-color: transparent; }
 .precos-grade input.mudou { border-color: var(--marca); background: var(--marca-suave); }
 .precos-grade td { vertical-align: middle; }
 .salvar-fixo { position: sticky; bottom: 0; z-index: 5; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 10px 14px; background: var(--superficie); border: 1px solid var(--linha); border-radius: 12px; box-shadow: 0 -4px 16px rgba(0,0,0,.06); }
+
+/* ---------- Foto do produto: arrastar, colar ou link ---------- */
+.campo-foto { display: flex; flex-direction: column; gap: 8px; }
+.soltar-foto { position: relative; width: 100%; max-width: 340px; aspect-ratio: 1; border: 2px dashed var(--linha); border-radius: 14px; background: var(--afundado); display: grid; place-items: center; cursor: pointer; overflow: hidden; transition: border-color .15s, background .15s; }
+.soltar-foto img { width: 100%; height: 100%; object-fit: contain; background: #fff; }
+.soltar-foto:hover, .soltar-foto.sobre { border-color: var(--marca); background: var(--marca-suave); }
+.soltar-foto.salvando { opacity: .6; cursor: progress; }
+.soltar-vazio { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; padding: 16px; color: var(--suave); }
+.soltar-vazio b { color: var(--marca); font-size: 1rem; }
+.soltar-dica { position: absolute; left: 8px; right: 8px; bottom: 8px; text-align: center; font-size: .78rem; padding: 4px 8px; border-radius: 999px; background: rgba(0,0,0,.55); color: #fff; opacity: 0; transition: opacity .15s; }
+.soltar-foto:hover .soltar-dica, .soltar-foto.sobre .soltar-dica, .soltar-foto.salvando .soltar-dica { opacity: 1; }
