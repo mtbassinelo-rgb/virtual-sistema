@@ -122,7 +122,12 @@ const reuso = await fetch(`${base}/loja/entrar/${convite}`, { redirect: "manual"
 ok((reuso.headers.get("location") ?? "").includes("motivo=link"), "Link usado de novo é recusado");
 const cat = await abrir("/loja", cookieCliente);
 ok(cat.status === 200 && cat.html.includes("Kit Platinum") && cat.html.includes("Gs "), "Catálogo do cliente abre com preços em Gs e o kit");
-ok(cat.html.includes("Sob encomenda"), "Cliente da loja vê os produtos sob encomenda (vêm do CD)");
+ok(cat.html.includes("marca-unidade") && cat.html.includes('lang="es"'), "Cliente da loja de CDE cai no site de CDE (em espanhol), não no principal");
+const entradaCde = await fetch(`${base}/loja/cde`, { redirect: "manual" });
+const cookieCde = (entradaCde.headers.get("set-cookie") ?? "").split(";")[0];
+ok(entradaCde.status === 303 && cookieCde.startsWith("vc_unidade=loja-cde"), "Endereço /cde guarda a loja de CDE para o visitante");
+const vitCde = await abrir("/loja", cookieCde);
+ok(vitCde.status === 200 && vitCde.html.includes("marca-unidade"), "Visitante da loja de CDE vê o site de CDE");
 ok(cat.html.includes("wa.me/"), "Área do cliente mostra o WhatsApp da empresa");
 ok((await abrir("/loja/acesso")).html.includes("wa.me/5545999972092"), "Sem login, o site mostra o WhatsApp principal (Brasil)");
 ok((await abrir("/loja/acesso")).html.includes("CPF, CNPJ, CI ou RUC"), "Tela de acesso pede documento e senha");
