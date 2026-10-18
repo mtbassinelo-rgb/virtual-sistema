@@ -1,7 +1,7 @@
 "use client";
 
-import { createContext, useActionState, useContext, useEffect, useMemo, useState } from "react";
-import { enviarCarrinho, type RespostaCarrinho } from "./acoes";
+import { createContext, useActionState, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { enviarCarrinho, guardarCarrinho, itensParaRepetir, type RespostaCarrinho } from "./acoes";
 import type { TextosCarrinho } from "@/lib/idioma";
 
 /** qtd = caixas fechadas quando o produto tem "caixa" (peças por caixa); senão, unidades. preco = por unidade. */
@@ -32,10 +32,19 @@ function ler(): ItemCarrinho[] {
 export function Carrinho({ children, cliente, t }: { children: React.ReactNode; cliente: ClienteCarrinho; t: TextosCarrinho }) {
   const [itens, setItens] = useState<ItemCarrinho[]>([]);
   const [aberto, abrir] = useState(false);
-  useEffect(() => setItens(ler()), []);
+  const carregado = useRef(false);
+  useEffect(() => { setItens(ler()); carregado.current = true; }, []);
   useEffect(() => {
     try { localStorage.setItem(CHAVE, JSON.stringify(itens)); } catch { /* navegação privada: o carrinho vale só nesta página */ }
   }, [itens]);
+  // cliente logado: o carrinho também fica guardado no sistema (a vendedora vê os carrinhos parados)
+  useEffect(() => {
+    if (!cliente || !carregado.current) return;
+    const t = setTimeout(() => {
+      guardarCarrinho(itens.map((i) => ({ produto_id: i.id, qtd: i.qtd * (i.caixa || 1) }))).catch(() => undefined);
+    }, 2500);
+    return () => clearTimeout(t);
+  }, [itens, cliente]);
   useEffect(() => {
     document.body.style.overflow = aberto ? "hidden" : "";
     const esc = (e: KeyboardEvent) => e.key === "Escape" && abrir(false);
@@ -187,4 +196,22 @@ export function LimparCarrinho() {
   const { limpar } = useCarrinho();
   useEffect(() => limpar(), []); // eslint-disable-line react-hooks/exhaustive-deps
   return null;
+}
+
+/** "Pedir de novo": coloca no carrinho os itens de um pedido antigo, com o preço de hoje. */
+export function RepetirPedido({ pedidoId, rotulo, vazio }: { pedidoId: string; rotulo: string; vazio: string }) {
+  const { definir, abrir } = useCarrinho();
+  const [estado, setEstado] = useState<"" | "carregando" | "vazio">("");
+  return (
+    <button type="button" className="botao-repetir" disabled={estado === "carregando"} onClick={async () => {
+      setEstado("carregando");
+      const itens = await itensParaRepetir(pedidoId).catch(() => []);
+      if (!itens.length) { setEstado("vazio"); return; }
+      for (const { qtd, ...item } of itens) definir(item, qtd);
+      setEstado("");
+      abrir(true);
+    }}>
+      {estado === "vazio" ? vazio : estado === "carregando" ? "…" : rotulo}
+    </button>
+  );
 }

@@ -94,6 +94,8 @@ export async function enviarCarrinho(_: RespostaCarrinho, fd: FormData): Promise
     try {
       await pool.query("select app.portal_criar_pedido($1, $2, $3)",
         [sha256(t!), JSON.stringify(itens.map(({ produto_id, quantidade, encomenda }) => ({ produto_id, quantidade, encomenda: !!encomenda }))), obs]);
+      await avisarEquipe(`Pedido novo pela área do cliente: ${cliente.nome}`,
+        `Cliente: ${cliente.nome}\nVendedora: ${cliente.vendedora}\n\n${await listaTexto(itens)}${obs ? "\n\nObs.: " + obs : ""}`).catch(() => undefined);
       return { url: "/loja/pedidos?novo=1&ok=" + encodeURIComponent("Pedido enviado! A vendedora confere e avisa o total para pagamento.") };
     } catch (e) {
       const msg = `Olá, ${cliente.vendedora}! Sou ${cliente.nome}. Quero fazer este pedido:\n${await listaTexto(itens)}${obs ? "\nObs.: " + obs : ""}`;
@@ -150,4 +152,31 @@ export async function registrarProcura(_: RespostaProcura, fd: FormData): Promis
     return { erro: mensagemErro(e) };
   }
   return { ok: es ? "¡Listo! Le avisamos cuando llegue." : "Pronto! Avisamos quando chegar." };
+}
+
+/** "Pedir de novo": itens de um pedido antigo com o preço e a caixa de hoje (só o que continua no catálogo). */
+export async function itensParaRepetir(pedidoId: string): Promise<{ id: string; nome: string; marca: string | null; preco: number | null; caixa: number | null; limite: number | null; qtd: number }[]> {
+  const cliente = await clienteAtual();
+  const t = await tokenCliente();
+  if (!cliente || !t || !/^[0-9a-f-]{36}$/i.test(pedidoId)) return [];
+  const sessao = sha256(t);
+  const itens = (await pool.query("select produto_id, quantidade from app.portal_itens_pedido($1, $2)", [sessao, pedidoId])).rows as { produto_id: string; quantidade: string }[];
+  if (!itens.length) return [];
+  const vit = new Map((await pool.query("select produto_id, nome, marca, unidades_caixa from app.vitrine_publica() where produto_id = any($1::uuid[])",
+    [itens.map((i) => i.produto_id)])).rows.map((r) => [String(r.produto_id), r]));
+  const precos = new Map((await pool.query("select produto_id, preco, limite_qtd from app.portal_catalogo($1)", [sessao])).rows.map((r) => [String(r.produto_id), r]));
+  return itens.filter((i) => vit.has(i.produto_id)).map((i) => {
+    const v = vit.get(i.produto_id), pr = precos.get(i.produto_id);
+    const caixa = v.unidades_caixa ? Number(v.unidades_caixa) : null;
+    return { id: i.produto_id, nome: String(v.nome), marca: v.marca ?? null, preco: pr ? Number(pr.preco) : null,
+             caixa, limite: pr?.limite_qtd ? Number(pr.limite_qtd) : null,
+             qtd: caixa ? Math.max(1, Math.ceil(Number(i.quantidade) / caixa)) : Math.max(1, Math.round(Number(i.quantidade))) };
+  });
+}
+
+/** Guarda o carrinho do cliente logado (a vendedora vê os carrinhos parados e pode chamar o cliente). */
+export async function guardarCarrinho(itens: { produto_id: string; qtd: number }[]): Promise<void> {
+  const t = await tokenCliente();
+  if (!t) return;
+  await pool.query("select app.portal_salvar_carrinho($1, $2::jsonb)", [sha256(t), JSON.stringify(itens.slice(0, 200))]).catch(() => undefined);
 }

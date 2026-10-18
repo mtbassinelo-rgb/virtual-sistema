@@ -259,6 +259,7 @@ function Cartao({ p, moeda, cliente, t }: { p: Produto; moeda: Moeda; cliente: b
       </div>
       <div className="cartao-corpo">
         <h3>{p.nome}</h3>
+        {promo && p.x?.promo_fim && <PrazoPromo fim={p.x.promo_fim} es={t.verAgora === "Ver productos"} />}
         {p.unidades_caixa && <div className="caixa-info">{t.caixaCom(p.unidades_caixa)}</div>}
         <Precos p={p} moeda={moeda} cliente={cliente} t={t} />
         {pr && (
@@ -330,4 +331,15 @@ function LinhaCatalogo({ p, moeda, cliente, t }: { p: Produto; moeda: Moeda; cli
         {esgotado(p, cliente) && <QueroProduto produtoId={p.produto_id} cliente={cliente} t={t.quero} />}</div>
     </article>
   );
+}
+
+/** "Promoção termina em 3 dias": deixa claro que o desconto acaba. */
+function PrazoPromo({ fim, es }: { fim: string; es: boolean }) {
+  const hoje = new Date(new Date().toLocaleDateString("en-CA", { timeZone: "America/Asuncion" }) + "T00:00:00");
+  const dias = Math.round((new Date(String(fim).slice(0, 10) + "T00:00:00").getTime() - hoje.getTime()) / 86400000);
+  if (dias < 0 || dias > 30) return null;
+  const txt = dias === 0 ? (es ? "¡La promoción termina hoy!" : "A promoção termina hoje!")
+    : dias === 1 ? (es ? "La promoción termina mañana" : "A promoção termina amanhã")
+    : (es ? `La promoción termina en ${dias} días` : `A promoção termina em ${dias} dias`);
+  return <span className="promo-prazo">{txt}</span>;
 }

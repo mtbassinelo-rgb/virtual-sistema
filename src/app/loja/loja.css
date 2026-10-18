@@ -470,3 +470,6 @@
 .banners-compacta { border-radius: 16px; overflow: hidden; margin: 4px 0; }
 .banners-compacta .banner { min-height: clamp(170px, 22vw, 260px); }
 .banners-compacta .banner-texto h2 { font-size: clamp(1.2rem, 2.6vw, 1.8rem); }
+.botao-repetir { font: inherit; font-weight: 600; border: 1.5px solid var(--roxo); color: var(--roxo); background: #fff; border-radius: 999px; padding: 6px 14px; cursor: pointer; }
+.botao-repetir:hover { background: var(--roxo-suave); }
+.promo-prazo { display: block; font-size: .78rem; font-weight: 600; color: #b42318; margin-top: 2px; }

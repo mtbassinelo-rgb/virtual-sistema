@@ -2,7 +2,7 @@ import { pool } from "@/lib/db";
 import { exigirCliente } from "@/lib/portal";
 import { dinheiro, data, hojeISO, linkWhatsApp, telefone, type Moeda } from "@/lib/formato";
 import { enviarComprovante } from "../acoes";
-import { LimparCarrinho } from "../carrinho";
+import { LimparCarrinho, RepetirPedido } from "../carrinho";
 import { Acompanhamento, type PedidoAcomp } from "../acompanhamento";
 import { idiomaAtual } from "@/lib/idioma";
 
@@ -76,6 +76,7 @@ export default async function MeusPedidos({ searchParams }: { searchParams: Prom
             </div>
             <div className="linha entre">
               <span>Total{p.total_confirmado ? "" : " (a confirmar)"}: <b className="num">{dinheiro(p.valor_total, moeda)}</b></span>
+              <RepetirPedido pedidoId={p.id} rotulo={idioma === "es" ? "Pedir de nuevo" : "Pedir de novo"} vazio={idioma === "es" ? "Ningún producto disponible" : "Nenhum produto disponível"} />
               {p.total_confirmado && <span>Saldo: <b className="num">{dinheiro(p.saldo, moeda)}</b></span>}
               {Number(p.a_conferir) > 0 && <span className="suave">Comprovante em conferência: {dinheiro(p.a_conferir, moeda)}</span>}
               {p.previsao_envio && <span className="suave">Previsão de envio: {data(p.previsao_envio)}</span>}
