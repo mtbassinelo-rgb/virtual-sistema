@@ -223,3 +223,6 @@ button.discreto:hover { color: var(--erro); border-color: transparent; }
 .botao-ad.ativo { background: #e3f6e8; color: #17703a; border-color: #8fd3a6; }
 .botao-ad.inativo { background: #f2f2f4; color: #8a8a93; border-color: #d4d4da; }
 .botao-ad:hover { filter: brightness(.95); }
+.acoes-ad { display: flex; gap: 4px; }
+.botao-ad.excluir { background: #fff; color: #a12020; border-color: #f0b4b4; }
+.botao-ad.excluir:hover { background: #fde4e4; }

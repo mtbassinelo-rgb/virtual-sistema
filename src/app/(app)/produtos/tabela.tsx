@@ -4,7 +4,27 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { MarcarTodos } from "./lote";
-import { alternarAtivo } from "./acoes";
+import { alternarAtivo, excluirProduto } from "./acoes";
+
+/** E = excluir (pede confirmação). */
+function BotaoExcluir({ id, nome }: { id: string; nome: string }) {
+  const router = useRouter();
+  const [ocupado, iniciar] = useTransition();
+  return (
+    <button type="button" className="botao-ad excluir" disabled={ocupado} title={`Excluir ${nome}`} aria-label={`Excluir ${nome}`}
+      onClick={() => {
+        if (!window.confirm(`Excluir "${nome}"?\n\nSe ele já teve pedido ou estoque, fica só desativado (o histórico é mantido).`)) return;
+        iniciar(async () => {
+          const r = await excluirProduto(id);
+          if (r.erro) { alert(r.erro); return; }
+          if (r.msg && !r.msg.startsWith("Produto excluído")) alert(r.msg);
+          router.refresh();
+        });
+      }}>
+      {ocupado ? "…" : "E"}
+    </button>
+  );
+}
 
 /** A = ativo no site (clique para desativar) · D = desativado (clique para ativar). */
 function BotaoAtivo({ id, ativo, nome }: { id: string; ativo: boolean; nome: string }) {
@@ -63,7 +83,7 @@ export function TabelaProdutos({ linhas, gestao, acao, volta }: {
       <div className="tabela tabela-produtos"><table>
         <thead><tr>
           {gestao && <th style={{ width: 32 }}><MarcarTodos form="lote" /></th>}
-          {gestao && <th title="A = ativo no site · D = desativado. Clique para trocar.">Site</th>}
+          {gestao && <th title="A = ativo no site · D = desativado (clique para trocar) · E = excluir">Site</th>}
           <th></th><th>Produto</th>
           <th className="num" title="Saldo somando os depósitos ativos">Estoque</th>
           <th className="num" title="Abaixo disso o produto entra no relatório de estoque baixo para comprar">Mínimo</th>
@@ -77,7 +97,7 @@ export function TabelaProdutos({ linhas, gestao, acao, volta }: {
           return (
             <tr key={p.id} className={p.ativo ? "" : "inativo"}>
               {gestao && <td><input type="checkbox" name="ids" value={p.id} form="lote" aria-label={`Selecionar ${p.nome}`} /></td>}
-              {gestao && <td style={{ width: 44 }}><BotaoAtivo id={p.id} ativo={p.ativo} nome={p.nome} /></td>}
+              {gestao && <td style={{ width: 80 }}><div className="acoes-ad"><BotaoAtivo key={String(p.ativo)} id={p.id} ativo={p.ativo} nome={p.nome} /><BotaoExcluir id={p.id} nome={p.nome} /></div></td>}
               <td style={{ width: 52 }}>
                 {p.foto ? <img src={p.foto} alt="" width={40} height={40} style={{ objectFit: "cover", borderRadius: 6, display: "block" }} />
                   : <div style={{ width: 40, height: 40, borderRadius: 6, background: "var(--afundado)" }} />}

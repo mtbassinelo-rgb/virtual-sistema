@@ -277,3 +277,20 @@ export async function alternarAtivo(id: string, ativar: boolean): Promise<{ erro
     return { erro: mensagemErro(e) };
   }
 }
+
+/** Botão E da lista: exclui o produto. Quem já teve pedido ou estoque fica inativo em vez de apagado. */
+export async function excluirProduto(id: string): Promise<{ erro?: string; msg?: string }> {
+  const u = await exigirUsuario();
+  try {
+    if (!ehGestao(u)) throw new Error("Só gerente ou dono exclui produtos.");
+    if (!/^[0-9a-f-]{36}$/i.test(id)) throw new Error("Produto inválido.");
+    const r = await comUsuario(u.id, async (c) => (await c.query("select app.produtos_em_lote(array[$1::uuid], 'excluir') as r", [id])).rows[0].r as
+      { excluidos: number; inativados_por_historico: number; fotos: string[] });
+    for (const f of r.fotos) await rm(path.join(pastaFotos(), path.basename(f)), { force: true });
+    revalidatePath("/produtos");
+    revalidatePath("/loja");
+    return { msg: r.excluidos ? "Produto excluído." : "Esse produto já tem pedido ou movimento de estoque, então não pode ser apagado: ficou desativado." };
+  } catch (e) {
+    return { erro: mensagemErro(e) };
+  }
+}
