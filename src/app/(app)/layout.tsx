@@ -34,6 +34,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
     { id: "vendas", titulo: "Vendas", icone: "vendas", itens: [
       { href: "/pedidos", texto: "Pedidos", contador: n.pedidos_abertos, dica: "Pedidos abertos: em separação ou aguardando" },
       { href: "/pedidos/novo", texto: "Novo pedido" },
+      { href: "/caixa", texto: "Caixa do dia", dica: "Abrir e fechar o caixa, vender no balcão e receber pedidos" },
       { href: "/clientes", texto: "Clientes" },
       { href: "/clientes/carrinhos", texto: "Carrinhos parados", contador: n.carrinhos, dica: "Clientes que montaram carrinho e não enviaram" },
       { href: "/metas", texto: "Metas" },
@@ -54,6 +55,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
     ] },
     { id: "estoque", titulo: "Estoque", icone: "estoque", itens: [
       { href: "/estoque", texto: "Saldo e movimentos" },
+      { href: "/estoque/inventario", texto: "Inventário (contagem)" },
       ...(gestao ? [{ href: "/estoque/importar", texto: "Importar do Bling" }] : []),
     ] },
     { id: "relatorios", titulo: "Relatórios", icone: "relatorios", itens: [

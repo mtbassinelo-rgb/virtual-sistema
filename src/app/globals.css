@@ -239,3 +239,20 @@ button.discreto:hover { color: var(--erro); border-color: transparent; }
 .troca-unidade a:hover { color: var(--texto); }
 .troca-unidade a.atual { background: var(--marca); color: #fff; }
 @media (max-width: 700px) { .troca-unidade a { padding: 4px 8px; font-size: .75rem; } }
+
+/* Caixa do dia */
+.grade-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+.pdv-busca { position: relative; }
+.pdv-busca > input { font-size: 1.05rem; padding: 12px 14px; }
+.pdv-achados { list-style: none; margin: 4px 0 0; padding: 4px; border: 1px solid var(--linha); border-radius: 8px; background: var(--superficie); box-shadow: 0 8px 24px rgba(0,0,0,.08); position: absolute; left: 0; right: 0; z-index: 6; max-height: 360px; overflow-y: auto; }
+.pdv-achados li { display: flex; gap: 6px; align-items: center; }
+.pdv-achados li > button:first-child { flex: 1; display: flex; justify-content: space-between; gap: 10px; text-align: left; background: transparent; border: 0; padding: 8px 10px; border-radius: 6px; cursor: pointer; }
+.pdv-achados li > button:first-child:hover { background: var(--marca-suave); }
+.pdv-achados small { display: block; color: var(--suave); font-size: .75rem; }
+.pdv-rodape { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--linha); padding-top: 12px; }
+.pdv-total { font-size: 1.1rem; } .pdv-total b { font-size: 1.6rem; margin-left: 8px; }
+.pdv-pagamentos { display: flex; flex-direction: column; gap: 8px; }
+.pdv-totais { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+.troco { background: #e3f6e8; color: #17703a; padding: 4px 10px; border-radius: 999px; }
+.fechar-caixa small { color: var(--suave); }
+.linha-destaque td { background: var(--marca-suave); }
