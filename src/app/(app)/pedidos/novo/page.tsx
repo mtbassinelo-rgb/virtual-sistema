@@ -33,7 +33,8 @@ export default async function NovoPedido({ searchParams }: { searchParams: Promi
         <Link href="/pedidos">← Pedidos</Link>
         <h1 style={{ marginTop: 4 }}>Novo pedido</h1>
         <div className="suave pequeno">Os preços vêm da tabela do cliente (Normal/VIP) na moeda escolhida e ficam congelados no pedido.
-          {d.exigeEstoque ? " Só entra o que tem estoque no depósito." : ""}</div>
+          {d.exigeEstoque ? " Só entra o que tem estoque no depósito." : ""}
+          {" "}O cliente pediu algo que não temos? <Link href="/procuras">Registre aqui</Link> para o gerente comprar.</div>
       </section>
       <Avisos erro={f.erro} />
       {d.depositos.length === 0 && !ehGestao(u) && (

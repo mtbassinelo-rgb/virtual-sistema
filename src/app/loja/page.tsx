@@ -4,6 +4,7 @@ import { clienteAtual, sha256, tokenCliente } from "@/lib/portal";
 import { dinheiro, data, type Moeda } from "@/lib/formato";
 import { LINHAS, corRotulo, interno, linhaDe, marcaDe, nomeCurto } from "@/lib/vitrine";
 import { Quantidade } from "./carrinho";
+import { QueroProduto } from "./quero-produto";
 import { TEXTOS, idiomaAtual, type Textos } from "@/lib/idioma";
 
 export const metadata = { title: { absolute: "Virtual Cosméticos · Atacado de cosméticos para salões e revendas" } };
@@ -288,6 +289,7 @@ function Cartao({ p, moeda, cliente, t }: { p: Produto; moeda: Moeda; cliente: b
         )}
         {pr?.ultima_compra && <div className="estoque">{t.comprouEm(data(pr.ultima_compra))}</div>}
         <Quantidade item={item} rotulo={semEstoque ? t.pedirEncomenda : cliente ? t.adicionarPedido : t.adicionar} />
+        {semEstoque && <QueroProduto produtoId={p.produto_id} cliente={cliente} t={t.quero} />}
       </div>
     </article>
   );
@@ -342,7 +344,8 @@ function LinhaCatalogo({ p, moeda, cliente, t }: { p: Produto; moeda: Moeda; cli
         </div>
       </div>
       <div className="linha-preco"><Precos p={p} moeda={moeda} cliente={cliente} t={t} /></div>
-      <div className="linha-qtd"><Quantidade item={itemCarrinho(p, esgotado(p, cliente))} rotulo={esgotado(p, cliente) ? t.pedirEncomenda : t.adicionar} /></div>
+      <div className="linha-qtd"><Quantidade item={itemCarrinho(p, esgotado(p, cliente))} rotulo={esgotado(p, cliente) ? t.pedirEncomenda : t.adicionar} />
+        {esgotado(p, cliente) && <QueroProduto produtoId={p.produto_id} cliente={cliente} t={t.quero} />}</div>
     </article>
   );
 }

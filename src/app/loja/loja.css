@@ -455,3 +455,13 @@
 .link-pedido input[type=number] { padding: 8px; font-size: 1rem; }
 .link-pedido .tabela { overflow-x: auto; }
 .link-pedido .linha { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+/* "Quero este produto" nos esgotados */
+.quero-produto { margin-top: 8px; font-size: .88rem; }
+.quero-produto summary { cursor: pointer; color: var(--roxo); font-weight: 600; list-style: none; }
+.quero-produto summary::-webkit-details-marker { display: none; }
+.quero-produto summary::before { content: "🔔 "; }
+.quero-produto form { display: grid; gap: 8px; margin-top: 8px; }
+.quero-produto label { display: grid; gap: 4px; font-size: .85rem; }
+.quero-produto input { padding: 8px 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; }
+.quero-ok { margin-top: 8px; font-size: .85rem; color: #0b5d2a; font-weight: 600; }

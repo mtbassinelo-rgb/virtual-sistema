@@ -52,7 +52,7 @@ for (const [email, quem] of [["gerente@teste.local", "Gerente"], ["keila@teste.l
   if (quem === "Keila") ok(outro.status === 404, "Keila não abre pedido da Yessica");
   else ok(outro.status === 200, "Gerente abre pedido de qualquer vendedora");
 }
-for (const tela of [`/pedidos/${pedidoKeila}/resumo`, "/comissoes", "/comissoes?mes=2026-01"]) {
+for (const tela of [`/pedidos/${pedidoKeila}/resumo`, "/comissoes", "/comissoes?mes=2026-01", "/procuras", "/procuras?dias=365"]) {
   for (const email of ["gerente@teste.local", "keila@teste.local"]) {
     const r = await abrir(tela, await sessao(email));
     ok(r.status === 200 && !r.html.includes("Application error"), `${email}: ${tela} abre`);

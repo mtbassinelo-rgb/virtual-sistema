@@ -71,6 +71,8 @@ export default async function Hoje() {
           where data_pedido >= date_trunc('month', current_date) group by 1, 2 order by 2, 3 desc`)).rows,
       produtos: (await c.query(`select produto nome, moeda, sum(quantidade) qtd, sum(lucro) lucro from app.v_itens_lucro
           where data_pedido >= date_trunc('month', current_date) and lucro is not null group by 1, 2 order by 2, 4 desc`)).rows,
+      procuras: (await c.query(`select coalesce(sum(novos), 0)::int novos, count(*) filter (where novos > 0)::int produtos
+          from app.v_procuras_resumo`)).rows[0] as { novos: number; produtos: number },
       contas: (await c.query(`select moeda, count(*) filter (where situacao = 'vencida')::int vencidas,
           coalesce(sum(valor) filter (where situacao = 'vencida'), 0) valor_vencidas,
           count(*) filter (where situacao in ('vence_hoje','vence_7_dias'))::int semana,
@@ -307,14 +309,14 @@ export default async function Hoje() {
   );
 }
 
-type Destaque = { vendedoras: { nome: string; moeda: Moeda; receita: string }[]; produtos: { nome: string; moeda: Moeda; qtd: string; lucro: string }[];
+type Destaque = { procuras: { novos: number; produtos: number }; vendedoras: { nome: string; moeda: Moeda; receita: string }[]; produtos: { nome: string; moeda: Moeda; qtd: string; lucro: string }[];
   contas: { moeda: Moeda; vencidas: number; valor_vencidas: string; semana: number; valor_semana: string }[] };
 
 /** Painel do mês para a gestão: mais e menos vendido, maior e menor lucro e contas a vencer. */
 function Destaques({ d }: { d: Destaque }) {
   const moedas = [...new Set([...d.vendedoras, ...d.produtos].map((x) => x.moeda))];
   const contas = d.contas.filter((c) => c.vencidas > 0 || c.semana > 0);
-  if (moedas.length === 0 && contas.length === 0) return null;
+  if (moedas.length === 0 && contas.length === 0 && d.procuras.novos === 0) return null;
   return (
     <section className="painel">
       <div className="linha entre">
@@ -333,6 +335,13 @@ function Destaques({ d }: { d: Destaque }) {
             p.length > 1 && <div key={m + "pn"} className="indicador"><span className="rotulo">Produto que menos lucrou{sufixo}</span><span className="valor" style={{ fontSize: "1rem" }}>{p[p.length - 1].nome}</span><span className="pequeno suave">{dinheiro(p[p.length - 1].lucro, m)} · {Number(p[p.length - 1].qtd).toLocaleString("pt-BR")} un</span></div>,
           ];
         })}
+        {d.procuras.novos > 0 && (
+          <Link href="/procuras" className="indicador" style={{ textDecoration: "none", color: "inherit" }}>
+            <span className="rotulo">Clientes pediram sem estoque</span>
+            <span className="valor">{d.procuras.novos}</span>
+            <span className="pequeno suave">{d.procuras.produtos} produto(s) · para as próximas compras</span>
+          </Link>
+        )}
         {contas.map((c) => (
           <Link key={c.moeda} href="/despesas?ver=semana" className="indicador" style={{ textDecoration: "none", color: "inherit" }}>
             <span className="rotulo">Contas a pagar ({c.moeda === "GS" ? "Gs" : "R$"})</span>

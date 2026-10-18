@@ -19,9 +19,10 @@ export default async function AreaInterna({ children }: { children: React.ReactN
   const n = await comUsuario(u.id, async (c) => (await c.query(`
     select (select count(*) from app.pedidos where status_comercial::text in ('aguardando_cliente','aguardando_aprovacao','em_separacao'))::int as pedidos_abertos,
            ${gestao ? `(select count(*) from app.v_despesas where situacao = 'vencida')::int` : "0"} as contas_vencidas,
+           ${gestao ? `(select count(*) from app.procuras where visto_em is null)::int` : "0"} as procuras,
            ${gestao ? `(select count(*) from app.fotos_catalogo where status = 'pendente')::int` : "0"} as fotos,
            (select count(*) from app.produtos p where p.ativo and not exists (select 1 from app.precos z where z.produto_id = p.id))::int as sem_preco
-  `)).rows[0] as { pedidos_abertos: number; contas_vencidas: number; fotos: number; sem_preco: number }).catch(() => ({ pedidos_abertos: 0, contas_vencidas: 0, fotos: 0, sem_preco: 0 }));
+  `)).rows[0] as { pedidos_abertos: number; contas_vencidas: number; procuras: number; fotos: number; sem_preco: number }).catch(() => ({ pedidos_abertos: 0, contas_vencidas: 0, procuras: 0, fotos: 0, sem_preco: 0 }));
 
   const grupos: GrupoMenu[] = [
     { id: "inicio", titulo: "Início", icone: "inicio", itens: [{ href: "/", texto: "Início" }] },
@@ -31,6 +32,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
       { href: "/clientes", texto: "Clientes" },
       { href: "/metas", texto: "Metas" },
       { href: "/promocoes", texto: "Promoções" },
+      ...(gestao ? [] : [{ href: "/procuras", texto: "Cliente pediu e não temos" }]),
     ] },
     { id: "produtos", titulo: "Produtos", icone: "produtos", itens: [
       { href: "/produtos", texto: "Todos os produtos" },
@@ -55,6 +57,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
       ...(gestao ? [
         { href: "/relatorios?aba=lucro", texto: "Lucro e rankings" },
         { href: "/relatorios?aba=envios", texto: "Envios ao Paraguai" },
+        { href: "/procuras", texto: "Procurados sem estoque", contador: n.procuras, dica: "Pedidos de produtos esgotados ainda não vistos" },
       ] : []),
     ] },
     gestao
