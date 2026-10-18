@@ -17,10 +17,11 @@ export default async function AreaInterna({ children }: { children: React.ReactN
   const gestao = ehGestao(u);
   // Contadores ao lado dos itens do menu: o que está esperando alguém
   const n = await comUsuario(u.id, async (c) => (await c.query(`
-    select (select count(*) from app.pedidos where status_comercial::text in ('aguardando_aprovacao','em_separacao'))::int as pedidos_abertos,
+    select (select count(*) from app.pedidos where status_comercial::text in ('aguardando_cliente','aguardando_aprovacao','em_separacao'))::int as pedidos_abertos,
+           ${gestao ? `(select count(*) from app.v_despesas where situacao = 'vencida')::int` : "0"} as contas_vencidas,
            ${gestao ? `(select count(*) from app.fotos_catalogo where status = 'pendente')::int` : "0"} as fotos,
            (select count(*) from app.produtos p where p.ativo and not exists (select 1 from app.precos z where z.produto_id = p.id))::int as sem_preco
-  `)).rows[0] as { pedidos_abertos: number; fotos: number; sem_preco: number }).catch(() => ({ pedidos_abertos: 0, fotos: 0, sem_preco: 0 }));
+  `)).rows[0] as { pedidos_abertos: number; contas_vencidas: number; fotos: number; sem_preco: number }).catch(() => ({ pedidos_abertos: 0, contas_vencidas: 0, fotos: 0, sem_preco: 0 }));
 
   const grupos: GrupoMenu[] = [
     { id: "inicio", titulo: "Início", icone: "inicio", itens: [{ href: "/", texto: "Início" }] },
@@ -51,7 +52,19 @@ export default async function AreaInterna({ children }: { children: React.ReactN
       { href: "/relatorios?aba=produtos", texto: "Mais vendidos" },
       { href: "/relatorios?aba=estoque", texto: "Estoque baixo e parado" },
       { href: "/relatorios?aba=catalogo", texto: "Saúde do catálogo" },
+      ...(gestao ? [
+        { href: "/relatorios?aba=lucro", texto: "Lucro e rankings" },
+        { href: "/relatorios?aba=envios", texto: "Envios ao Paraguai" },
+      ] : []),
     ] },
+    gestao
+      ? { id: "financeiro", titulo: "Financeiro", icone: "financeiro", itens: [
+          { href: "/despesas", texto: "Despesas e contas", contador: n.contas_vencidas, dica: "Contas vencidas" },
+          { href: "/relatorios?aba=resultado", texto: "Resultado do mês" },
+          { href: "/comissoes", texto: "Comissões" },
+          { href: "/parametros", texto: "Parâmetros" },
+        ] }
+      : { id: "financeiro", titulo: "Comissão", icone: "financeiro", itens: [{ href: "/comissoes", texto: "Minha comissão" }] },
     { id: "site", titulo: "Loja online", icone: "site", itens: [
       { href: "/site", texto: "Banners e destaques" },
     ] },

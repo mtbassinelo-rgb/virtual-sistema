@@ -1,7 +1,8 @@
 import Link from "next/link";
+import type { PoolClient } from "pg";
 import { ehGestao, exigirUsuario } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
-import { dinheiro, data, hojeISO, type Moeda } from "@/lib/formato";
+import { dinheiro, data, hojeISO, nomeMes, pct, type Moeda } from "@/lib/formato";
 import { Barra, Selo } from "../avisos";
 
 export const metadata = { title: "Relatórios" };
@@ -11,22 +12,34 @@ const ABAS = [
   { k: "produtos", t: "Mais vendidos", d: "Os produtos que mais saíram no período, em quantidade." },
   { k: "estoque", t: "Estoque baixo e parado", d: "O que está acabando, esgotado ou sem venda há muito tempo." },
   { k: "catalogo", t: "Saúde do catálogo", d: "Produtos sem preço, sem foto ou sem peças por caixa: o que falta arrumar na loja." },
+  { k: "lucro", t: "Lucro e rankings", d: "Quem vendeu e lucrou mais e menos, e os produtos que mais e menos dão lucro.", gestao: true },
+  { k: "resultado", t: "Resultado do mês", d: "Venda, custo da mercadoria, lucro bruto, despesas e resultado, mês a mês.", gestao: true },
+  { k: "envios", t: "Envios ao Paraguai", d: "Caixas e produtos que saíram por semana para clientes do Paraguai, e o custo do passeiro.", gestao: true },
 ] as const;
+const COM_PERIODO = ["vendas", "produtos", "lucro", "envios"];
 
 type Soma = { moeda: Moeda; pedidos: number; vendido: string; recebido: string; saldo: string };
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Lin = Record<string, any>;
-type Dados = { totais?: Soma[]; vend?: Lin[]; meses?: Lin[]; canais?: Lin[]; itens?: Lin[]; marcas?: Lin[]; g?: Lin[]; cat?: Lin; fotos?: number };
+type Dados = {
+  totais?: Soma[]; vend?: Lin[]; meses?: Lin[]; canais?: Lin[]; itens?: Lin[]; marcas?: Lin[]; g?: Lin[]; cat?: Lin; fotos?: number;
+  luc?: Lin[]; rank?: Lin[]; topLucro?: Lin[]; baixaMargem?: Lin[]; poucaVenda?: Lin[]; campeoes?: Lin[]; resultado?: Lin[]; envios?: Lin[];
+  porCategoria?: Lin[]; custoVolume?: number;
+};
 
 export default async function Relatorios({ searchParams }: { searchParams: Promise<{ aba?: string; de?: string; ate?: string }> }) {
   const u = await exigirUsuario();
   const f = await searchParams;
-  const aba = ABAS.find((a) => a.k === f.aba) ?? ABAS[0];
+  const visiveis = ABAS.filter((a) => !("gestao" in a) || ehGestao(u));
+  const aba = visiveis.find((a) => a.k === f.aba) ?? visiveis[0];
   const de = /^\d{4}-\d{2}-\d{2}$/.test(f.de ?? "") ? f.de! : hojeISO(-30);
   const ate = /^\d{4}-\d{2}-\d{2}$/.test(f.ate ?? "") ? f.ate! : hojeISO();
   const url = (m: Record<string, string>) => `/relatorios?${new URLSearchParams({ aba: aba.k, de, ate, ...m })}`;
 
   const d: Dados = await comUsuario(u.id, async (c): Promise<Dados> => {
+    if (aba.k === "lucro") return carregarLucro(c, de, ate);
+    if (aba.k === "resultado") return carregarResultado(c);
+    if (aba.k === "envios") return carregarEnvios(c, de, ate);
     if (aba.k === "vendas") {
       const per = `p.status_comercial <> 'cancelado' and p.data_pedido between $1::date and $2::date`;
       const totais = (await c.query(`select p.moeda, count(*)::int pedidos, sum(p.valor_total) vendido, sum(p.recebido) recebido, sum(p.saldo) saldo
@@ -83,7 +96,7 @@ export default async function Relatorios({ searchParams }: { searchParams: Promi
           <h1>Relatórios</h1>
           <p>{aba.d}</p>
         </div>
-        {(aba.k === "vendas" || aba.k === "produtos") && (
+        {COM_PERIODO.includes(aba.k) && (
           <form className="linha" method="get">
             <input type="hidden" name="aba" value={aba.k} />
             <label>De<input type="date" name="de" defaultValue={de} /></label>
@@ -93,9 +106,9 @@ export default async function Relatorios({ searchParams }: { searchParams: Promi
         )}
       </section>
       <nav className="abas" aria-label="Relatórios">
-        {ABAS.map((a) => <a key={a.k} href={url({ aba: a.k })} aria-current={a.k === aba.k ? "page" : undefined}>{a.t}</a>)}
+        {visiveis.map((a) => <a key={a.k} href={url({ aba: a.k })} aria-current={a.k === aba.k ? "page" : undefined}>{a.t}</a>)}
       </nav>
-      {(aba.k === "vendas" || aba.k === "produtos") && (
+      {COM_PERIODO.includes(aba.k) && (
         <div className="filtros">
           {[["Últimos 7 dias", hojeISO(-7)], ["Últimos 30 dias", hojeISO(-30)], ["Últimos 90 dias", hojeISO(-90)], ["Este ano", `${new Date().getFullYear()}-01-01`]].map(([t, ini]) => (
             <a key={t} href={url({ de: ini, ate: hojeISO() })} className={de === ini && ate === hojeISO() ? "ativo" : ""}>{t}</a>
@@ -213,6 +226,10 @@ export default async function Relatorios({ searchParams }: { searchParams: Promi
         </section>
       )}
 
+      {aba.k === "lucro" && <Lucro d={d} de={de} ate={ate} />}
+      {aba.k === "resultado" && <Resultado d={d} />}
+      {aba.k === "envios" && <Envios d={d} de={de} ate={ate} />}
+
       {aba.k === "catalogo" && cat && (
         <>
           <section className="atalhos">
@@ -243,6 +260,250 @@ export default async function Relatorios({ searchParams }: { searchParams: Promi
           </section>
         </>
       )}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Lucro e rankings (gestão)
+// ---------------------------------------------------------------------
+async function carregarLucro(c: PoolClient, de: string, ate: string): Promise<Dados> {
+  const per = [de, ate];
+  const luc = (await c.query(`select moeda, sum(receita) receita, sum(receita) filter (where custo is not null) receita_com_custo,
+      sum(custo) custo, sum(lucro) lucro, count(*) filter (where custo is null)::int sem_custo, count(*)::int itens
+    from app.v_itens_lucro where data_pedido between $1::date and $2::date group by moeda order by moeda desc`, per)).rows;
+  const rank = (await c.query(`with v as (
+      select p.vendedora_id, p.moeda, count(*)::int pedidos, sum(p.valor_total) vendido
+        from app.pedidos p where app.conta_como_venda(p.status_comercial) and p.data_pedido between $1::date and $2::date group by 1, 2),
+    l as (select vendedora_id, moeda, sum(lucro) lucro, sum(receita) filter (where custo is not null) base
+        from app.v_itens_lucro where data_pedido between $1::date and $2::date group by 1, 2)
+    select ve.nome, v.moeda, v.pedidos, v.vendido, l.lucro, case when l.base > 0 then l.lucro / l.base end margem
+      from v join app.vendedoras ve on ve.id = v.vendedora_id left join l on l.vendedora_id = v.vendedora_id and l.moeda = v.moeda
+     order by v.moeda desc, v.vendido desc`, per)).rows;
+  const porProduto = `select produto_id id, produto nome, codigo, marca, moeda, sum(quantidade) qtd, sum(receita) receita, sum(lucro) lucro,
+      case when sum(receita) > 0 then sum(lucro) / sum(receita) end margem
+    from app.v_itens_lucro where data_pedido between $1::date and $2::date and custo is not null group by 1, 2, 3, 4, 5`;
+  const topLucro = (await c.query(`${porProduto} order by lucro desc limit 15`, per)).rows;
+  const baixaMargem = (await c.query(`${porProduto} having sum(receita) > 0 order by margem asc, lucro asc limit 10`, per)).rows;
+  const poucaVenda = (await c.query(`select p.id, p.nome, p.codigo, p.marca,
+      coalesce((select sum(s.quantidade) from app.estoque_saldos s where s.produto_id = p.id), 0) estoque,
+      coalesce((select sum(i.quantidade) from app.v_itens_lucro i where i.produto_id = p.id and i.data_pedido between $1::date and $2::date), 0) vendido
+    from app.produtos p where p.ativo and p.tipo = 'simples'
+      and exists (select 1 from app.estoque_saldos s where s.produto_id = p.id and s.quantidade > 0)
+    order by vendido asc, estoque desc limit 15`, per)).rows;
+  const campeoes = (await c.query(`select distinct on (mes, moeda) to_char(date_trunc('month', data_pedido), 'YYYY-MM') mes, moeda,
+      produto nome, sum(quantidade) qtd, sum(lucro) lucro
+    from app.v_itens_lucro where data_pedido >= date_trunc('month', current_date) - interval '5 months'
+    group by 1, 2, 3 order by mes desc, moeda desc, sum(coalesce(lucro, 0)) desc, sum(quantidade) desc`)).rows;
+  return { luc, rank, topLucro, baixaMargem, poucaVenda, campeoes };
+}
+
+function Lucro({ d, de, ate }: { d: Dados; de: string; ate: string }) {
+  const { luc = [], rank = [], topLucro = [], baixaMargem = [], poucaVenda = [], campeoes = [] } = d;
+  if (luc.length === 0) return <div className="painel vazio">Nenhuma venda confirmada entre {data(de)} e {data(ate)}.</div>;
+  const semCusto = luc.reduce((t, l) => t + Number(l.sem_custo), 0);
+  return (
+    <>
+      {luc.map((l) => (
+        <section key={l.moeda} className="indicadores">
+          <div className="indicador"><span className="rotulo">Vendido em itens ({l.moeda === "GS" ? "Gs" : "R$"})</span><span className="valor">{dinheiro(l.receita, l.moeda)}</span></div>
+          <div className="indicador"><span className="rotulo">Custo da mercadoria</span><span className="valor">{dinheiro(l.custo, l.moeda)}</span></div>
+          <div className="indicador"><span className="rotulo">Lucro bruto</span><span className="valor">{dinheiro(l.lucro, l.moeda)}</span></div>
+          <div className="indicador"><span className="rotulo">Margem</span><span className="valor">{pct(Number(l.receita_com_custo) > 0 ? Number(l.lucro) / Number(l.receita_com_custo) : null)}</span></div>
+        </section>
+      ))}
+      {semCusto > 0 && (
+        <div className="aviso-caixa aviso">{semCusto} {semCusto === 1 ? "item vendido não tem" : "itens vendidos não têm"} custo cadastrado e
+          ficaram fora do lucro. Cadastre o custo em <Link href="/produtos/precos-rapido">Editar preços rápido</Link>.</div>
+      )}
+      <section className="painel">
+        <h2>Vendedoras: quem vendeu e lucrou mais</h2>
+        {["GS", "BRL"].map((m) => {
+          const lin = rank.filter((r) => r.moeda === m);
+          if (!lin.length) return null;
+          const maisLucro = [...lin].sort((a, b) => Number(b.lucro ?? 0) - Number(a.lucro ?? 0))[0];
+          const menosLucro = [...lin].sort((a, b) => Number(a.lucro ?? 0) - Number(b.lucro ?? 0))[0];
+          return (
+            <div key={m} className="tabela">
+              <table style={{ minWidth: 560 }}>
+                <thead><tr><th>#</th><th>Vendedora ({m === "GS" ? "Gs" : "R$"})</th><th>Pedidos</th><th>Vendido</th><th>Lucro</th><th>Margem</th></tr></thead>
+                <tbody>{lin.map((r, i) => (
+                  <tr key={r.nome}>
+                    <td className="num suave">{i + 1}</td>
+                    <td>{r.nome}{" "}
+                      {i === 0 && <Selo cor="ok">mais vendeu</Selo>}{" "}
+                      {i === lin.length - 1 && lin.length > 1 && <Selo cor="aviso">menos vendeu</Selo>}{" "}
+                      {r === maisLucro && r.lucro != null && <Selo cor="marca">mais lucro</Selo>}{" "}
+                      {r === menosLucro && lin.length > 1 && r.lucro != null && <Selo>menos lucro</Selo>}
+                    </td>
+                    <td className="num">{r.pedidos}</td>
+                    <td className="num">{dinheiro(r.vendido, m as Moeda)}</td>
+                    <td className="num">{r.lucro == null ? "—" : dinheiro(r.lucro, m as Moeda)}</td>
+                    <td className="num">{pct(r.margem)}</td>
+                  </tr>))}</tbody>
+              </table>
+            </div>
+          );
+        })}
+      </section>
+      <div className="duas-colunas">
+        <section className="painel">
+          <h2>Produtos que mais dão lucro</h2>
+          {topLucro.length === 0 ? <div className="vazio">Sem itens com custo cadastrado no período.</div> : (
+            <div className="tabela"><table>
+              <thead><tr><th>#</th><th>Produto</th><th>Qtd.</th><th>Lucro</th><th>Margem</th></tr></thead>
+              <tbody>{topLucro.map((p, i) => (
+                <tr key={(p.id ?? p.nome) + p.moeda}>
+                  <td className="num suave">{i + 1}</td>
+                  <td>{p.id ? <Link href={`/produtos/${p.id}`}>{p.nome}</Link> : p.nome}<div className="pequeno suave">{[p.codigo, p.marca].filter(Boolean).join(" · ")}</div></td>
+                  <td className="num">{Number(p.qtd).toLocaleString("pt-BR")}</td>
+                  <td className="num">{dinheiro(p.lucro, p.moeda)}</td>
+                  <td className="num">{pct(p.margem)}</td>
+                </tr>))}</tbody>
+            </table></div>
+          )}
+        </section>
+        <section className="painel">
+          <h2>Menor margem</h2>
+          <p className="suave pequeno" style={{ margin: 0 }}>Vendem, mas deixam pouco. Vale revisar o preço ou o custo.</p>
+          {baixaMargem.length === 0 ? <div className="vazio">Sem dados no período.</div> : (
+            <div className="tabela"><table style={{ minWidth: 0 }}>
+              <tbody>{baixaMargem.map((p) => (
+                <tr key={(p.id ?? p.nome) + p.moeda}>
+                  <td>{p.id ? <Link href={`/produtos/${p.id}`}>{p.nome}</Link> : p.nome}</td>
+                  <td className="num"><Selo cor={Number(p.margem) < 0.2 ? "erro" : "aviso"}>{pct(p.margem)}</Selo></td>
+                  <td className="num">{dinheiro(p.lucro, p.moeda)}</td>
+                </tr>))}</tbody>
+            </table></div>
+          )}
+        </section>
+      </div>
+      <div className="duas-colunas">
+        <section className="painel">
+          <h2>Campeão de cada mês</h2>
+          <p className="suave pequeno" style={{ margin: 0 }}>O produto que mais deu lucro em cada um dos últimos 6 meses.</p>
+          <div className="tabela"><table style={{ minWidth: 0 }}>
+            <thead><tr><th>Mês</th><th>Produto</th><th>Qtd.</th><th>Lucro</th></tr></thead>
+            <tbody>{campeoes.map((x) => (
+              <tr key={x.mes + x.moeda}>
+                <td>{nomeMes(x.mes)} <span className="suave pequeno">{x.moeda === "GS" ? "Gs" : "R$"}</span></td>
+                <td>{x.nome}</td>
+                <td className="num">{Number(x.qtd).toLocaleString("pt-BR")}</td>
+                <td className="num">{x.lucro == null ? "—" : dinheiro(x.lucro, x.moeda)}</td>
+              </tr>))}</tbody>
+          </table></div>
+        </section>
+        <section className="painel">
+          <h2>Têm estoque e venderam pouco</h2>
+          <div className="tabela"><table style={{ minWidth: 0 }}>
+            <thead><tr><th>Produto</th><th>Vendido</th><th>Estoque</th></tr></thead>
+            <tbody>{poucaVenda.map((p) => (
+              <tr key={p.id}>
+                <td><Link href={`/produtos/${p.id}`}>{p.nome}</Link><div className="pequeno suave">{p.codigo}</div></td>
+                <td className="num">{Number(p.vendido).toLocaleString("pt-BR")}</td>
+                <td className="num">{Number(p.estoque).toLocaleString("pt-BR")}</td>
+              </tr>))}</tbody>
+          </table></div>
+        </section>
+      </div>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Resultado do mês (gestão)
+// ---------------------------------------------------------------------
+async function carregarResultado(c: PoolClient): Promise<Dados> {
+  const resultado = (await c.query(`select to_char(mes, 'YYYY-MM') mes, moeda, vendido, custo, lucro_bruto, itens_sem_custo, despesas, resultado
+    from app.resultado_mensal((date_trunc('month', current_date) - interval '5 months')::date, current_date)
+    order by mes desc, moeda desc`)).rows;
+  const porCategoria = (await c.query(`select c.nome, d.moeda, sum(d.valor) total, c.operacional
+    from app.despesas d join app.despesa_categorias c on c.codigo = d.categoria
+   where d.competencia = date_trunc('month', current_date)::date group by c.nome, d.moeda, c.operacional, c.ordem order by c.ordem, d.moeda desc`)).rows;
+  return { resultado, porCategoria };
+}
+
+function Resultado({ d }: { d: Dados }) {
+  const { resultado = [], porCategoria = [] } = d;
+  const linhas = resultado.filter((r) => Number(r.vendido) || Number(r.despesas));
+  return (
+    <>
+      <section className="painel">
+        <h2>Últimos 6 meses</h2>
+        <p className="suave pequeno" style={{ margin: 0 }}>Lucro bruto = venda dos itens com custo cadastrado − custo da mercadoria. Despesas = contas lançadas no mês
+          (aluguel, salários, passeiro…). Compra de mercadoria não entra aqui: ela vira custo quando o produto é vendido.</p>
+        {linhas.length === 0 ? <div className="vazio">Ainda não há vendas nem despesas nos últimos 6 meses.</div> : (
+          <div className="tabela"><table>
+            <thead><tr><th>Mês</th><th>Vendido</th><th>Custo</th><th>Lucro bruto</th><th>Despesas</th><th>Resultado</th></tr></thead>
+            <tbody>{linhas.map((r) => (
+              <tr key={r.mes + r.moeda}>
+                <td>{nomeMes(r.mes)} <span className="suave pequeno">{r.moeda === "GS" ? "Gs" : "R$"}</span>
+                  {Number(r.itens_sem_custo) > 0 && <div className="pequeno suave">{r.itens_sem_custo} itens sem custo</div>}</td>
+                <td className="num">{dinheiro(r.vendido, r.moeda)}</td>
+                <td className="num">{dinheiro(r.custo, r.moeda)}</td>
+                <td className="num">{dinheiro(r.lucro_bruto, r.moeda)}</td>
+                <td className="num">{dinheiro(r.despesas, r.moeda)}</td>
+                <td className="num"><Selo cor={Number(r.resultado) >= 0 ? "ok" : "erro"}>{dinheiro(r.resultado, r.moeda)}</Selo></td>
+              </tr>))}</tbody>
+          </table></div>
+        )}
+      </section>
+      <section className="painel">
+        <div className="linha entre"><h2>Despesas deste mês por categoria</h2><Link className="botao" href="/despesas">Lançar e pagar contas</Link></div>
+        {porCategoria.length === 0 ? <div className="vazio">Nenhuma despesa lançada neste mês.</div> : (
+          <div className="tabela"><table style={{ minWidth: 0 }}><tbody>{porCategoria.map((x) => (
+            <tr key={x.nome + x.moeda}>
+              <td>{x.nome}{!x.operacional && <div className="pequeno suave">não entra no resultado (vira custo ao vender)</div>}</td>
+              <td className="num">{dinheiro(x.total, x.moeda)}</td>
+            </tr>))}</tbody></table></div>
+        )}
+      </section>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Envios ao Paraguai por semana (gestão)
+// ---------------------------------------------------------------------
+async function carregarEnvios(c: PoolClient, de: string, ate: string): Promise<Dados> {
+  const envios = (await c.query("select * from app.envios_paraguai($1::date, $2::date)", [de, ate])).rows;
+  const custoVolume = Number((await c.query("select app.param('passeiro_custo_volume') v")).rows[0].v ?? 0);
+  return { envios, custoVolume };
+}
+
+function Envios({ d, de, ate }: { d: Dados; de: string; ate: string }) {
+  const { envios = [], custoVolume = 0 } = d;
+  const soma = (k: string) => envios.reduce((t, e) => t + Number(e[k] ?? 0), 0);
+  return (
+    <>
+      <section className="indicadores">
+        <div className="indicador"><span className="rotulo">Volumes enviados</span><span className="valor">{soma("volumes").toLocaleString("pt-BR")}</span></div>
+        <div className="indicador"><span className="rotulo">Caixas fechadas de produto</span><span className="valor">{soma("caixas_fechadas").toLocaleString("pt-BR", { maximumFractionDigits: 1 })}</span></div>
+        <div className="indicador"><span className="rotulo">Peças</span><span className="valor">{soma("pecas").toLocaleString("pt-BR")}</span></div>
+        <div className="indicador"><span className="rotulo">Pago ao passeiro</span><span className="valor">{dinheiro(soma("passeiro_pago"), "GS")}</span></div>
+        <div className="indicador"><span className="rotulo">Custo por volume (real)</span><span className="valor">{soma("volumes") ? dinheiro(soma("passeiro_pago") / soma("volumes"), "GS") : "—"}</span></div>
+      </section>
+      <section className="painel">
+        <p className="suave pequeno" style={{ margin: 0 }}>Pedidos de clientes do Paraguai despachados entre {data(de)} e {data(ate)}, agrupados pela semana do envio.
+          Volumes = caixas de envio informadas no pedido. Pago ao passeiro = despesas da categoria Passeiro pagas na semana.
+          {custoVolume > 0 ? ` Custo estimado: ${dinheiro(custoVolume, "GS")} por volume.` : " Defina o custo estimado por volume em Parâmetros."}</p>
+        {envios.length === 0 ? <div className="vazio">Nenhum envio para o Paraguai no período.</div> : (
+          <div className="tabela"><table>
+            <thead><tr><th>Semana de</th><th>Pedidos</th><th>Clientes</th><th>Volumes</th><th>Caixas fechadas</th><th>Peças</th><th>Custo estimado</th><th>Pago ao passeiro</th></tr></thead>
+            <tbody>{envios.map((e) => (
+              <tr key={e.semana}>
+                <td>{data(e.semana)}</td>
+                <td className="num">{e.pedidos}</td>
+                <td className="num">{e.clientes}</td>
+                <td className="num">{e.volumes}{e.pedidos_sem_volume > 0 && <div className="pequeno suave">{e.pedidos_sem_volume} sem volume informado</div>}</td>
+                <td className="num">{Number(e.caixas_fechadas).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}</td>
+                <td className="num">{Number(e.pecas).toLocaleString("pt-BR")}</td>
+                <td className="num">{dinheiro(e.custo_estimado, "GS")}</td>
+                <td className="num">{dinheiro(e.passeiro_pago, "GS")}</td>
+              </tr>))}</tbody>
+          </table></div>
+        )}
+      </section>
     </>
   );
 }

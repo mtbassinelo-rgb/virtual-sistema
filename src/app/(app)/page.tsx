@@ -65,7 +65,19 @@ export default async function Hoje() {
     const sugestoesCredito = gestao ? (await c.query(`select c.id, c.nome, c.moeda, c.credito_sugestao_limite, c.credito_sugestao_prazo, u.nome as quem
         from app.clientes c left join app.usuarios u on u.id = c.credito_sugerido_por
        where c.credito_sugestao_limite is not null order by c.credito_sugerido_em`)).rows : [];
-    return { sugestoesCredito, cadastros, site, aConferir, metasPropostas, recusados, envioAtrasado, pagAtrasado, metasPerto, transferencias, portal, separar, confirmar, pendencias };
+    // Destaques do mês para gerente e administrativo: quem vendeu mais e menos, produto que mais e menos lucrou, contas
+    const destaques = gestao ? {
+      vendedoras: (await c.query(`select vendedora_nome nome, moeda, sum(receita) receita from app.v_itens_lucro
+          where data_pedido >= date_trunc('month', current_date) group by 1, 2 order by 2, 3 desc`)).rows,
+      produtos: (await c.query(`select produto nome, moeda, sum(quantidade) qtd, sum(lucro) lucro from app.v_itens_lucro
+          where data_pedido >= date_trunc('month', current_date) and lucro is not null group by 1, 2 order by 2, 4 desc`)).rows,
+      contas: (await c.query(`select moeda, count(*) filter (where situacao = 'vencida')::int vencidas,
+          coalesce(sum(valor) filter (where situacao = 'vencida'), 0) valor_vencidas,
+          count(*) filter (where situacao in ('vence_hoje','vence_7_dias'))::int semana,
+          coalesce(sum(valor) filter (where situacao in ('vence_hoje','vence_7_dias')), 0) valor_semana
+          from app.v_despesas where pago_em is null group by moeda order by moeda desc`)).rows,
+    } : null;
+    return { destaques, sugestoesCredito, cadastros, site, aConferir, metasPropostas, recusados, envioAtrasado, pagAtrasado, metasPerto, transferencias, portal, separar, confirmar, pendencias };
   });
 
   return (
@@ -83,6 +95,8 @@ export default async function Hoje() {
         <Link className="atalho" href="/relatorios"><b>Relatórios</b><span>Vendas, mais vendidos e estoque</span></Link>
         <Link className="atalho" href="/estoque"><b>Estoque</b><span>Saldo por depósito e ajustes</span></Link>
       </nav>
+
+      {d.destaques && <Destaques d={d.destaques} />}
 
       <div className="indicadores">
         {gestao && (
@@ -290,5 +304,43 @@ export default async function Hoje() {
         </section>
       </div>
     </>
+  );
+}
+
+type Destaque = { vendedoras: { nome: string; moeda: Moeda; receita: string }[]; produtos: { nome: string; moeda: Moeda; qtd: string; lucro: string }[];
+  contas: { moeda: Moeda; vencidas: number; valor_vencidas: string; semana: number; valor_semana: string }[] };
+
+/** Painel do mês para a gestão: mais e menos vendido, maior e menor lucro e contas a vencer. */
+function Destaques({ d }: { d: Destaque }) {
+  const moedas = [...new Set([...d.vendedoras, ...d.produtos].map((x) => x.moeda))];
+  const contas = d.contas.filter((c) => c.vencidas > 0 || c.semana > 0);
+  if (moedas.length === 0 && contas.length === 0) return null;
+  return (
+    <section className="painel">
+      <div className="linha entre">
+        <h2>Destaques do mês</h2>
+        <Link href="/relatorios?aba=lucro">Ver relatório completo →</Link>
+      </div>
+      <div className="indicadores">
+        {moedas.map((m) => {
+          const v = d.vendedoras.filter((x) => x.moeda === m);
+          const p = d.produtos.filter((x) => x.moeda === m);
+          const sufixo = m === "GS" ? " (Gs)" : " (R$)";
+          return [
+            v.length > 0 && <div key={m + "vm"} className="indicador"><span className="rotulo">Vendeu mais{sufixo}</span><span className="valor">{v[0].nome}</span><span className="pequeno suave">{dinheiro(v[0].receita, m)}</span></div>,
+            v.length > 1 && <div key={m + "vn"} className="indicador"><span className="rotulo">Vendeu menos{sufixo}</span><span className="valor">{v[v.length - 1].nome}</span><span className="pequeno suave">{dinheiro(v[v.length - 1].receita, m)}</span></div>,
+            p.length > 0 && <div key={m + "pm"} className="indicador"><span className="rotulo">Produto que mais lucrou{sufixo}</span><span className="valor" style={{ fontSize: "1rem" }}>{p[0].nome}</span><span className="pequeno suave">{dinheiro(p[0].lucro, m)} · {Number(p[0].qtd).toLocaleString("pt-BR")} un</span></div>,
+            p.length > 1 && <div key={m + "pn"} className="indicador"><span className="rotulo">Produto que menos lucrou{sufixo}</span><span className="valor" style={{ fontSize: "1rem" }}>{p[p.length - 1].nome}</span><span className="pequeno suave">{dinheiro(p[p.length - 1].lucro, m)} · {Number(p[p.length - 1].qtd).toLocaleString("pt-BR")} un</span></div>,
+          ];
+        })}
+        {contas.map((c) => (
+          <Link key={c.moeda} href="/despesas?ver=semana" className="indicador" style={{ textDecoration: "none", color: "inherit" }}>
+            <span className="rotulo">Contas a pagar ({c.moeda === "GS" ? "Gs" : "R$"})</span>
+            <span className="valor">{c.vencidas > 0 ? `${c.vencidas} vencida${c.vencidas > 1 ? "s" : ""}` : `${c.semana} em 7 dias`}</span>
+            <span className="pequeno suave">{c.vencidas > 0 ? dinheiro(c.valor_vencidas, c.moeda) + " vencido" : ""}{c.vencidas > 0 && c.semana > 0 ? " · " : ""}{c.semana > 0 ? dinheiro(c.valor_semana, c.moeda) + " na semana" : ""}</span>
+          </Link>
+        ))}
+      </div>
+    </section>
   );
 }

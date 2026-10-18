@@ -196,3 +196,12 @@ button.discreto:hover { color: var(--erro); border-color: transparent; }
 .soltar-vazio b { color: var(--marca); font-size: 1rem; }
 .soltar-dica { position: absolute; left: 8px; right: 8px; bottom: 8px; text-align: center; font-size: .78rem; padding: 4px 8px; border-radius: 999px; background: rgba(0,0,0,.55); color: #fff; opacity: 0; transition: opacity .15s; }
 .soltar-foto:hover .soltar-dica, .soltar-foto.sobre .soltar-dica, .soltar-foto.salvando .soltar-dica { opacity: 1; }
+
+/* Resumo do pedido para o cliente: impressão / PDF só com o conteúdo */
+.resumo-pedido header img { border-radius: 8px; }
+@media print {
+  .lateral, .barra-topo, .abrir-menu, .nao-imprimir, .menu-fundo { display: none !important; }
+  .casca, .principal-area, .conteudo { display: block !important; margin: 0 !important; padding: 0 !important; }
+  .resumo-pedido { border: none; padding: 0; }
+  body { background: #fff; color: #000; }
+}
