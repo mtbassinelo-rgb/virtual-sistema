@@ -35,7 +35,7 @@ h1 { font-size: 1.35rem; } h2 { font-size: 1.1rem; } h3 { font-size: .95rem; }
 .menu a:hover { background: var(--afundado); color: var(--texto); }
 .quem { display: flex; gap: 8px; align-items: center; color: var(--suave); font-size: .85rem; }
 
-main.conteudo { max-width: 1240px; margin: 0 auto; padding: 20px max(16px, env(safe-area-inset-left)) 48px; display: flex; flex-direction: column; gap: 20px; }
+main.conteudo { max-width: 1240px; width: 100%; margin: 0 auto; padding: 22px max(16px, env(safe-area-inset-left)) 48px; display: flex; flex-direction: column; gap: 20px; }
 .painel { background: var(--superficie); border: 1px solid var(--linha); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .linha { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
 .entre { justify-content: space-between; }
@@ -111,3 +111,77 @@ button.discreto:hover { color: var(--erro); border-color: transparent; }
 .etapas-entrega span.feita { background: var(--ok-suave); color: var(--ok); font-weight: 600; }
 .separar-item { border-bottom: 1px solid var(--linha); padding-bottom: 8px; }
 .kit-linhas { display: grid; gap: 6px; }
+
+/* ---------- Casca do sistema: menu lateral + barra do topo ---------- */
+:root { --lateral: #2b1236; --lateral-texto: #e9dcef; --lateral-suave: #b49cbf; --lateral-ativo: #4a2160; --lateral-destaque: #e9b8ff; }
+.casca { display: grid; grid-template-columns: 248px minmax(0, 1fr); min-height: 100vh; }
+.lateral { background: var(--lateral); color: var(--lateral-texto); position: sticky; top: 0; height: 100vh; overflow-y: auto; display: flex; flex-direction: column; padding: 14px 10px; gap: 10px; }
+.marca-lateral { display: flex; gap: 10px; align-items: center; color: #fff; text-decoration: none; font-weight: 700; padding: 4px 8px 12px; border-bottom: 1px solid rgba(255,255,255,.08); }
+.marca-lateral img { border-radius: 8px; background: #fff; }
+.marca-lateral small { display: block; font-weight: 400; color: var(--lateral-suave); font-size: .75rem; }
+.menu-lateral { display: flex; flex-direction: column; gap: 2px; }
+.menu-lateral svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.menu-lateral summary, .menu-lateral .grupo-unico { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 9px; color: var(--lateral-texto); text-decoration: none; font-weight: 600; cursor: pointer; list-style: none; }
+.menu-lateral summary::-webkit-details-marker { display: none; }
+.menu-lateral summary::after { content: ""; margin-left: auto; width: 7px; height: 7px; border-right: 1.8px solid var(--lateral-suave); border-bottom: 1.8px solid var(--lateral-suave); transform: rotate(-45deg); transition: transform .15s; }
+.menu-lateral details[open] > summary::after { transform: rotate(45deg); }
+.menu-lateral summary:hover, .menu-lateral .grupo-unico:hover { background: rgba(255,255,255,.06); }
+.menu-lateral summary.atual, .menu-lateral .grupo-unico.atual { color: #fff; }
+.menu-lateral .grupo-unico.atual { background: var(--lateral-ativo); }
+.menu-lateral ul { list-style: none; margin: 2px 0 8px; padding: 0 0 0 28px; display: flex; flex-direction: column; gap: 1px; }
+.menu-lateral ul a { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border-radius: 8px; color: var(--lateral-suave); text-decoration: none; font-size: .9rem; }
+.menu-lateral ul a:hover { color: #fff; background: rgba(255,255,255,.06); }
+.menu-lateral ul a.atual { color: #fff; background: var(--lateral-ativo); box-shadow: inset 3px 0 0 var(--lateral-destaque); }
+.contador { font-size: .72rem; font-weight: 700; min-width: 22px; text-align: center; padding: 1px 7px; border-radius: 999px; background: var(--lateral-destaque); color: var(--lateral); }
+.lateral-rodape { margin-top: auto; padding: 10px; border-top: 1px solid rgba(255,255,255,.08); font-size: .85rem; }
+.lateral-rodape a { color: var(--lateral-suave); text-decoration: none; }
+.lateral-rodape a:hover { color: #fff; }
+.abrir-menu { display: none; }
+.menu-fundo { display: none; }
+
+.principal-area { min-width: 0; display: flex; flex-direction: column; }
+.barra-topo { position: sticky; top: 0; z-index: 6; background: var(--superficie); border-bottom: 1px solid var(--linha); display: flex; align-items: center; gap: 16px; padding: 10px max(16px, env(safe-area-inset-left)); }
+.busca-geral { flex: 1; max-width: 520px; }
+.busca-geral input { border-radius: 999px; padding: 8px 16px; background: var(--afundado); border-color: transparent; }
+.busca-geral input:focus { background: var(--superficie); border-color: var(--marca); }
+.barra-topo .quem { margin-left: auto; }
+.barra-topo .quem a { color: var(--texto); text-decoration: none; font-weight: 600; text-align: right; line-height: 1.2; }
+.barra-topo .quem small { display: block; font-weight: 400; color: var(--suave); font-size: .75rem; }
+.lote-barra { top: 58px; }
+
+@media (max-width: 900px) {
+  .casca { grid-template-columns: minmax(0, 1fr); }
+  .lateral { position: sticky; top: 0; height: auto; z-index: 8; flex-direction: row; align-items: center; justify-content: space-between; padding: 8px 12px; overflow: visible; }
+  .marca-lateral { border: none; padding: 0; }
+  .marca-lateral small, .lateral-rodape { display: none; }
+  .abrir-menu { display: inline-flex; background: transparent; color: #fff; border-color: rgba(255,255,255,.25); }
+  .menu-lateral { display: none; position: fixed; top: 0; left: 0; bottom: 0; width: min(300px, 86vw); background: var(--lateral); padding: 16px 10px; overflow-y: auto; z-index: 20; }
+  .menu-lateral.aberto { display: flex; }
+  .menu-fundo { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 19; }
+  .barra-topo { top: 52px; }
+  .lote-barra { top: 110px; }
+}
+
+/* ---------- Cabeçalho de página com explicação curta ---------- */
+.cabecalho-pagina { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.cabecalho-pagina p { margin: 4px 0 0; color: var(--suave); max-width: 70ch; }
+.trilha { font-size: .8rem; color: var(--suave); margin-bottom: 4px; }
+.trilha a { color: var(--suave); text-decoration: none; }
+.trilha a:hover { color: var(--marca); }
+.abas { display: flex; gap: 4px; border-bottom: 1px solid var(--linha); overflow-x: auto; }
+.abas a { padding: 8px 14px; text-decoration: none; color: var(--suave); font-weight: 600; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+.abas a[aria-current="page"] { color: var(--marca); border-bottom-color: var(--marca); }
+.atalhos { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.atalho { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--linha); background: var(--superficie); text-decoration: none; color: var(--texto); }
+.atalho b { color: var(--marca); }
+.atalho span { font-size: .82rem; color: var(--suave); }
+.atalho:hover { border-color: var(--marca); }
+.grafico-barras { display: flex; flex-direction: column; gap: 6px; }
+.grafico-barras .lin { display: grid; grid-template-columns: minmax(90px, 160px) minmax(0, 1fr) auto; gap: 10px; align-items: center; font-size: .85rem; }
+.grafico-barras .lin .barra { height: 12px; }
+
+/* ---------- Edição rápida de preços ---------- */
+.precos-grade input { padding: 5px 8px; text-align: right; font-variant-numeric: tabular-nums; }
+.precos-grade input.mudou { border-color: var(--marca); background: var(--marca-suave); }
+.precos-grade td { vertical-align: middle; }
+.salvar-fixo { position: sticky; bottom: 0; z-index: 5; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 10px 14px; background: var(--superficie); border: 1px solid var(--linha); border-radius: 12px; box-shadow: 0 -4px 16px rgba(0,0,0,.06); }

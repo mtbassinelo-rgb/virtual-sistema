@@ -72,8 +72,17 @@ export default async function Hoje() {
     <>
       <section>
         <h1>Bom trabalho, {u.nome.split(" ")[0]}</h1>
-        <div className="suave">O que precisa de atenção hoje.</div>
+        <div className="suave">O que precisa de atenção hoje. Use o menu à esquerda para ir a qualquer parte do sistema.</div>
       </section>
+
+      <nav className="atalhos" aria-label="Atalhos">
+        <Link className="atalho" href="/pedidos/novo"><b>Novo pedido</b><span>Lançar um pedido de cliente</span></Link>
+        <Link className="atalho" href="/clientes"><b>Clientes</b><span>Cadastro, crédito e acesso à loja</span></Link>
+        {gestao && <Link className="atalho" href="/produtos/precos-rapido"><b>Editar preços</b><span>Preencher e ajustar preços na tabela</span></Link>}
+        <Link className="atalho" href="/produtos"><b>Produtos</b><span>Buscar, ativar, fotos e caixas</span></Link>
+        <Link className="atalho" href="/relatorios"><b>Relatórios</b><span>Vendas, mais vendidos e estoque</span></Link>
+        <Link className="atalho" href="/estoque"><b>Estoque</b><span>Saldo por depósito e ajustes</span></Link>
+      </nav>
 
       <div className="indicadores">
         {gestao && (

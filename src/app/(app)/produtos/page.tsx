@@ -46,11 +46,11 @@ export default async function Produtos({ searchParams }: {
   return (
     <>
       <section className="linha entre">
-        <div><h1>Produtos</h1><div className="suave pequeno">{d.total.toLocaleString("pt-BR")} produto(s)</div></div>
+        <div><h1>Produtos</h1><div className="suave pequeno">{d.total.toLocaleString("pt-BR")} produto(s). Clique no nome para editar tudo do produto; marque vários para ativar, inativar ou excluir de uma vez.</div></div>
         {ehGestao(u) && (
           <div className="linha">
             <a className="botao" href="/produtos/fotos">Fotos do catálogo{fotosPendentes > 0 ? ` (${fotosPendentes} para conferir)` : ""}</a>
-            <a className="botao" href="/estoque/precos">Preços em planilha</a>
+            <a className="botao" href="/produtos/precos-rapido">Editar preços rápido</a>
             <a className="botao principal" href="/produtos/novo">Novo produto</a>
           </div>
         )}
