@@ -5,6 +5,7 @@ import { Avisos } from "../avisos";
 import { produtosEmLote, salvarGradeProdutos } from "./acoes";
 import { BarraLote } from "./lote";
 import { TabelaProdutos, type LinhaProduto } from "./tabela";
+import { unidadeSistema } from "@/lib/unidade-sistema";
 
 export const metadata = { title: "Produtos" };
 
@@ -31,6 +32,7 @@ export default async function Produtos({ searchParams }: { searchParams: Promise
   const u = await exigirUsuario();
   const gestao = ehGestao(u);
   const f = await searchParams;
+  const { atual: unidade } = await unidadeSistema(u);
   const pagina = Math.max(1, Number(f.pagina) || 1);
   const POR_PAGINA = TAMANHOS.includes(Number(f.por)) ? Number(f.por) : 100;
   const par: unknown[] = [];
@@ -66,7 +68,8 @@ export default async function Produtos({ searchParams }: { searchParams: Promise
     const base = `from app.produtos p
       cross join lateral (select ${precos}) x
       cross join lateral (select coalesce(sum(es.quantidade), 0) as saldo from app.estoque_saldos es
-                            join app.depositos dp on dp.id = es.deposito_id and dp.ativo where es.produto_id = p.id) s
+                            join app.depositos dp on dp.id = es.deposito_id and dp.ativo
+                           where es.produto_id = p.id ${unidade ? `and dp.id = '${unidade.id}'` : ""}) s
       where ${cond.join(" and ")}`;
     const total = Number((await c.query(`select count(*) n ${base}`, par)).rows[0].n);
     const lista = (await c.query(`select p.id, p.codigo, p.nome, p.marca, p.foto, p.tipo, p.ativo, p.codigo_provisorio, p.unidades_caixa,
@@ -92,7 +95,7 @@ export default async function Produtos({ searchParams }: { searchParams: Promise
       <section className="cabecalho-pagina">
         <div>
           <h1>Produtos</h1>
-          <p>{d.total.toLocaleString("pt-BR")} produto(s){gestao ? ". Mude preço, preço promocional, caixa ou estoque mínimo direto na tabela e salve (dá para desfazer); marque vários para ativar, inativar ou excluir de uma vez." : "."}</p>
+          <p>{unidade ? <b>Estoque de {unidade.nome}. </b> : null}{d.total.toLocaleString("pt-BR")} produto(s){gestao ? ". Mude preço, preço promocional, caixa ou estoque mínimo direto na tabela e salve (dá para desfazer); marque vários para ativar, inativar ou excluir de uma vez." : "."}</p>
         </div>
         {gestao && (
           <div className="linha">

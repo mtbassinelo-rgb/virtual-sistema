@@ -8,6 +8,7 @@ import { QueroProduto } from "./quero-produto";
 import { TEXTOS, idiomaAtual, type Textos } from "@/lib/idioma";
 import { bannersPadrao, type Banner } from "@/lib/banners-padrao";
 import { FaixaBanners } from "./banners";
+import { ehPrincipal, unidadeLoja } from "@/lib/unidade";
 
 export const metadata = { title: { absolute: "Virtual Cosméticos · Atacado de cosméticos para salões e revendas" } };
 
@@ -27,13 +28,20 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
   const f = await searchParams;
   const cliente = await clienteAtual();
   const idioma = await idiomaAtual();
-  const t = TEXTOS[idioma];
+  const unidade = await unidadeLoja();
+  const vendeUnidade = unidade.vende_unidade;
+  // site de outra unidade (ex.: CDE): os textos de abertura falam da loja dela, não do CD de Foz
+  const t: Textos = ehPrincipal(unidade) ? TEXTOS[idioma] : {
+    ...TEXTOS[idioma],
+    heroTitulo: idioma === "es" ? `${unidade.loja_nome}: cosméticos por unidad y por caja cerrada.` : `${unidade.loja_nome}: cosméticos por unidade e por caixa fechada.`,
+    heroTexto: idioma === "es" ? "Los mismos productos de la distribuidora, con stock propio en la tienda. Compre por unidad o por caja." : "Os mesmos produtos da distribuidora, com estoque próprio na loja. Compre por unidade ou por caixa.",
+  };
   const proprios = (await pool.query("select * from app.banners_ativos($1)", [idioma])).rows as Banner[];
   // banners da equipe primeiro, depois os prontos (marcas e atacado)
   const banners = [...proprios, ...bannersPadrao(idioma, Boolean(cliente))];
   const token = cliente ? await tokenCliente() : null;
 
-  const publicos = (await pool.query("select * from app.vitrine_publica()")).rows as Publico[];
+  const publicos = (await pool.query("select * from app.vitrine_publica_unidade($1)", [unidade.id])).rows as Publico[];
   const precos = new Map<string, Preco>();
   let meta: Record<string, unknown> | null = null;
   if (cliente && token) {
@@ -91,7 +99,7 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
   const kits = !filtrando ? todos.filter((p) => p.linha === "kits").slice(0, 8) : [];
 
   const n = (x: number) => `${x.toLocaleString(idioma === "es" ? "es-PY" : "pt-BR")} ${x === 1 ? t.produto : t.produtos}`;
-  const cartao = (p: Produto) => <Cartao key={p.produto_id} p={p} moeda={moeda} cliente={Boolean(cliente)} t={t} />;
+  const cartao = (p: Produto) => <Cartao key={p.produto_id} p={p} moeda={moeda} cliente={Boolean(cliente)} t={t} vendeUnidade={vendeUnidade} />;
   const titulo = marca ?? (soPromo ? t.promocoes : soNovidade ? t.novidades : linha ? t.linhas[linha] : q ? t.resultados(q) : t.catalogo);
 
   return (
@@ -214,7 +222,7 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
         ) : (
           vista === "grade"
             ? <div className="grade compacta">{lista.map(cartao)}</div>
-            : <div className="catalogo-lista">{lista.map((p) => <LinhaCatalogo key={p.produto_id} p={p} moeda={moeda} cliente={Boolean(cliente)} t={t} />)}</div>
+            : <div className="catalogo-lista">{lista.map((p) => <LinhaCatalogo key={p.produto_id} p={p} moeda={moeda} cliente={Boolean(cliente)} t={t} vendeUnidade={vendeUnidade} />)}</div>
         )}
 
         {paginas > 1 && (
@@ -236,7 +244,7 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
   );
 }
 
-function Cartao({ p, moeda, cliente, t }: { p: Produto; moeda: Moeda; cliente: boolean; t: Textos }) {
+function Cartao({ p, moeda, cliente, t, vendeUnidade }: { p: Produto; moeda: Moeda; cliente: boolean; t: Textos; vendeUnidade: boolean }) {
   const cor = corRotulo(p.nome, p.linha);
   const pr = p.p;
   const semEstoque = esgotado(p, cliente);
@@ -271,10 +279,25 @@ function Cartao({ p, moeda, cliente, t }: { p: Produto; moeda: Moeda; cliente: b
           </div>
         )}
         {pr?.ultima_compra && <div className="estoque">{t.comprouEm(data(pr.ultima_compra))}</div>}
-        <Quantidade item={item} rotulo={semEstoque ? t.pedirEncomenda : cliente ? t.adicionarPedido : t.adicionar} />
+        <Comprar p={p} item={item} vendeUnidade={vendeUnidade} t={t} rotulo={semEstoque ? t.pedirEncomenda : cliente ? t.adicionarPedido : t.adicionar} />
         {semEstoque && <QueroProduto produtoId={p.produto_id} cliente={cliente} t={t.quero} />}
       </div>
     </article>
+  );
+}
+
+/**
+ * Botão de comprar. Na loja que vende por unidade e por caixa (CDE), produto com caixa mostra as duas opções:
+ * a caixa fechada e a unidade avulsa (no carrinho viram duas linhas do mesmo produto).
+ */
+function Comprar({ p, item, vendeUnidade, t, rotulo }: { p: Produto; item: ReturnType<typeof itemCarrinho>; vendeUnidade: boolean; t: Textos; rotulo: string }) {
+  if (!vendeUnidade || !p.unidades_caixa) return <Quantidade item={item} rotulo={rotulo} />;
+  const unidade = { ...item, id: `${item.id}:un`, produto: item.id, nome: `${item.nome} (${t.unidade.toLowerCase()})`, caixa: null };
+  return (
+    <div className="comprar-duplo">
+      <div><span>{t.caixaCom(p.unidades_caixa)}</span><Quantidade item={item} rotulo={rotulo} /></div>
+      <div><span>{t.unidade}</span><Quantidade item={unidade} rotulo={rotulo} /></div>
+    </div>
   );
 }
 
@@ -308,7 +331,7 @@ function Precos({ p, moeda, cliente, t }: { p: Produto; moeda: Moeda; cliente: b
 }
 
 /** Linha do catálogo em lista: mais produtos por tela, como um catálogo impresso. */
-function LinhaCatalogo({ p, moeda, cliente, t }: { p: Produto; moeda: Moeda; cliente: boolean; t: Textos }) {
+function LinhaCatalogo({ p, moeda, cliente, t, vendeUnidade }: { p: Produto; moeda: Moeda; cliente: boolean; t: Textos; vendeUnidade: boolean }) {
   const cor = corRotulo(p.nome, p.linha);
   const pr = p.p;
   const promo = pr?.desconto_pct ?? p.x?.promo_pct;
@@ -327,7 +350,7 @@ function LinhaCatalogo({ p, moeda, cliente, t }: { p: Produto; moeda: Moeda; cli
         </div>
       </div>
       <div className="linha-preco"><Precos p={p} moeda={moeda} cliente={cliente} t={t} /></div>
-      <div className="linha-qtd"><Quantidade item={itemCarrinho(p, esgotado(p, cliente))} rotulo={esgotado(p, cliente) ? t.pedirEncomenda : t.adicionar} />
+      <div className="linha-qtd"><Comprar p={p} item={itemCarrinho(p, esgotado(p, cliente))} vendeUnidade={vendeUnidade} t={t} rotulo={esgotado(p, cliente) ? t.pedirEncomenda : t.adicionar} />
         {esgotado(p, cliente) && <QueroProduto produtoId={p.produto_id} cliente={cliente} t={t.quero} />}</div>
     </article>
   );

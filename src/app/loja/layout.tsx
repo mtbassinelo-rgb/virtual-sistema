@@ -5,6 +5,7 @@ import { linkWhatsApp, telefone } from "@/lib/formato";
 import { TEXTOS, idiomaAtual, textosCarrinho } from "@/lib/idioma";
 import { LINHAS, interno, linhaDe, marcaDe } from "@/lib/vitrine";
 import { BotaoCarrinho, Carrinho } from "./carrinho";
+import { ehPrincipal, unidadeLoja } from "@/lib/unidade";
 import { FecharMenus, MenuSite } from "./menu-site";
 import "./loja.css";
 
@@ -34,6 +35,8 @@ function Redes() {
 
 export default async function LayoutLoja({ children }: { children: React.ReactNode }) {
   const c = await clienteAtual();
+  const unidade = await unidadeLoja();
+  const principal = ehPrincipal(unidade);
   const idioma = await idiomaAtual();
   const t = TEXTOS[idioma];
   // Português: WhatsApp principal. Espanhol (clientes em guaranis): WhatsApp de vendas em Gs.
@@ -41,7 +44,7 @@ export default async function LayoutLoja({ children }: { children: React.ReactNo
     ?? String((await pool.query("select app.whatsapp_empresa($1) as w", [idioma === "es" ? "GS" : "BRL"])).rows[0]?.w ?? "");
   const zap = linkWhatsApp(numero, t.zapMsg);
   // Menu de categorias e marcas, com a quantidade de produtos de cada uma
-  const produtos = (await pool.query("select nome, marca, tipo from app.vitrine_publica()")).rows as { nome: string; marca: string | null; tipo: string }[];
+  const produtos = (await pool.query("select nome, marca, tipo from app.vitrine_publica_unidade($1)", [unidade.id])).rows as { nome: string; marca: string | null; tipo: string }[];
   const porLinha = new Map<string, number>(), porMarca = new Map<string, number>();
   for (const p of produtos) {
     if (interno(p.nome)) continue;
@@ -58,7 +61,7 @@ export default async function LayoutLoja({ children }: { children: React.ReactNo
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
       <link rel="stylesheet" precedence="default"
             href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Figtree:wght@400;500;600;700&display=swap" />
-      <Carrinho cliente={c ? { nome: c.nome, vendedora: c.vendedora, moeda: c.moeda } : null} t={textosCarrinho(t, c)}>
+      <Carrinho cliente={c ? { nome: c.nome, vendedora: c.vendedora, moeda: c.moeda } : null} t={textosCarrinho(t, c)} unidade={unidade.codigo}>
         <div className="fixo">
         <header className="topo">
           <div className="in topo-in">
@@ -78,9 +81,9 @@ export default async function LayoutLoja({ children }: { children: React.ReactNo
                 : [{ href: "/loja/cadastro", texto: t.querSerCliente }, { href: "/loja/acesso", texto: t.jaSouCliente }] },
               { linha: true, links: [{ href: `/loja/idioma?l=${t.idiomaCodigo}`, texto: t.idioma }, { href: INSTAGRAM, texto: "Instagram" }, { href: FACEBOOK, texto: "Facebook" }] },
             ]} />
-            <Link href="/loja" className="marca" aria-label="Virtual Cosméticos">
+            <Link href="/loja" className="marca" aria-label={unidade.loja_nome}>
               <img src="/marca/icone.png" width={42} height={40} alt="" />
-              <span className="marca-txt"><b>Virtual</b>Cosméticos</span>
+              <span className="marca-txt"><b>Virtual</b>Cosméticos{!principal && <em className="marca-unidade">{unidade.codigo === "loja-cde" ? "CDE" : unidade.nome}</em>}</span>
             </Link>
             <form action="/loja" className="busca" role="search">
               <input name="q" type="search" placeholder={t.buscar} aria-label={t.buscar} />

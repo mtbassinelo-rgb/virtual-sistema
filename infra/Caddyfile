@@ -17,6 +17,9 @@ teste.{$DOMINIO} {
 	encode gzip
 	@raiz path /
 	redir @raiz /loja
+	# Site da loja de Ciudad del Este (mesmos produtos, estoque da loja)
+	@cde path /cde /cde/
+	redir @cde /loja/cde
 	@cliente path /loja /loja/* /_next/* /marca/* /fotos/* /icon.png /favicon.ico
 	handle @cliente {
 		reverse_proxy vc-app-producao:3000

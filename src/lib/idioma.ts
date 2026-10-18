@@ -1,13 +1,15 @@
 import "server-only";
 import { cookies, headers } from "next/headers";
+import { unidadeLoja } from "./unidade";
 
 export type Idioma = "pt" | "es";
 export const COOKIE_IDIOMA = "vc_idioma";
 
-/** Idioma do site: escolha do visitante (cookie) ou, na primeira visita, o idioma do navegador. */
+/** Idioma do site: escolha do visitante (cookie); senão o idioma da unidade (CDE abre em espanhol); senão o do navegador. */
 export async function idiomaAtual(): Promise<Idioma> {
   const c = (await cookies()).get(COOKIE_IDIOMA)?.value;
   if (c === "pt" || c === "es") return c;
+  if ((await unidadeLoja()).loja_idioma === "es") return "es";
   const al = (await headers()).get("accept-language") ?? "";
   return /^es\b/i.test(al.trim()) ? "es" : "pt";
 }

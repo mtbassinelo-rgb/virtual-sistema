@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { exigirUsuario, ehGestao, podeEscrever } from "@/lib/auth";
+import { unidadeSistema } from "@/lib/unidade-sistema";
 import { comUsuario } from "@/lib/db";
 import { hojeISO } from "@/lib/formato";
 import { Avisos } from "../../avisos";
@@ -12,6 +13,7 @@ export default async function NovoPedido({ searchParams }: { searchParams: Promi
   const u = await exigirUsuario();
   if (!podeEscrever(u)) redirect("/pedidos");
   const f = await searchParams;
+  const { atual: unidade } = await unidadeSistema(u);
   const d = await comUsuario(u.id, async (c) => ({
     clientes: (await c.query(
       `select c.id, c.nome, c.categoria_preco, c.moeda, v.nome as vendedora from app.clientes c
@@ -60,7 +62,7 @@ export default async function NovoPedido({ searchParams }: { searchParams: Promi
           </select>
         </label>
         <label>Depósito
-          <select name="deposito_id" defaultValue={d.depositos.find((x) => x.padrao)?.id ?? ""}>
+          <select name="deposito_id" defaultValue={(unidade && d.depositos.some((x) => x.id === unidade.id) ? unidade.id : d.depositos.find((x) => x.padrao)?.id) ?? ""}>
             <option value="">Padrão da vendedora</option>
             {d.depositos.map((x) => <option key={x.id} value={x.id}>{x.nome}</option>)}
           </select>

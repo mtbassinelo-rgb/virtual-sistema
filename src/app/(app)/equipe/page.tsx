@@ -2,7 +2,7 @@ import { ehGestao, exigirUsuario } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
 import { PERFIS } from "@/lib/formato";
 import { Avisos, Selo } from "../avisos";
-import { ativarPessoa } from "./acoes";
+import { ativarPessoa, salvarUnidadesVendedora } from "./acoes";
 import { BotaoLinkSenha, NovaPessoa } from "./formularios";
 
 export const metadata = { title: "Equipe" };
@@ -19,6 +19,8 @@ export default async function Equipe({ searchParams }: { searchParams: Promise<{
   const d = await comUsuario(u.id, async (c) => ({
     pessoas: (await c.query("select * from app.equipe()")).rows as Pessoa[],
     vendedoras: (await c.query("select id, nome from app.vendedoras where nome <> 'Marketplace' order by nome")).rows as { id: string; nome: string }[],
+    depositos: (await c.query("select id, nome from app.depositos where ativo order by tipo, nome")).rows as { id: string; nome: string }[],
+    vinculos: (await c.query("select vendedora_id, deposito_id, padrao from app.vendedora_depositos")).rows as { vendedora_id: string; deposito_id: string; padrao: boolean }[],
   }));
   return (
     <>
@@ -56,6 +58,41 @@ export default async function Equipe({ searchParams }: { searchParams: Promise<{
         ))}</tbody>
       </table></div>
       <NovaPessoa dono={u.perfil === "dono"} vendedoras={d.vendedoras} />
+
+      <section className="painel" id="unidades">
+        <h2 style={{ margin: 0 }}>Unidades de cada vendedora</h2>
+        <p className="suave pequeno" style={{ margin: 0 }}>
+          Marque de quais unidades a vendedora pode separar e vender (ex.: as vendedoras de Foz também vendem do CD CDE) e qual é a padrão.
+          Os clientes de uma vendedora entram no site da unidade padrão dela: clientes da vendedora de CDE veem só o estoque de CDE.
+          Um cliente específico pode ter outra unidade na ficha dele (Clientes → cliente → Unidade).
+        </p>
+        <div className="tabela"><table>
+          <thead><tr><th>Vendedora</th>{d.depositos.map((x) => <th key={x.id}>{x.nome}</th>)}<th></th></tr></thead>
+          <tbody>{d.vendedoras.map((v) => {
+            const meus = d.vinculos.filter((x) => x.vendedora_id === v.id);
+            const form = `un-${v.id}`;
+            return (
+              <tr key={v.id}>
+                <td><b>{v.nome}</b><form id={form} action={salvarUnidadesVendedora}><input type="hidden" name="vendedora_id" value={v.id} /></form></td>
+                {d.depositos.map((x) => {
+                  const vin = meus.find((m) => m.deposito_id === x.id);
+                  return (
+                    <td key={x.id}>
+                      <label className="linha" style={{ gap: 6, flexDirection: "row", color: "inherit" }}>
+                        <input type="checkbox" name="depositos" value={x.id} form={form} defaultChecked={Boolean(vin)} /> vende
+                      </label>
+                      <label className="linha" style={{ gap: 6, flexDirection: "row", color: "inherit" }}>
+                        <input type="radio" name="padrao" value={x.id} form={form} defaultChecked={Boolean(vin?.padrao)} /> padrão
+                      </label>
+                    </td>
+                  );
+                })}
+                <td><button form={form}>Salvar</button></td>
+              </tr>
+            );
+          })}</tbody>
+        </table></div>
+      </section>
     </>
   );
 }

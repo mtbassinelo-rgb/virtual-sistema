@@ -7,6 +7,8 @@ reset role;
 \set JULISA   '00000000-0000-0000-0000-0000000000c1'
 \set PROD     '00000000-0000-0000-0000-0000000000b1'
 select id as cd from app.depositos where codigo = 'cd-foz' \gset
+-- estes testes cobrem a loja que oferece também o estoque do CD que a abastece
+update app.depositos set mostra_abastecedor = true where codigo = 'loja-cde';
 -- Segundo produto, parado (sem vendas)
 insert into app.produtos (id, codigo, nome, fornecedor) values ('00000000-0000-0000-0000-0000000000b2','RHE-011','Mousse','Rhenuks');
 insert into app.precos (produto_id, tabela, valor, vigente_desde) values
@@ -164,4 +166,6 @@ select app.importar_precos('[{"codigo":"RHE-011","tabela":"py_normal","valor":19
 select teste.ok(app.remover_preco_de_hoje('00000000-0000-0000-0000-0000000000b2', 'py_normal'), 'Desfazer tira o preço de hoje');
 select teste.ok((select valor from app.precos where produto_id = '00000000-0000-0000-0000-0000000000b2' and tabela = 'py_normal' order by vigente_desde desc limit 1) = 17000, 'E volta a valer o preço anterior');
 reset role;
+reset role;
+update app.depositos set mostra_abastecedor = false where codigo = 'loja-cde';
 \echo '== Testes da área de atacado passaram =='

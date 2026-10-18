@@ -5,6 +5,7 @@ import { ehGestao, exigirUsuario, sair } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
 import { PERFIS } from "@/lib/formato";
 import { MenuLateral, type GrupoMenu } from "./menu-lateral";
+import { unidadeSistema } from "@/lib/unidade-sistema";
 
 async function acaoSair() {
   "use server";
@@ -15,6 +16,7 @@ async function acaoSair() {
 export default async function AreaInterna({ children }: { children: React.ReactNode }) {
   const u = await exigirUsuario();
   const gestao = ehGestao(u);
+  const un = await unidadeSistema(u);
   // Contadores ao lado dos itens do menu: o que está esperando alguém
   const n = await comUsuario(u.id, async (c) => (await c.query(`
     select (select count(*) from app.pedidos where status_comercial::text in ('aguardando_cliente','aguardando_aprovacao','em_separacao'))::int as pedidos_abertos,
@@ -100,6 +102,15 @@ export default async function AreaInterna({ children }: { children: React.ReactN
             <label className="sr-only" htmlFor="busca-geral">Buscar no sistema</label>
             <input id="busca-geral" name="q" type="search" placeholder="Buscar produto, cliente ou pedido…" autoComplete="off" />
           </form>
+          {un.lista.length > 1 && (
+            <nav className="troca-unidade" aria-label="Unidade">
+              <a href="/unidade" className={!un.atual ? "atual" : ""} aria-current={!un.atual ? "true" : undefined}>Todas</a>
+              {un.lista.map((x) => (
+                <a key={x.id} href={`/unidade?d=${x.id}`} className={un.atual?.id === x.id ? "atual" : ""} aria-current={un.atual?.id === x.id ? "true" : undefined}
+                   title={`Ver estoque e pedidos de ${x.nome}`}>{x.codigo === "loja-cde" ? "CD CDE" : x.codigo === "cd-foz" ? "CD Foz" : x.nome}</a>
+              ))}
+            </nav>
+          )}
           <div className="quem">
             <Link href="/conta" title="Minha conta: trocar senha">{u.nome}<small>{PERFIS[u.perfil]}</small></Link>
             <form action={acaoSair}><button type="submit">Sair</button></form>

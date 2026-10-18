@@ -232,3 +232,10 @@ button.discreto:hover { color: var(--erro); border-color: transparent; }
 .salvar-fixo.com-erro { border-color: #f0b4b4; }
 .texto-erro { color: #a12020; font-weight: 600; }
 .fechar-aviso { margin-left: auto; padding: 2px 10px; }
+
+/* Troca de unidade no topo (CD Foz / CD CDE / Todas) */
+.troca-unidade { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--afundado); border: 1px solid var(--linha); }
+.troca-unidade a { padding: 5px 12px; border-radius: 999px; font-size: .82rem; font-weight: 600; color: var(--suave); text-decoration: none; white-space: nowrap; }
+.troca-unidade a:hover { color: var(--texto); }
+.troca-unidade a.atual { background: var(--marca); color: #fff; }
+@media (max-width: 700px) { .troca-unidade a { padding: 4px 8px; font-size: .75rem; } }

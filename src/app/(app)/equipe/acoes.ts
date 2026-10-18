@@ -60,3 +60,20 @@ export async function ativarPessoa(fd: FormData) {
   revalidatePath("/equipe");
   redirect(`/equipe?${q}`);
 }
+
+/** Em quais unidades (CD Foz, CDE…) cada vendedora vende e qual é a padrão dos pedidos dela. */
+export async function salvarUnidadesVendedora(fd: FormData) {
+  const u = await exigirUsuario();
+  const vendedora = texto(fd, "vendedora_id");
+  const marcadas = fd.getAll("depositos").map(String).filter((x) => /^[0-9a-f-]{36}$/i.test(x));
+  let q: string;
+  try {
+    if (!ehGestao(u)) throw new Error("Só gerente ou dono define as unidades das vendedoras.");
+    await comUsuario(u.id, (c) => c.query("select app.definir_unidades_vendedora($1, $2::uuid[], $3)", [vendedora, marcadas, texto(fd, "padrao") || null]));
+    q = "ok=" + encodeURIComponent("Unidades da vendedora salvas.");
+  } catch (e) {
+    q = "erro=" + encodeURIComponent(mensagemErro(e));
+  }
+  revalidatePath("/equipe");
+  redirect(`/equipe?${q}#unidades`);
+}

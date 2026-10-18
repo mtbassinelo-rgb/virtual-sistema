@@ -5,7 +5,7 @@ import { enviarCarrinho, guardarCarrinho, itensParaRepetir, type RespostaCarrinh
 import type { TextosCarrinho } from "@/lib/idioma";
 
 /** qtd = caixas fechadas quando o produto tem "caixa" (peças por caixa); senão, unidades. preco = por unidade. */
-export type ItemCarrinho = { id: string; nome: string; marca: string | null; preco: number | null; qtd: number; limite?: number | null; caixa?: number | null; encomenda?: boolean };
+export type ItemCarrinho = { id: string; produto?: string; nome: string; marca: string | null; preco: number | null; qtd: number; limite?: number | null; caixa?: number | null; encomenda?: boolean };
 export type ClienteCarrinho = { nome: string; vendedora: string; moeda: "GS" | "BRL" } | null;
 
 type Ctx = {
@@ -19,29 +19,35 @@ type Ctx = {
 
 const Contexto = createContext<Ctx | null>(null);
 const CHAVE = "vc_carrinho_v1";
+/** Cada unidade (site principal, CDE) tem o próprio carrinho no navegador. */
+const chaveDe = (unidade: string) => unidade === "cd-foz" ? CHAVE : `${CHAVE}_${unidade}`;
+/** Id do produto: na loja que vende unidade e caixa, o mesmo produto pode estar duas vezes (":un" = unidade). */
+export const produtoDe = (i: { id: string; produto?: string }) => i.produto ?? i.id;
 
-function ler(): ItemCarrinho[] {
+function ler(chave: string): ItemCarrinho[] {
   try {
-    const v = JSON.parse(localStorage.getItem(CHAVE) ?? "[]");
+    const v = JSON.parse(localStorage.getItem(chave) ?? "[]");
     return Array.isArray(v) ? v.filter((i) => i && typeof i.id === "string" && i.qtd > 0) : [];
   } catch {
     return [];
   }
 }
 
-export function Carrinho({ children, cliente, t }: { children: React.ReactNode; cliente: ClienteCarrinho; t: TextosCarrinho }) {
+export function Carrinho({ children, cliente, t, unidade }: { children: React.ReactNode; cliente: ClienteCarrinho; t: TextosCarrinho; unidade: string }) {
+  const CHAVE_UNIDADE = chaveDe(unidade);
   const [itens, setItens] = useState<ItemCarrinho[]>([]);
   const [aberto, abrir] = useState(false);
   const carregado = useRef(false);
-  useEffect(() => { setItens(ler()); carregado.current = true; }, []);
+  useEffect(() => { setItens(ler(CHAVE_UNIDADE)); carregado.current = true; }, [CHAVE_UNIDADE]);
   useEffect(() => {
-    try { localStorage.setItem(CHAVE, JSON.stringify(itens)); } catch { /* navegação privada: o carrinho vale só nesta página */ }
-  }, [itens]);
+    if (!carregado.current) return;
+    try { localStorage.setItem(CHAVE_UNIDADE, JSON.stringify(itens)); } catch { /* navegação privada: o carrinho vale só nesta página */ }
+  }, [itens, CHAVE_UNIDADE]);
   // cliente logado: o carrinho também fica guardado no sistema (a vendedora vê os carrinhos parados)
   useEffect(() => {
     if (!cliente || !carregado.current) return;
     const t = setTimeout(() => {
-      guardarCarrinho(itens.map((i) => ({ produto_id: i.id, qtd: i.qtd * (i.caixa || 1) }))).catch(() => undefined);
+      guardarCarrinho(itens.map((i) => ({ produto_id: produtoDe(i), qtd: i.qtd * (i.caixa || 1) }))).catch(() => undefined);
     }, 2500);
     return () => clearTimeout(t);
   }, [itens, cliente]);
@@ -124,7 +130,7 @@ function Gaveta({ cliente }: { cliente: ClienteCarrinho }) {
   const un = (i: ItemCarrinho) => i.qtd * (i.caixa || 1);
   const total = cliente ? itens.reduce((s, i) => s + (i.preco ?? 0) * un(i), 0) : 0;
   const semPreco = cliente ? itens.filter((i) => i.preco == null).length : 0;
-  const payload = JSON.stringify(itens.map((i) => ({ produto_id: i.id, quantidade: un(i), caixas: i.caixa ? i.qtd : null, encomenda: !!i.encomenda })));
+  const payload = JSON.stringify(itens.map((i) => ({ produto_id: produtoDe(i), quantidade: un(i), caixas: i.caixa ? i.qtd : null, encomenda: !!i.encomenda })));
 
   return (
     <div className={`gaveta ${aberto ? "aberta" : ""}`} aria-hidden={!aberto}>

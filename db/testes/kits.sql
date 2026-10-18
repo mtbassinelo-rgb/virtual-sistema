@@ -108,3 +108,19 @@ select teste.ok((select marca from app.produtos where codigo = 'T-MARCA-1') = 'P
 update app.produtos set marca = 'Marca Nova Qualquer' where codigo = 'T-MARCA-1';
 select teste.ok((select marca from app.produtos where codigo = 'T-MARCA-1') = 'MARCA NOVA QUALQUER', 'Marca nova também fica em maiúsculas');
 delete from app.produtos where codigo = 'T-MARCA-1';
+
+\echo '== Unidades: loja de CDE vê só o próprio estoque =='
+reset role;
+select id as cde from app.depositos where codigo = 'loja-cde' \gset
+select teste.ok(not (select tem_estoque from app.vitrine_publica_unidade(:'cde') where produto_id = '00000000-0000-0000-0000-0000000000b2'),
+  'Produto só no CD Foz aparece sem estoque no site de CDE');
+update app.depositos set mostra_abastecedor = true where id = :'cde';
+select teste.ok((select tem_estoque from app.vitrine_publica_unidade(:'cde') where produto_id = '00000000-0000-0000-0000-0000000000b2'),
+  'Se a unidade mostrar o CD que a abastece, o produto aparece com estoque');
+update app.depositos set mostra_abastecedor = false where id = :'cde';
+select teste.ok((select vende_unidade and loja_idioma = 'es' from app.unidades_loja() where codigo = 'loja-cde'), 'CDE vende por unidade e o site abre em espanhol');
+set role vc_app;
+select teste.como('00000000-0000-0000-0000-000000000003');
+select teste.falha(format($$select app.definir_unidades_vendedora('00000000-0000-0000-0000-0000000000a1', array[%L::uuid], %L)$$, :'cde', :'cde'),
+  'Só gerente', 'Vendedora não muda as próprias unidades');
+reset role;

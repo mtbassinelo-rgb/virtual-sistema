@@ -164,7 +164,7 @@ export default async function Cliente({ params, searchParams }: {
           <h2>Área do cliente (atacado)</h2>
           <p className="pequeno suave">
             {!cli.portal_ativo ? "Acesso bloqueado." : d.temAcesso ? <>O cliente entra em <b>distribuidoravirtualcosmeticos.com/loja</b> com o documento e a senha.</> : "Ainda sem acesso: informe o documento e crie o acesso."} Estoque que ele vê: {d.depositoAtual ?? "—"}
-            {d.depositoAtual === "Loja Ciudad del Este" ? " (pode pedir do CD de Foz, 1 a 3 dias)" : ""}.
+            {d.depositoAtual === "Loja Ciudad del Este" ? " (site Virtual Cosméticos CDE: só o estoque da loja, por unidade ou caixa)" : ""}.
           </p>
           {!ro && <AcessoCliente clienteId={cli.id} documento={cli.documento ?? null} temAcesso={d.temAcesso} />}
           {!ro && (

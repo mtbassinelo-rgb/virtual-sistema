@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { exigirUsuario, ehGestao, podeEscrever } from "@/lib/auth";
+import { unidadeSistema } from "@/lib/unidade-sistema";
 import { comUsuario } from "@/lib/db";
 import { dinheiro, data, STATUS_COMERCIAL, STATUS_PAGAMENTO, COR_PAGAMENTO, MODALIDADES, type Moeda } from "@/lib/formato";
 import { Selo } from "../avisos";
@@ -19,6 +20,8 @@ const ATALHOS: [string, string][] = [
 export default async function Pedidos({ searchParams }: { searchParams: Promise<Filtros> }) {
   const u = await exigirUsuario();
   const f = await searchParams;
+  // sem filtro de depósito na busca: usa a unidade escolhida no topo
+  if (f.deposito === undefined) { const { atual } = await unidadeSistema(u); if (atual) f.deposito = atual.id; }
 
   const cond: string[] = [];
   const par: unknown[] = [];
