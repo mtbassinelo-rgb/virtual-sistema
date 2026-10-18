@@ -1,8 +1,29 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { MarcarTodos } from "./lote";
+import { alternarAtivo } from "./acoes";
+
+/** A = ativo no site (clique para desativar) · D = desativado (clique para ativar). */
+function BotaoAtivo({ id, ativo, nome }: { id: string; ativo: boolean; nome: string }) {
+  const router = useRouter();
+  const [estado, setEstado] = useState(ativo);
+  const [ocupado, iniciar] = useTransition();
+  return (
+    <button type="button" className={`botao-ad ${estado ? "ativo" : "inativo"}`} disabled={ocupado}
+      title={estado ? `Ativo no site. Clique para desativar ${nome}` : `Desativado. Clique para ativar ${nome} no site`}
+      aria-label={estado ? `Desativar ${nome}` : `Ativar ${nome}`}
+      onClick={() => iniciar(async () => {
+        const r = await alternarAtivo(id, !estado);
+        if (r.erro) { alert(r.erro); return; }
+        setEstado(!estado); router.refresh();
+      })}>
+      {ocupado ? "…" : estado ? "A" : "D"}
+    </button>
+  );
+}
 
 export type LinhaProduto = {
   id: string; codigo: string; nome: string; marca: string | null; foto: string | null; tipo: string; ativo: boolean;
@@ -42,6 +63,7 @@ export function TabelaProdutos({ linhas, gestao, acao, volta }: {
       <div className="tabela tabela-produtos"><table>
         <thead><tr>
           {gestao && <th style={{ width: 32 }}><MarcarTodos form="lote" /></th>}
+          {gestao && <th title="A = ativo no site · D = desativado. Clique para trocar.">Site</th>}
           <th></th><th>Produto</th>
           <th className="num" title="Saldo somando os depósitos ativos">Estoque</th>
           <th className="num" title="Abaixo disso o produto entra no relatório de estoque baixo para comprar">Mínimo</th>
@@ -55,6 +77,7 @@ export function TabelaProdutos({ linhas, gestao, acao, volta }: {
           return (
             <tr key={p.id} className={p.ativo ? "" : "inativo"}>
               {gestao && <td><input type="checkbox" name="ids" value={p.id} form="lote" aria-label={`Selecionar ${p.nome}`} /></td>}
+              {gestao && <td style={{ width: 44 }}><BotaoAtivo id={p.id} ativo={p.ativo} nome={p.nome} /></td>}
               <td style={{ width: 52 }}>
                 {p.foto ? <img src={p.foto} alt="" width={40} height={40} style={{ objectFit: "cover", borderRadius: 6, display: "block" }} />
                   : <div style={{ width: 40, height: 40, borderRadius: 6, background: "var(--afundado)" }} />}

@@ -219,3 +219,7 @@ button.discreto:hover { color: var(--erro); border-color: transparent; }
 .estoque-num { font-weight: 700; font-variant-numeric: tabular-nums; padding: 2px 8px; border-radius: 999px; }
 .estoque-num.baixo { background: #fff3d6; color: #8a5a00; }
 .estoque-num.zerado { background: #fde4e4; color: #a12020; }
+.botao-ad { width: 32px; height: 32px; padding: 0; border-radius: 8px; font-weight: 800; font-size: .9rem; cursor: pointer; border: 1.5px solid; }
+.botao-ad.ativo { background: #e3f6e8; color: #17703a; border-color: #8fd3a6; }
+.botao-ad.inativo { background: #f2f2f4; color: #8a8a93; border-color: #d4d4da; }
+.botao-ad:hover { filter: brightness(.95); }

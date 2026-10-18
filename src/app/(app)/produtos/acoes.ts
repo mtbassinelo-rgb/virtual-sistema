@@ -262,3 +262,18 @@ export async function salvarGradeProdutos(fd: FormData) {
   revalidatePath("/loja");
   redirect(`${volta}${volta.includes("?") ? "&" : "?"}${q}`);
 }
+
+/** Botão A/D da lista: ativa ou desativa um produto no site na hora. */
+export async function alternarAtivo(id: string, ativar: boolean): Promise<{ erro?: string }> {
+  const u = await exigirUsuario();
+  try {
+    if (!ehGestao(u)) throw new Error("Só gerente ou dono ativa ou desativa produtos.");
+    if (!/^[0-9a-f-]{36}$/i.test(id)) throw new Error("Produto inválido.");
+    await comUsuario(u.id, (c) => c.query("select app.produtos_em_lote(array[$1::uuid], $2)", [id, ativar ? "ativar" : "inativar"]));
+    revalidatePath("/produtos");
+    revalidatePath("/loja");
+    return {};
+  } catch (e) {
+    return { erro: mensagemErro(e) };
+  }
+}
