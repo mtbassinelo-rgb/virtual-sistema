@@ -511,3 +511,40 @@
 .reposicao { list-style: none; margin: 16px 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .reposicao li { display: grid; grid-template-columns: minmax(0, 1fr) 150px; gap: 12px; align-items: center; background: var(--papel); border: 1px solid var(--linha-l); border-radius: var(--raio-g); padding: 12px 14px; }
 .g-descontos li.g-descontos-nota { background: transparent; color: var(--apagado); padding: 0 2px; font-size: .74rem; }
+
+/* Escolha de fragrâncias: botão no cartão + folha que sobe de baixo */
+.abrir-variantes { width: 100%; margin-top: 6px; padding: 10px 12px; border-radius: 10px; border: 1.5px solid var(--roxo); background: #fff; color: var(--roxo); font-weight: 700; font-size: .88rem; cursor: pointer; }
+.abrir-variantes.com-itens { background: var(--roxo); color: #fff; }
+.folha-fundo { position: fixed; inset: 0; background: rgba(20, 8, 30, .5); z-index: 80; display: flex; align-items: flex-end; justify-content: center; animation: folha-fade .15s ease-out; }
+.folha { background: #fff; width: 100%; max-width: 560px; max-height: 88vh; border-radius: 18px 18px 0 0; display: flex; flex-direction: column; box-shadow: 0 -8px 30px rgba(0,0,0,.2); animation: folha-sobe .2s ease-out; padding-bottom: env(safe-area-inset-bottom); }
+.folha-alca { width: 42px; height: 4px; border-radius: 4px; background: #d9d2e3; margin: 8px auto 2px; }
+.folha-topo { display: flex; align-items: center; gap: 12px; padding: 8px 16px 12px; border-bottom: 1px solid var(--linha-l); }
+.folha-topo img { width: 52px; height: 52px; object-fit: contain; border-radius: 10px; background: #faf7fc; }
+.folha-topo div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.folha-topo b { font-size: .98rem; line-height: 1.25; }
+.folha-topo small { color: #7a6d86; font-size: .8rem; }
+.folha-x { border: 0; background: #f3eff7; width: 36px; height: 36px; border-radius: 50%; font-size: 1.4rem; line-height: 1; cursor: pointer; color: #4b3a5a; }
+.folha-lista { overflow-y: auto; padding: 4px 16px; flex: 1; -webkit-overflow-scrolling: touch; }
+.var-linha { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--linha-l); }
+.var-linha:last-child { border-bottom: 0; }
+.var-linha.esgotada .var-info b { color: #9a8fa5; }
+.var-foto { width: 40px; height: 40px; border-radius: 50%; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); }
+.var-foto img { width: 100%; height: 100%; object-fit: cover; background: #fff; }
+.var-linha .var-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.var-linha .var-info b { font-size: .92rem; line-height: 1.25; overflow-wrap: anywhere; }
+.var-linha .var-info > span { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: .78rem; }
+.var-linha .var-preco { color: #5a4a68; font-weight: 600; }
+.var-linha .adicionar { padding: 8px 14px; white-space: nowrap; }
+.var-linha .comprar-duplo { gap: 4px; }
+.folha-rodape { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--linha-l); background: #fff; }
+.folha-rodape > span { flex: 1; font-size: .82rem; color: #5a4a68; font-weight: 600; }
+.folha-ver, .folha-pronto { border-radius: 10px; padding: 11px 16px; font-weight: 700; cursor: pointer; font-size: .9rem; }
+.folha-ver { background: #fff; color: var(--roxo); border: 1.5px solid var(--roxo); }
+.folha-pronto { background: var(--roxo); color: #fff; border: 0; }
+@media (min-width: 700px) {
+  .folha-fundo { align-items: center; }
+  .folha { border-radius: 18px; max-height: 80vh; }
+  .folha-alca { display: none; }
+}
+@keyframes folha-sobe { from { transform: translateY(40px); opacity: .6; } to { transform: none; opacity: 1; } }
+@keyframes folha-fade { from { opacity: 0; } to { opacity: 1; } }

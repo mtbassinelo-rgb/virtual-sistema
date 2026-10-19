@@ -312,3 +312,51 @@ export function AdicionarTodos({ itens, rotulo }: { itens: ItemCarrinho[]; rotul
     <button type="button" className="botao-repetir" onClick={() => { for (const { qtd, ...item } of itens) definir(item, qtd); abrir(true); }}>{rotulo}</button>
   );
 }
+
+/**
+ * Escolha de fragrâncias: o cartão mostra um botão; ao tocar, abre uma folha que sobe de baixo (no celular ocupa a
+ * largura toda; no computador fica no centro). Cada fragrância numa linha com foto, nome e o + / −.
+ * Embaixo fica o total escolhido e o botão para fechar ou ver o pedido.
+ */
+export function SeletorVariantes({ ids, titulo, foto, subtitulo, rotulo, textos, children }: {
+  ids: string[]; titulo: string; foto: string | null; subtitulo?: string; rotulo: string;
+  textos: { pronto: string; verPedido: string; escolhidas: (n: number) => string; fechar: string }; children: React.ReactNode;
+}) {
+  const { itens, abrir: abrirPedido } = useCarrinho();
+  const [aberto, setAberto] = useState(false);
+  const doGrupo = itens.filter((i) => ids.includes(produtoDe(i)));
+  const n = doGrupo.reduce((s, i) => s + i.qtd, 0);
+  useEffect(() => {
+    if (!aberto) return;
+    const antes = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setAberto(false);
+    window.addEventListener("keydown", esc);
+    return () => { document.body.style.overflow = antes; window.removeEventListener("keydown", esc); };
+  }, [aberto]);
+  return (
+    <>
+      <button type="button" className={`abrir-variantes ${n ? "com-itens" : ""}`} onClick={() => setAberto(true)}>
+        {n ? textos.escolhidas(n) : rotulo}
+      </button>
+      {aberto && (
+        <div className="folha-fundo" onClick={() => setAberto(false)}>
+          <div className="folha" role="dialog" aria-modal="true" aria-label={titulo} onClick={(e) => e.stopPropagation()}>
+            <div className="folha-alca" aria-hidden="true" />
+            <header className="folha-topo">
+              {foto ? <img src={foto} alt="" /> : null}
+              <div><b>{titulo}</b>{subtitulo && <small>{subtitulo}</small>}</div>
+              <button type="button" className="folha-x" onClick={() => setAberto(false)} aria-label={textos.fechar}>×</button>
+            </header>
+            <div className="folha-lista">{children}</div>
+            <footer className="folha-rodape">
+              <span>{n ? textos.escolhidas(n) : ""}</span>
+              {n > 0 && <button type="button" className="folha-ver" onClick={() => { setAberto(false); abrirPedido(true); }}>{textos.verPedido}</button>}
+              <button type="button" className="folha-pronto" onClick={() => setAberto(false)}>{textos.pronto}</button>
+            </footer>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}

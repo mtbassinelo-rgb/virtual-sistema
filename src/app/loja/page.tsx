@@ -3,7 +3,7 @@ import { pool } from "@/lib/db";
 import { clienteAtual, sha256, tokenCliente } from "@/lib/portal";
 import { dinheiro, data, type Moeda } from "@/lib/formato";
 import { LINHAS, corRotulo, interno, linhaDe, marcaDe, nomeCurto } from "@/lib/vitrine";
-import { Quantidade } from "./carrinho";
+import { Quantidade, SeletorVariantes } from "./carrinho";
 import { QueroProduto } from "./quero-produto";
 import { TEXTOS, idiomaAtual, type Textos } from "@/lib/idioma";
 import { bannersPadrao, type Banner } from "@/lib/banners-padrao";
@@ -349,24 +349,30 @@ function CartaoGrupo({ p, moeda, cliente, t, vendeUnidade, linha }: { p: Produto
         <h3>{p.nome}</h3>
         <div className="caixa-info">{t.fragrancias(vs.length)}{p.unidades_caixa ? ` · ${t.caixaCom(p.unidades_caixa)}` : ""}</div>
         {cliente && menor != null && <div className="precos"><div className="preco"><small>{t.aPartirDe}</small> {dinheiro(menor, moeda)} <small>{p.unidades_caixa ? t.porCaixa : t.porUnidade}</small></div></div>}
-        <details className="variantes">
-          <summary>{t.escolherFragrancia(vs.length)}</summary>
-          <ul>{vs.map((v) => {
+        <SeletorVariantes ids={vs.map((v) => v.produto_id)} titulo={p.nome} foto={p.foto}
+          subtitulo={[t.fragrancias(vs.length), p.unidades_caixa ? t.caixaCom(p.unidades_caixa) : ""].filter(Boolean).join(" · ")}
+          rotulo={t.escolherFragrancia(vs.length)} textos={{ pronto: t.pronto, verPedido: t.verPedido, escolhidas: t.escolhidas, fechar: t.fechar }}>
+          {vs.map((v) => {
             const esg = esgotado(v, cliente);
             const pv = v.p ? Number(v.p.preco) * (v.unidades_caixa || 1) : null;
             return (
-              <li key={v.produto_id}>
+              <div key={v.produto_id} className={`var-linha ${esg ? "esgotada" : ""}`}>
+                <div className="var-foto" style={{ background: corRotulo(v.variante ?? v.nome, p.linha).fundo }}>
+                  {v.foto && v.foto !== p.foto ? <img src={v.foto} alt="" loading="lazy" /> : null}
+                </div>
                 <div className="var-info">
                   <b>{v.variante ?? v.nome}</b>
-                  {esg ? <span className="etiqueta-mini esgotado">{t.esgotado}</span>
-                    : v.p?.disponibilidade === "ultimas" ? <span className="etiqueta-mini">{t.ultimas}</span> : null}
-                  {cliente && pv != null && pv !== menor && <span className="var-preco">{dinheiro(pv, moeda)}</span>}
+                  <span>
+                    {esg ? <span className="etiqueta-mini esgotado">{t.esgotado}</span>
+                      : v.p?.disponibilidade === "ultimas" ? <span className="etiqueta-mini">{t.ultimas}</span> : null}
+                    {cliente && pv != null && <span className="var-preco">{dinheiro(pv, moeda)}</span>}
+                  </span>
                 </div>
                 <Comprar p={v} item={itemCarrinho(v, esg)} vendeUnidade={vendeUnidade} t={t} rotulo={esg ? t.pedirEncomenda : t.adicionar} />
-              </li>
+              </div>
             );
-          })}</ul>
-        </details>
+          })}
+        </SeletorVariantes>
       </div>
     </article>
   );
