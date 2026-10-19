@@ -338,6 +338,8 @@ function CartaoGrupo({ p, moeda, cliente, t, vendeUnidade, linha }: { p: Produto
   const promo = Math.max(0, ...vs.map((v) => Number(v.p?.desconto_pct ?? v.x?.promo_pct ?? 0)));
   const precos = vs.map((v) => v.p ? Number(v.p.preco) * (v.unidades_caixa || 1) : null).filter((x): x is number => x != null);
   const menor = precos.length ? Math.min(...precos) : null;
+  const unitarios = vs.map((v) => v.p ? Number(v.p.preco) : null).filter((x): x is number => x != null);
+  const menorUn = unitarios.length ? Math.min(...unitarios) : null;
   return (
     <article className={`cartao cartao-grupo ${linha ? "em-lista" : ""}`}>
       <div className="rotulo" style={{ background: cor.fundo, color: cor.tinta }}>
@@ -348,7 +350,8 @@ function CartaoGrupo({ p, moeda, cliente, t, vendeUnidade, linha }: { p: Produto
       <div className="cartao-corpo">
         <h3>{p.nome}</h3>
         <div className="caixa-info">{t.fragrancias(vs.length)}{p.unidades_caixa ? ` · ${t.caixaCom(p.unidades_caixa)}` : ""}</div>
-        {cliente && menor != null && <div className="precos"><div className="preco"><small>{t.aPartirDe}</small> {dinheiro(menor, moeda)} <small>{p.unidades_caixa ? t.porCaixa : t.porUnidade}</small></div></div>}
+        {cliente && menor != null && <div className="precos"><div className="preco"><small>{t.aPartirDe}</small> {dinheiro(menor, moeda)} <small>{p.unidades_caixa ? t.porCaixa : t.porUnidade}</small></div>
+          {p.unidades_caixa && menorUn != null && <div className="preco-un"><b>{dinheiro(menorUn, moeda)}</b> {t.porUnidade}</div>}</div>}
         <SeletorVariantes ids={vs.map((v) => v.produto_id)} titulo={p.nome} foto={p.foto}
           subtitulo={[t.fragrancias(vs.length), p.unidades_caixa ? t.caixaCom(p.unidades_caixa) : ""].filter(Boolean).join(" · ")}
           rotulo={t.escolherFragrancia(vs.length)} textos={{ pronto: t.pronto, verPedido: t.verPedido, escolhidas: t.escolhidas, fechar: t.fechar }}>
@@ -361,14 +364,17 @@ function CartaoGrupo({ p, moeda, cliente, t, vendeUnidade, linha }: { p: Produto
                   {v.foto && v.foto !== p.foto ? <img src={v.foto} alt="" loading="lazy" /> : null}
                 </div>
                 <div className="var-info">
-                  <b>{v.variante ?? v.nome}</b>
+                  <div className="var-nome">
+                    <b>{v.variante ?? v.nome}</b>
+                    {cliente && v.p && <strong className="var-un">{dinheiro(Number(v.p.preco), moeda)}<small>/{t.un}</small></strong>}
+                  </div>
                   <span>
                     {esg ? <span className="etiqueta-mini esgotado">{t.esgotado}</span>
                       : v.p?.disponibilidade === "ultimas" ? <span className="etiqueta-mini">{t.ultimas}</span> : null}
-                    {cliente && pv != null && <span className="var-preco">{dinheiro(pv, moeda)}</span>}
+                    {cliente && pv != null && v.unidades_caixa ? <span className="var-preco">{t.cxAbrev} {dinheiro(pv, moeda)}</span> : null}
                   </span>
                 </div>
-                <Comprar p={v} item={itemCarrinho(v, esg)} vendeUnidade={vendeUnidade} t={t} rotulo={esg ? t.pedirEncomenda : t.adicionar} />
+                <Comprar p={v} item={itemCarrinho(v, esg)} vendeUnidade={vendeUnidade} t={t} rotulo={esg ? t.encomendar : t.adicionar} />
               </div>
             );
           })}
@@ -402,7 +408,7 @@ function Precos({ p, moeda, cliente, t }: { p: Produto; moeda: Moeda; cliente: b
         {dinheiro(cx ? un * cx : un, moeda)} <small>{cx ? t.porCaixa : t.porUnidade}</small>
         {pr.desconto_pct && <s>{dinheiro(cx ? Number(pr.preco_tabela) * cx : pr.preco_tabela, moeda)}</s>}
       </div>
-      {cx && <div className="preco-un">{dinheiro(un, moeda)} {t.porUnidade}</div>}
+      {cx && <div className="preco-un"><b>{dinheiro(un, moeda)}</b> {t.porUnidade}</div>}
     </div>
   );
 }
