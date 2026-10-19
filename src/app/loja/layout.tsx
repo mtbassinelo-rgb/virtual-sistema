@@ -178,7 +178,8 @@ export default async function LayoutLoja({ children }: { children: React.ReactNo
               {c ? (
                 <>
                   <p>{t.atendimentoDe(c.vendedora)}</p>
-                  <Link href="/loja/sair">{t.sair}</Link>
+                  {/* <a> e não <Link>: o Link pré-carrega a rota em segundo plano e isso deslogava o cliente sozinho */}
+                  <a href="/loja/sair" rel="nofollow">{t.sair}</a>
                 </>
               ) : (
                 <>
