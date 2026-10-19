@@ -18,7 +18,7 @@ const num = (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 1 
  * e quanto comprar para cobrir os próximos dias (mais o prazo de entrega), arredondado para caixa fechada.
  */
 export default async function PlanejarCompra({ searchParams }: {
-  searchParams: Promise<{ marca?: string; fornecedor?: string; dias?: string; prazo?: string; todos?: string; q?: string }>;
+  searchParams: Promise<{ marca?: string; fornecedor?: string; dias?: string; prazo?: string; todos?: string; q?: string; unidade?: string }>;
 }) {
   const u = await exigirUsuario();
   const f = await searchParams;
@@ -30,7 +30,13 @@ export default async function PlanejarCompra({ searchParams }: {
   const fornecedor = (f.fornecedor ?? "").trim() || null;
   const q = (f.q ?? "").trim() || null;
 
-  const d = await comUsuario(u.id, async (c) => ({
+  const d = await comUsuario(u.id, async (c) => {
+    const depositos = (await c.query("select id, codigo, nome from app.depositos where ativo order by tipo, nome")).rows as { id: string; codigo: string; nome: string }[];
+    // padrão: CD Foz (a distribuidora); dá para ver outra unidade ou todas
+    const principal = depositos.find((x) => x.codigo === "cd-foz") ?? depositos[0];
+    const dep = f.unidade === "todas" ? null : depositos.find((x) => x.id === f.unidade) ?? principal;
+    return {
+    depositos, dep,
     marcas: (await c.query("select marca, count(*)::int n from app.produtos where ativo and marca is not null group by 1 order by 1")).rows as { marca: string; n: number }[],
     fornecedores: (await c.query("select fornecedor, count(*)::int n from app.produtos where ativo and fornecedor is not null and fornecedor <> '' group by 1 order by 1")).rows as { fornecedor: string; n: number }[],
     linhas: (marca || fornecedor || q) ? (await c.query(`
@@ -41,21 +47,24 @@ export default async function PlanejarCompra({ searchParams }: {
           from app.pedido_itens i join app.pedidos pe on pe.id = i.pedido_id
           cross join lateral app.componentes(i.produto_id, i.quantidade) x
          where pe.status_comercial not in ('cancelado') and pe.data_pedido > current_date - 90
+           and ($4::uuid is null or coalesce(pe.deposito_id, $5::uuid) = $4::uuid)
          group by 1)
       select p.id as produto_id, p.codigo, p.nome, p.marca, p.fornecedor, p.unidades_caixa, p.estoque_minimo, p.custo,
              coalesce(s.saldo, 0)::numeric as saldo, coalesce(v.v30, 0)::numeric as v30, coalesce(v.v90, 0)::numeric as v90
         from app.produtos p
         left join lateral (select sum(es.quantidade) as saldo from app.estoque_saldos es
-                             join app.depositos dd on dd.id = es.deposito_id and dd.ativo where es.produto_id = p.id) s on true
+                             join app.depositos dd on dd.id = es.deposito_id and dd.ativo
+                            where es.produto_id = p.id and ($4::uuid is null or es.deposito_id = $4::uuid)) s on true
         left join vendas v on v.produto_id = p.id
        where p.ativo and p.tipo <> 'kit'
          and ($1::text is null or p.marca = $1) and ($2::text is null or p.fornecedor = $2)
          and ($3::text is null or app.nome_normal(p.nome) like '%' || app.nome_normal($3) || '%' or p.codigo ilike $3 || '%')
-       order by p.nome limit 800`, [marca, fornecedor, q])).rows.map((r) => ({
+       order by p.nome limit 800`, [marca, fornecedor, q, dep?.id ?? null, principal?.id ?? null])).rows.map((r) => ({
         ...r, saldo: Number(r.saldo), v30: Number(r.v30), v90: Number(r.v90),
         unidades_caixa: r.unidades_caixa ? Number(r.unidades_caixa) : null, estoque_minimo: r.estoque_minimo != null ? Number(r.estoque_minimo) : null,
         custo: r.custo != null ? Number(r.custo) : null })) as Linha[] : [],
-  }));
+    };
+  });
 
   // Previsão: ritmo de venda (o maior entre os últimos 30 e 90 dias, para não comprar de menos), dias até acabar
   // e quanto comprar para cobrir o período escolhido + o prazo de entrega, sem ficar abaixo do mínimo.
@@ -88,6 +97,7 @@ export default async function PlanejarCompra({ searchParams }: {
         <div>
           <div className="trilha"><Link href="/relatorios?aba=estoque">Relatórios</Link> / Planejar compra</div>
           <h1>Planejar compra{titulo ? `: ${titulo}` : ""}</h1>
+          <div className="suave pequeno">Estoque e vendas de: <b>{d.dep ? (d.dep.codigo === "cd-foz" ? "CD Foz (distribuidora)" : d.dep.nome) : "todas as unidades"}</b></div>
           <p>Escolha a marca: aparece o estoque de cada produto, quanto vende por mês, quando acaba e quanto comprar para cobrir os próximos dias, já em caixas fechadas.</p>
         </div>
       </section>
@@ -103,6 +113,12 @@ export default async function PlanejarCompra({ searchParams }: {
           <select name="fornecedor" defaultValue={fornecedor ?? ""}>
             <option value="">—</option>
             {d.fornecedores.map((m) => <option key={m.fornecedor} value={m.fornecedor}>{m.fornecedor} ({m.n})</option>)}
+          </select>
+        </label>
+        <label>Unidade
+          <select name="unidade" defaultValue={d.dep?.id ?? "todas"}>
+            {d.depositos.map((x) => <option key={x.id} value={x.id}>{x.codigo === "cd-foz" ? "CD Foz (distribuidora)" : x.nome}</option>)}
+            <option value="todas">Todas somadas</option>
           </select>
         </label>
         <label>Produto (opcional)<input name="q" defaultValue={q ?? ""} placeholder="ex.: shampoo, matizador" /></label>
