@@ -242,22 +242,29 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
           <Link href={url({ vista: null })} className={vista === "grade" ? "ativa" : ""} aria-current={vista === "grade" ? "true" : undefined}>{t.grade}</Link>
           <Link href={url({ vista: "lista" })} className={vista === "lista" ? "ativa" : ""} aria-current={vista === "lista" ? "true" : undefined}>{t.lista}</Link>
         </div>
-        <nav className="linhas" aria-label={t.catalogo}>
-          <Link href={url({ linha: null })} className={!linha ? "ativa" : ""}>{t.tudo}</Link>
-          {LINHAS.filter((l) => contagem.get(l.chave)).map((l) => (
-            <Link key={l.chave} href={url({ linha: l.chave })} className={linha === l.chave ? "ativa" : ""}>{t.linhas[l.chave] ?? l.nome}</Link>
-          ))}
-        </nav>
-        {linha && SUBLINHAS[linha] && contagemSub.size > 1 && (
-          <nav className="linhas sublinhas" aria-label={t.linhas[linha]}>
-            <Link href={url({ sub: null })} className={!sub ? "ativa" : ""}>{t.tudo}</Link>
-            {[...SUBLINHAS[linha], { chave: "outros", nome: "Outros", es: "Otros" }].filter((s) => contagemSub.get(s.chave)).map((s) => (
-              <Link key={s.chave} href={url({ sub: s.chave })} className={sub === s.chave ? "ativa" : ""}>
-                {idioma === "es" ? s.es : s.nome} <small>{contagemSub.get(s.chave)}</small>
-              </Link>
+        <div className="catalogo-corpo">
+        {/* Filtros: na vertical ao lado dos produtos no computador; em fileira deslizante no celular */}
+        <aside className="filtros">
+          <nav className="linhas" aria-label={t.catalogo}>
+            <b className="filtros-titulo">{t.categorias}</b>
+            <Link href={url({ linha: null })} className={!linha ? "ativa" : ""}>{t.tudo}</Link>
+            {LINHAS.filter((l) => contagem.get(l.chave)).map((l) => (
+              <Link key={l.chave} href={url({ linha: l.chave })} className={linha === l.chave ? "ativa" : ""}>{t.linhas[l.chave] ?? l.nome} <small>{contagem.get(l.chave)}</small></Link>
             ))}
           </nav>
-        )}
+          {linha && SUBLINHAS[linha] && contagemSub.size > 1 && (
+            <nav className="linhas sublinhas" aria-label={t.linhas[linha]}>
+              <b className="filtros-titulo">{t.linhas[linha]}</b>
+              <Link href={url({ sub: null })} className={!sub ? "ativa" : ""}>{t.tudo}</Link>
+              {[...SUBLINHAS[linha], { chave: "outros", nome: "Outros", es: "Otros" }].filter((s) => contagemSub.get(s.chave)).map((s) => (
+                <Link key={s.chave} href={url({ sub: s.chave })} className={sub === s.chave ? "ativa" : ""}>
+                  {idioma === "es" ? s.es : s.nome} <small>{contagemSub.get(s.chave)}</small>
+                </Link>
+              ))}
+            </nav>
+          )}
+        </aside>
+        <div className="catalogo-conteudo">
         {f.erro && <div className="aviso-erro" role="alert">{f.erro}</div>}
         {(q || marca || soPromo || soNovidade) && (
           <p className="limpar">
@@ -282,6 +289,8 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
             {pagina < paginas && <Link href={url({ pagina: pagina + 1 })}>{t.proxima}</Link>}
           </nav>
         )}
+        </div>
+        </div>
       </section>
 
       {!cliente && (
