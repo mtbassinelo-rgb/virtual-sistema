@@ -122,6 +122,10 @@ update app.depositos set mostra_abastecedor = true where id = :'cde';
 select teste.ok((select tem_estoque from app.vitrine_publica_unidade(:'cde') where produto_id = '00000000-0000-0000-0000-0000000000b2'),
   'Se a unidade mostrar o CD que a abastece, o produto aparece com estoque');
 update app.depositos set mostra_abastecedor = false where id = :'cde';
+update app.produtos set mostrar_no_site = false where id = '00000000-0000-0000-0000-0000000000b2';
+select teste.ok(not exists (select 1 from app.vitrine_publica_unidade(:'cde') where produto_id = '00000000-0000-0000-0000-0000000000b2'),
+  'Produto escondido do site (solto que virou kit) não aparece na vitrine da unidade');
+update app.produtos set mostrar_no_site = true where id = '00000000-0000-0000-0000-0000000000b2';
 select teste.ok((select vende_unidade and loja_idioma = 'es' from app.unidades_loja() where codigo = 'loja-cde'), 'CDE vende por unidade e o site abre em espanhol');
 set role vc_app;
 select teste.como('00000000-0000-0000-0000-000000000003');
