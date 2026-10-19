@@ -12,8 +12,13 @@ teste.{$DOMINIO} {
 	reverse_proxy vc-app-teste:3000
 }
 
+# www vai sempre para o endereço sem www: um endereço só, para o cliente não "sair" ao trocar de um para o outro
+www.{$DOMINIO} {
+	redir https://{$DOMINIO}{uri} permanent
+}
+
 # Domínio principal: área do cliente (atacado). O resto vai para o endereço da equipe.
-{$DOMINIO}, www.{$DOMINIO} {
+{$DOMINIO} {
 	encode gzip
 	@raiz path /
 	redir @raiz /loja

@@ -135,6 +135,10 @@ ok(vitCde.status === 200 && vitCde.html.includes("marca-unidade"), "Visitante da
 ok(cat.html.includes("wa.me/"), "Área do cliente mostra o WhatsApp da empresa");
 ok((await abrir("/loja/acesso")).html.includes("wa.me/5545999972092"), "Sem login, o site mostra o WhatsApp principal (Brasil)");
 ok((await abrir("/loja/acesso")).html.includes("CPF, CNPJ, CI ou RUC"), "Tela de acesso pede documento e senha");
+{
+  const r = await fetch(base + "/loja/acesso/entrar", { method: "POST", redirect: "manual", body: new URLSearchParams({ documento: "000", senha: "errada" }) });
+  ok(r.status === 303 && (r.headers.get("location") ?? "").includes("/loja/acesso?erro="), "Login errado volta para a tela de acesso com o aviso");
+}
 ok([302, 303, 307, 308].includes((await abrir("/loja/conta")).status), "Minha conta do cliente exige login");
 ok((await abrir("/loja/conta", cookieCliente)).status === 200, "Cliente logado abre Minha conta");
 ok((await abrir("/conta", await sessao("keila@teste.local"))).html.includes("Trocar senha"), "Equipe abre Minha conta");

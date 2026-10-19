@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
 import { idiomaAtual } from "@/lib/idioma";
-import { abrirSessaoCliente, clienteAtual, conferirCliente } from "@/lib/portal";
+import { clienteAtual } from "@/lib/portal";
 
 export const metadata = { title: "Área do cliente" };
 
@@ -17,17 +16,6 @@ const T = {
         novo: "¿Todavía no es cliente?", cadastro: "Quiero ser cliente" },
 };
 
-async function entrar(fd: FormData) {
-  "use server";
-  const es = (await idiomaAtual()) === "es";
-  const r = await conferirCliente(String(fd.get("documento") ?? ""), String(fd.get("senha") ?? ""), es);
-  if (!r.id) redirect(`/loja/acesso?erro=${encodeURIComponent(r.erro ?? "")}`);
-  await abrirSessaoCliente(r.id);
-  // A senha criada pela vendedora vale normalmente; trocar é opcional (Minha área → Trocar senha)
-  revalidatePath("/loja", "layout");   // cabeçalho e carrinho já como cliente (sem pedir nome/WhatsApp)
-  redirect("/loja");
-}
-
 export default async function Acesso({ searchParams }: { searchParams: Promise<{ motivo?: string; erro?: string }> }) {
   const { motivo, erro } = await searchParams;
   if (await clienteAtual()) redirect("/loja");
@@ -38,7 +26,7 @@ export default async function Acesso({ searchParams }: { searchParams: Promise<{
         <h1>{t.titulo}</h1>
         <p style={{ margin: 0 }}>{motivo === "link" ? t.link : t.texto}</p>
         {erro && <div className="aviso-erro" role="alert">{erro}</div>}
-        <form action={entrar} className="acesso-form">
+        <form action="/loja/acesso/entrar" method="post" className="acesso-form">
           <label>{t.doc}<input name="documento" required autoComplete="username" inputMode="text" maxLength={30} /></label>
           <label>{t.senha}<input name="senha" type="password" required autoComplete="current-password" maxLength={100} /></label>
           <button className="adicionar">{t.entrar}</button>
