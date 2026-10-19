@@ -78,7 +78,8 @@ const PT = {
   confere: (v: string) => `${v} confere o estoque, confirma o total e manda os dados para pagamento.`,
   naoCliente: "Ainda não é cliente? Mande o pedido e a nossa equipe responde no WhatsApp com os preços de atacado.",
   seuNome: "Seu nome ou do salão", whatsapp: "WhatsApp com DDD", cidade: "Cidade",
-  enviando: "Enviando…", enviarPara: (v: string) => `Enviar pedido para ${v}`, enviarZap: "Enviar pedido pelo WhatsApp",
+  enviando: "Enviando…", enviarPara: (v: string) => `Enviar pedido para ${v}`, enviarZap: "Enviar pedido pelo WhatsApp", finalizar: "Finalizar pedido",
+  confereGenerico: "A sua vendedora confere o estoque, confirma o total e manda os dados para pagamento.",
   mandarZap: "Mandar este pedido pelo WhatsApp", diminuir: "Diminuir", aumentar: "Aumentar", quantidade: "Quantidade",
   abrirPedido: (n: number) => `Abrir pedido (${n} itens)`,
   msgVisitante: (nome: string, cidade: string, lista: string, obs: string) =>
@@ -148,7 +149,8 @@ const ES: typeof PT = {
   confere: (v: string) => `${v} verifica el stock, confirma el total y le envía los datos para el pago.`,
   naoCliente: "¿Todavía no es cliente? Envíe el pedido y nuestro equipo responde por WhatsApp con los precios mayoristas.",
   seuNome: "Su nombre o el del salón", whatsapp: "WhatsApp con código de área", cidade: "Ciudad",
-  enviando: "Enviando…", enviarPara: (v: string) => `Enviar pedido a ${v}`, enviarZap: "Enviar pedido por WhatsApp",
+  enviando: "Enviando…", enviarPara: (v: string) => `Enviar pedido a ${v}`, enviarZap: "Enviar pedido por WhatsApp", finalizar: "Finalizar pedido",
+  confereGenerico: "Su vendedora verifica el stock, confirma el total y le envía los datos para el pago.",
   mandarZap: "Enviar este pedido por WhatsApp", diminuir: "Disminuir", aumentar: "Aumentar", quantidade: "Cantidad",
   abrirPedido: (n: number) => `Abrir pedido (${n} ítems)`,
   msgVisitante: (nome: string, cidade: string, lista: string, obs: string) =>
@@ -167,7 +169,7 @@ export function textosCarrinho(t: Textos, cliente: { vendedora: string } | null)
     aumentar: t.aumentar, quantidade: t.quantidade, pedido: t.pedido, adicionar: t.adicionar,
     semPrecoTabela: t.semPrecoTabela(9999), abrirPedido: t.abrirPedido(9999),
     caixas: t === TEXTOS.es ? "9999 caja(s)" : "9999 caixa(s)", cx: t === TEXTOS.es ? "cj" : "cx", un: "un.",
-    confere: cliente ? t.confere(cliente.vendedora) : "", enviarPara: cliente ? t.enviarPara(cliente.vendedora) : "",
+    confere: cliente ? t.confere(cliente.vendedora) : "", confereGenerico: t.confereGenerico, finalizar: t.finalizar, enviarPara: cliente ? t.enviarPara(cliente.vendedora) : "",
   };
 }
 export type TextosCarrinho = ReturnType<typeof textosCarrinho>;

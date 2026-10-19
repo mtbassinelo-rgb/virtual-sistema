@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useActionState, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { enviarCarrinho, guardarCarrinho, itensParaRepetir, sugestoesCompreJunto, type RespostaCarrinho, type Sugestao } from "./acoes";
+import { clienteDoCarrinho, enviarCarrinho, guardarCarrinho, itensParaRepetir, sugestoesCompreJunto, type RespostaCarrinho, type Sugestao } from "./acoes";
 import type { TextosCarrinho } from "@/lib/idioma";
 
 /** qtd = caixas fechadas quando o produto tem "caixa" (peças por caixa); senão, unidades. preco = por unidade. */
@@ -138,8 +138,14 @@ export function Quantidade({ item, rotulo }: { item: Omit<ItemCarrinho, "qtd">; 
 const fmt = (v: number, moeda: "GS" | "BRL") =>
   moeda === "GS" ? `Gs ${Math.round(v).toLocaleString("es-PY")}` : v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-function Gaveta({ cliente }: { cliente: ClienteCarrinho }) {
+function Gaveta({ cliente: clienteInicial }: { cliente: ClienteCarrinho }) {
   const { itens, aberto, abrir, definir, limpar, t, descontos } = useCarrinho();
+  // A página pode ter sido montada antes do login: ao abrir o carrinho, confere no servidor se o cliente já entrou
+  const [cliente, setCliente] = useState<ClienteCarrinho>(clienteInicial);
+  useEffect(() => { setCliente(clienteInicial); }, [clienteInicial]);
+  useEffect(() => {
+    if (aberto && !cliente) clienteDoCarrinho().then((c) => { if (c) setCliente(c); }).catch(() => undefined);
+  }, [aberto]); // eslint-disable-line react-hooks/exhaustive-deps
   const [estado, acao, enviando] = useActionState<RespostaCarrinho, FormData>(enviarCarrinho, {});
   useEffect(() => {
     if (estado.url) {
@@ -204,7 +210,7 @@ function Gaveta({ cliente }: { cliente: ClienteCarrinho }) {
                   <div className="g-total"><span>{t.total}</span><b>{fmt(total, cliente.moeda)}</b></div>
                   {semPreco > 0 && <p className="g-nota">{t.semPrecoTabela.replace("9999", String(semPreco))}</p>}
                   <label>{t.observacao}<input name="observacao" placeholder={t.obsExemplo} maxLength={500} /></label>
-                  <p className="g-nota">{t.confere}</p>
+                  <p className="g-nota">{t.confere || t.confereGenerico}</p>
                 </>
               ) : (
                 <>
@@ -220,7 +226,7 @@ function Gaveta({ cliente }: { cliente: ClienteCarrinho }) {
                 <a className="g-zap" href={estado.alternativa} target="_blank" rel="noopener noreferrer">{t.mandarZap}</a>
               )}
               <button className="enviar" disabled={enviando}>
-                {enviando ? t.enviando : cliente ? t.enviarPara : t.enviarZap}
+                {enviando ? t.enviando : cliente ? t.finalizar : t.enviarZap}
               </button>
             </form>
           </>

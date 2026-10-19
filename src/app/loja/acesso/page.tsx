@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { idiomaAtual } from "@/lib/idioma";
 import { abrirSessaoCliente, clienteAtual, conferirCliente } from "@/lib/portal";
 
@@ -23,6 +24,7 @@ async function entrar(fd: FormData) {
   if (!r.id) redirect(`/loja/acesso?erro=${encodeURIComponent(r.erro ?? "")}`);
   await abrirSessaoCliente(r.id);
   // A senha criada pela vendedora vale normalmente; trocar é opcional (Minha área → Trocar senha)
+  revalidatePath("/loja", "layout");   // cabeçalho e carrinho já como cliente (sem pedir nome/WhatsApp)
   redirect("/loja");
 }
 

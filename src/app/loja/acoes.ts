@@ -148,6 +148,12 @@ export async function enviarCarrinho(_: RespostaCarrinho, fd: FormData): Promise
   }
 }
 
+/** Cliente logado agora (o carrinho confere ao abrir, para não pedir nome/WhatsApp de quem já entrou). */
+export async function clienteDoCarrinho(): Promise<{ nome: string; vendedora: string; moeda: "GS" | "BRL" } | null> {
+  const c = await clienteAtual();
+  return c ? { nome: c.nome, vendedora: c.vendedora, moeda: c.moeda as "GS" | "BRL" } : null;
+}
+
 export type RespostaProcura = { ok?: string; erro?: string };
 
 /** "Quero este produto" num produto esgotado: registra a procura e avisa o gerente. */
