@@ -263,6 +263,8 @@ button.discreto:hover { color: var(--erro); border-color: transparent; }
 .grupo-sugerido ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .grupo-sugerido li { display: grid; grid-template-columns: 170px minmax(0, 1fr) auto; gap: 8px; align-items: center; }
 .grupo-sugerido li input { padding: 4px 8px; }
+.grupo-acoes { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+.grupo-acoes select { max-width: 50%; padding: 4px 6px; }
 
 /* Catálogo para enviar (impressão / PDF) */
 .marcas-catalogo { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 4px 12px; }

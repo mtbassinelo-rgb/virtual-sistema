@@ -36,6 +36,13 @@ function variantes(itens: ProdutoGrupo[], marca: string): string[] {
   });
 }
 
+/** Nome da fragrância de um produto que entra num grupo que já existe (o que o nome dele tem de diferente dos outros). */
+export function varianteNoGrupo(nomesDoGrupo: string[], novo: ProdutoGrupo): string {
+  const outros = nomesDoGrupo.map((nome, i) => ({ id: `x${i}`, nome, marca: novo.marca, tipo: novo.tipo }));
+  if (!outros.length) return novo.nome;
+  return variantes([...outros, novo], novo.marca ?? "").at(-1) ?? novo.nome;
+}
+
 export function sugerirGrupos(produtos: ProdutoGrupo[]): GrupoSugerido[] {
   const porMarca = new Map<string, ProdutoGrupo[]>();
   for (const p of produtos) if (p.marca) porMarca.set(p.marca, [...(porMarca.get(p.marca) ?? []), p]);
