@@ -2,7 +2,7 @@ import Link from "next/link";
 import { pool } from "@/lib/db";
 import { clienteAtual, sha256, tokenCliente } from "@/lib/portal";
 import { dinheiro, data, type Moeda } from "@/lib/formato";
-import { LINHAS, SUBLINHAS, corRotulo, interno, linhaDe, marcaDe, nomeCurto, subLinhaDe } from "@/lib/vitrine";
+import { LINHAS, SUBLINHAS, corRotulo, interno, linhaDe, linhasExtras, marcaDe, nomeCurto, subLinhaDe } from "@/lib/vitrine";
 import { Quantidade, SeletorVariantes } from "./carrinho";
 import { QueroProduto } from "./quero-produto";
 import { TEXTOS, idiomaAtual, type Textos } from "@/lib/idioma";
@@ -19,7 +19,7 @@ type Preco = {
   ultima_compra: string | null; destaque: "promocao" | "recompra" | "sugestao" | null;
 };
 type Extra = { produto_id: string; vendidos_90d: string; promo_pct: string | null; promo_fim: string | null; destaque: boolean };
-type Produto = Publico & { linha: string; marcaNome: string | null; p?: Preco; x?: Extra; grupo?: string | null; variante?: string | null; variantes?: Produto[] };
+type Produto = Publico & { linha: string; extras?: string[]; marcaNome: string | null; p?: Preco; x?: Extra; grupo?: string | null; variante?: string | null; variantes?: Produto[] };
 
 const POR_PAGINA = 60;
 const sem = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -60,7 +60,10 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
     ...p, grupo: grupos.get(p.produto_id)?.grupo ?? null, variante: grupos.get(p.produto_id)?.variante ?? null, linha: linhaDe(p.nome, p.marca, p.tipo), marcaNome: marcaDe(p.nome, p.marca), p: precos.get(p.produto_id), x: extras.get(p.produto_id),
   }));
   const contagem = new Map<string, number>();
-  for (const p of todos) contagem.set(p.linha, (contagem.get(p.linha) ?? 0) + 1);
+  for (const p of todos) {
+    p.extras = linhasExtras(p.grupo ?? p.nome, p.linha);
+    for (const l of [p.linha, ...p.extras]) contagem.set(l, (contagem.get(l) ?? 0) + 1);
+  }
   const marcas = new Map<string, number>();
   for (const p of todos) if (p.marcaNome) marcas.set(p.marcaNome, (marcas.get(p.marcaNome) ?? 0) + 1);
   const listaMarcas = [...marcas.entries()].sort((a, b) => b[1] - a[1]);
@@ -75,7 +78,7 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
   const soPromo = f.promocao === "1";
   const soNovidade = f.novidade === "1";
   const novidades = todos.filter((p) => p.novidade);
-  if (linha) todos = todos.filter((p) => p.linha === linha);
+  if (linha) todos = todos.filter((p) => p.linha === linha || p.extras?.includes(linha));
   // subcategorias da linha (ex.: Cabelo → Ativador de cachos, Shampoos…)
   const contagemSub = new Map<string, number>();
   if (linha && SUBLINHAS[linha]) for (const p of todos) { const k = subLinhaDe(linha, p.grupo ?? p.nome) ?? "outros"; contagemSub.set(k, (contagemSub.get(k) ?? 0) + 1); }

@@ -37,7 +37,11 @@ export function linhaDe(nome: string, marca?: string | null, tipo?: string | nul
   const m = sem(marca ?? "");
   if (/sexy fantasy|fantasy sexy/.test(m) || SEXSHOP.test(n)) return "sexshop";
   if (tipo === "kit") return "kits";
-  for (const [chave, re] of REGRAS) if (re.test(n)) return chave;
+  for (const [chave, re] of REGRAS) {
+    // maquiagem só se não for hidratante/corpo/cabelo (ex.: "hidratante corporal iluminador" é Corpo e banho)
+    if (chave === "maquiagem" && /hidrat|hid\.|corporal|\bcorpo\b|capilar|cabelo|shampoo|splash/.test(n)) continue;
+    if (re.test(n)) return chave;
+  }
   return "outros";
 }
 
@@ -112,7 +116,7 @@ export function corMarca(marca: string) {
 }
 
 /** Subcategorias dentro de uma linha (filtro de segundo nível no site). A ordem é a ordem dos botões; a primeira regra que bate vale. */
-export const SUBLINHAS: Record<string, { chave: string; nome: string; es: string; re: RegExp }[]> = {
+export const SUBLINHAS: Record<string, { chave: string; nome: string; es: string; re: RegExp; p?: number }[]> = {
   cabelo: [
     { chave: "ativador", nome: "Ativador de cachos", es: "Activador de rizos", re: /ativador|cachos/ },
     { chave: "pentear", nome: "Creme para pentear", es: "Crema para peinar", re: /pentear|para peinar/ },
@@ -129,15 +133,25 @@ export const SUBLINHAS: Record<string, { chave: string; nome: string; es: string
     { chave: "condicionador", nome: "Condicionadores", es: "Acondicionadores", re: /condicionador/ },
     { chave: "oleo", nome: "Óleos capilares", es: "Aceites capilares", re: /oleo|oil/ },
   ],
+  // Ordem = ordem dos botões; "p" = prioridade na hora de classificar (menor ganha; sem p = 5, empate pela ordem)
   corpo: [
-    { chave: "splash", nome: "Body splash", es: "Body splash", re: /splash|body mist|colonia/ },
-    { chave: "hidratante", nome: "Hidratantes", es: "Cremas hidratantes", re: /hidratante|hid\.|locao|creme corporal|manteiga|oleo corporal/ },
-    { chave: "intimo", nome: "Higiene íntima", es: "Higiene íntima", re: /intim|calcinha/ },
-    { chave: "sabonete", nome: "Sabonetes", es: "Jabones", re: /sabonete|jabon|banho/ },
-    { chave: "esfoliante", nome: "Esfoliantes", es: "Exfoliantes", re: /esfolia/ },
-    { chave: "desodorante", nome: "Desodorantes", es: "Desodorantes", re: /desodorant/ },
-    { chave: "pes", nome: "Pés e mãos", es: "Pies y manos", re: /\bpes\b|\bmaos\b|cuticula|rachadura|calcanhar/ },
-    { chave: "gel", nome: "Géis e massagem", es: "Geles y masajes", re: /\bgel\b|massag|arnica|cartilagem|redutor|celulite/ },
+    { chave: "splash", nome: "Body splash", es: "Body splash", re: /splash|body mist/, p: 2 },
+    { chave: "oleo", nome: "Óleo corporal", es: "Aceite corporal", re: /\boleo\b/, p: 6 },
+    { chave: "skin", nome: "Skin care", es: "Skin care", re: /skin ?care|serum|vitamina c|niacinamida|retinol|olheira|acne|micelar|tonico|acido hialuronico/, p: 4 },
+    { chave: "hidratante", nome: "Hidratante facial / corporal", es: "Hidratante facial / corporal", re: /hidratante|hidrantante|hid\.|locao|creme corporal|creme facial|manteiga/, p: 7 },
+    { chave: "esfoliante", nome: "Esfoliante facial / corporal", es: "Exfoliante facial / corporal", re: /esfolia/, p: 3 },
+    { chave: "geleia", nome: "Geleia corporal", es: "Jalea corporal", re: /geleia/, p: 1 },
+    { chave: "sab_intimo", nome: "Sabonete íntimo", es: "Jabón íntimo", re: /sabonete.*intim|intim.*sabonete/, p: 1 },
+    { chave: "sabonete", nome: "Sabonete facial / corporal", es: "Jabón facial / corporal", re: /sabonete|jabon/, p: 4 },
+    { chave: "barra", nome: "Sabonete em barra", es: "Jabón en barra", re: /sabonete.*barra|\bbarra\b/, p: 2 },
+    { chave: "oleo_banho", nome: "Óleo de banho", es: "Aceite de baño", re: /oleo (de )?banho/, p: 1 },
+    { chave: "tratamento", nome: "Tratamento corpo e rosto", es: "Tratamiento cuerpo y rostro", re: /tratamento|redutor|celulite|estria|clareador|firmador|colageno|cartilagem|arnica|\bgel\b|massag/, p: 8 },
+    { chave: "spa", nome: "Linha spa", es: "Línea spa", re: /\bspa\b|parafina|sais? de banho|ofuro/, p: 2 },
+    { chave: "pes", nome: "Pés, mãos, cotovelos, axilas e virilha", es: "Pies, manos, codos, axilas e ingles", re: /\bpes\b|\bmaos\b|cotovelo|axila|virilha|cuticula|calcanhar|rachadura|aspereza/, p: 2 },
+    { chave: "perf_intimo", nome: "Perfume íntimo", es: "Perfume íntimo", re: /perfume (de |para )?(calcinha|intim)/, p: 1 },
+    { chave: "perf_capilar", nome: "Perfume capilar", es: "Perfume capilar", re: /perfume capilar|hair (perfume|splash|mist)/, p: 0 },
+    { chave: "deo_intimo", nome: "Desodorante íntimo", es: "Desodorante íntimo", re: /desodorante (de |para )?(intim|calcinha)/, p: 1 },
+    { chave: "pomada", nome: "Pomada massageadora", es: "Pomada masajeadora", re: /pomada/, p: 1 },
   ],
   kits: [
     { chave: "matizador", nome: "Kit matizadores", es: "Kit matizadores", re: /\bmatiz|ativador de tons|desamarel|blond|platin|violet|loiro/ },
@@ -155,5 +169,14 @@ export function subLinhaDe(linha: string, nome: string): string | null {
   const subs = SUBLINHAS[linha];
   if (!subs) return null;
   const n = sem(nome);
-  return subs.find((s) => s.re.test(n))?.chave ?? "outros";
+  let melhor: string | null = null, pm = 99;
+  for (const s of subs) if ((s.p ?? 5) < pm && s.re.test(n)) { melhor = s.chave; pm = s.p ?? 5; }
+  return melhor ?? "outros";
+}
+
+/** Linhas a mais em que o produto também aparece (ex.: perfume de calcinha fica em Sex shop e também em Corpo e banho). */
+export function linhasExtras(nome: string, linha: string): string[] {
+  const n = sem(nome);
+  if (linha !== "corpo" && /splash|body mist|perfume capilar|hair (perfume|mist)|perfume (de |para )?(calcinha|intim)|desodorante (de |para )?(intim|calcinha)|sabonete.*intim/.test(n)) return ["corpo"];
+  return [];
 }
