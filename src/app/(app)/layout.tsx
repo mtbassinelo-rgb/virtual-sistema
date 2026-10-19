@@ -62,6 +62,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
     { id: "estoque", titulo: "Estoque", icone: "estoque", itens: [
       { href: "/estoque", texto: "Saldo e movimentos" },
       { href: "/estoque/inventario", texto: "Inventário (contagem)" },
+      { href: "/estoque/historico", texto: "Histórico do estoque", dica: "Quem mexeu no estoque, quando e em quais produtos" },
       ...(gestao ? [{ href: "/estoque/importar", texto: "Importar do Bling" }] : []),
     ] },
     { id: "relatorios", titulo: "Relatórios", icone: "relatorios", itens: [
