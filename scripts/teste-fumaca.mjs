@@ -84,7 +84,11 @@ for (const tela of ["/promocoes", "/estoque/importar", "/estoque/precos", "/prod
 }
 
 const impKeila = await abrir("/estoque/importar", await sessao("keila@teste.local"));
-ok(impKeila.status === 200 && impKeila.html.includes("Só gerente ou dono"), "Vendedora não importa produtos");
+const semAcesso = (r) => (r.status >= 300 && r.status < 400 && r.local.includes("/sem-permissao")) || r.html.includes("Sem acesso a esta área") || r.html.includes("Só gerente ou dono");
+ok(semAcesso(impKeila), "Vendedora não importa produtos");
+ok(semAcesso(await abrir("/equipe", await sessao("keila@teste.local"))), "Vendedora não abre Equipe e acessos");
+const semPerm = await abrir("/sem-permissao?area=equipe", await sessao("keila@teste.local"));
+ok(semPerm.status === 200 && semPerm.html.includes("Sem acesso a esta área"), "Tela de sem acesso abre");
 
 const modelo = await fetch(base + "/estoque/precos/modelo", { headers: { cookie: await sessao("gerente@teste.local") } });
 ok(modelo.status === 200 && (await modelo.text()).includes("PY Normal (Gs)"), "Gerente baixa a planilha de preços");
