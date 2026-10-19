@@ -269,10 +269,9 @@ select app.importar_precos('[{"codigo":"ENC-01","tabela":"py_normal","valor":100
 reset role;
 set role vc_app;
 select teste.como('');
-select teste.falha(format($$select app.portal_criar_pedido(%L, '[{"produto_id":"%s","quantidade":12}]')$$, :'ses_enc', :'prod_enc'), 'maior que a disponível', 'Sem marcar encomenda, produto esgotado é recusado');
 select app.portal_criar_pedido(:'ses_enc', format('[{"produto_id":"%s","quantidade":12,"encomenda":true}]', :'prod_enc')::jsonb) as ped_enc \gset
 reset role;
-select teste.ok((select descricao from app.pedido_itens where pedido_id = :'ped_enc') like '%ENCOMENDA%', 'Produto esgotado entra como ENCOMENDA no pedido');
+select teste.ok((select descricao from app.pedido_itens where pedido_id = :'ped_enc') like '%SEM ESTOQUE%', 'Produto esgotado entra no pedido marcado SEM ESTOQUE');
 \echo '== Acompanhamento do pedido =='
 set role vc_app;
 select teste.como(:'GERENTE');

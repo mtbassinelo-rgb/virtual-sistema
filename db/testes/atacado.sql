@@ -67,8 +67,13 @@ select teste.ok((select preco from app.portal_catalogo('sessao-1') where codigo 
 select teste.ok((select disponibilidade from app.portal_catalogo('sessao-1') where codigo = 'RHE-001') = 'disponivel', 'Disponibilidade sem mostrar quantidade');
 
 \echo '== Pedido do cliente =='
-select teste.falha($$select app.portal_criar_pedido('sessao-1', '[{"produto_id":"00000000-0000-0000-0000-0000000000b2","quantidade":999}]')$$,
-  'maior que a disponível', 'Cliente não pede mais do que há em estoque');
+select app.portal_criar_pedido('sessao-1', '[{"produto_id":"00000000-0000-0000-0000-0000000000b2","quantidade":999}]') as p_mais \gset
+reset role;
+select teste.ok((select count(*) from app.pedido_itens where pedido_id = :'p_mais' and descricao like '%SEM ESTOQUE%') = 1, 'Pedido acima do estoque entra; o excedente fica marcado para a vendedora');
+select teste.ok((select sum(quantidade) from app.pedido_itens where pedido_id = :'p_mais') = 999, 'Quantidade pedida mantida inteira');
+delete from app.pedido_itens where pedido_id = :'p_mais'; delete from app.pedidos where id = :'p_mais';
+set role vc_app;
+select teste.como('');
 select app.portal_criar_pedido('sessao-1', '[{"produto_id":"00000000-0000-0000-0000-0000000000b2","quantidade":24},{"produto_id":"00000000-0000-0000-0000-0000000000b1","quantidade":12}]', 'Entregar sexta') as pp \gset
 reset role;
 select teste.ok((select status_comercial from app.pedidos where id = :'pp') = 'aguardando_aprovacao', 'Pedido do cliente aguarda aprovação da vendedora');
