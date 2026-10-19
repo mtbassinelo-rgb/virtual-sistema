@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { ehGestao, exigirUsuario } from "@/lib/auth";
 import { comUsuario, mensagemErro } from "@/lib/db";
 import { texto } from "@/lib/formato";
+import { PERMISSOES, padraoDoPerfil, permitidaParaPerfil } from "@/lib/permissoes";
 
 export type RespostaLink = { link?: string; nome?: string; erro?: string };
 const HORAS = 72;
@@ -76,4 +77,41 @@ export async function salvarUnidadesVendedora(fd: FormData) {
   }
   revalidatePath("/equipe");
   redirect(`/equipe?${q}#unidades`);
+}
+
+/** Áreas liberadas, horário permitido e unidades em que a pessoa mexe no estoque/caixa. */
+export async function salvarAcessos(fd: FormData) {
+  const u = await exigirUsuario();
+  const id = texto(fd, "usuario_id");
+  let q: string;
+  try {
+    if (!ehGestao(u)) throw new Error("Só gerente ou dono cuida dos acessos.");
+    const perfil = await comUsuario(u.id, async (c) => String((await c.query("select perfil from app.usuarios where id = $1", [id])).rows[0]?.perfil ?? ""));
+    if (!perfil) throw new Error("Pessoa não encontrada.");
+    // guarda só o que difere do padrão do perfil
+    const permissoes: Record<string, boolean> = {};
+    for (const p of PERMISSOES) {
+      if (!permitidaParaPerfil(perfil, p.chave)) continue;
+      const marcado = fd.get(`perm_${p.chave}`) === "1";
+      if (marcado !== padraoDoPerfil(perfil, p.chave)) permissoes[p.chave] = marcado;
+    }
+    const horarios: { dia: number; inicio: string; fim: string }[] = [];
+    if (texto(fd, "limite") === "horario") {
+      for (let dia = 0; dia < 7; dia++) {
+        if (fd.get(`dia_${dia}`) !== "1") continue;
+        const inicio = texto(fd, `ini_${dia}`) || "08:00", fim = texto(fd, `fim_${dia}`) || "18:00";
+        if (!/^\d{2}:\d{2}$/.test(inicio) || !/^\d{2}:\d{2}$/.test(fim) || fim <= inicio) throw new Error("Confira os horários: o fim precisa ser depois do início.");
+        horarios.push({ dia, inicio, fim });
+      }
+      if (!horarios.length) throw new Error("Marque pelo menos um dia, ou escolha \"Sem limite de horário\". Para bloquear de vez, use Desativar.");
+    }
+    const depositos = fd.getAll("dep").map(String).filter((x) => /^[0-9a-f-]{36}$/i.test(x));
+    await comUsuario(u.id, (c) => c.query("select app.definir_acesso_usuario($1, $2::jsonb, $3::jsonb, $4::uuid[])",
+      [id, JSON.stringify(permissoes), JSON.stringify(horarios), depositos]));
+    q = "ok=" + encodeURIComponent("Acessos salvos. Valem a partir da próxima página que a pessoa abrir.");
+  } catch (e) {
+    q = "erro=" + encodeURIComponent(mensagemErro(e));
+  }
+  revalidatePath("/equipe");
+  redirect(`/equipe?${q}#acesso-${id}`);
 }

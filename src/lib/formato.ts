@@ -127,6 +127,7 @@ export const PERFIS: Record<string, string> = {
   dono: "Dono",
   gerente: "Gerente",
   vendedora: "Vendedora",
+  estoquista: "Estoquista",
   consulta: "Consulta",
 };
 

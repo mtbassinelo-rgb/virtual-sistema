@@ -6,6 +6,7 @@ import { comUsuario } from "@/lib/db";
 import { PERFIS } from "@/lib/formato";
 import { MenuLateral, type GrupoMenu } from "./menu-lateral";
 import { unidadeSistema } from "@/lib/unidade-sistema";
+import { permissaoDoLink, pode } from "@/lib/permissoes";
 
 async function acaoSair() {
   "use server";
@@ -29,7 +30,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
            (select count(*) from app.pedidos where desconto_qtd_status = 'pendente' and status_comercial <> 'cancelado')::int as descontos
   `)).rows[0] as { pedidos_abertos: number; contas_vencidas: number; procuras: number; fotos: number; sem_preco: number; carrinhos: number; chegaram: number; descontos: number }).catch(() => ({ pedidos_abertos: 0, contas_vencidas: 0, procuras: 0, fotos: 0, sem_preco: 0, carrinhos: 0, chegaram: 0, descontos: 0 }));
 
-  const grupos: GrupoMenu[] = [
+  const todos: GrupoMenu[] = [
     gestao
       ? { id: "inicio", titulo: "Início", icone: "inicio", itens: [{ href: "/", texto: "Painel do dia" }, { href: "/abertura", texto: "Abertura da loja", dica: "O que falta para os clientes comprarem pelo site" }] }
       : { id: "inicio", titulo: "Início", icone: "inicio", itens: [{ href: "/", texto: "Início" }] },
@@ -91,6 +92,11 @@ export default async function AreaInterna({ children }: { children: React.ReactN
       { href: "/conta", texto: "Minha conta" },
     ] },
   ];
+
+  // Cada pessoa vê só as áreas liberadas para ela (Equipe → Acessos)
+  const grupos = todos
+    .map((g) => ({ ...g, itens: g.itens.filter((i) => { const k = permissaoDoLink(i.href); return !k || pode(u, k); }) }))
+    .filter((g) => g.itens.length > 0);
 
   return (
     <div className="casca">

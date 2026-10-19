@@ -1,0 +1,67 @@
+/**
+ * Permissões por área do sistema. Cada perfil tem um padrão; na tela Equipe o gerente liga ou desliga áreas de cada pessoa
+ * (fica guardado só o que difere do padrão). Áreas marcadas "só gestão" dependem de regras do banco que só gerente e dono
+ * passam, então não podem ser dadas a vendedora ou estoquista.
+ */
+export type Perfil = "dono" | "gerente" | "vendedora" | "consulta" | "estoquista";
+
+export type Permissao = { chave: string; nome: string; rotas: string[]; gestao?: boolean };
+
+export const PERMISSOES: Permissao[] = [
+  { chave: "pedidos", nome: "Pedidos (ver, criar e separar)", rotas: ["/pedidos"] },
+  { chave: "caixa", nome: "Caixa do dia", rotas: ["/caixa"] },
+  { chave: "clientes", nome: "Clientes", rotas: ["/clientes"] },
+  { chave: "metas", nome: "Metas", rotas: ["/metas"] },
+  { chave: "promocoes", nome: "Promoções", rotas: ["/promocoes"] },
+  { chave: "catalogo", nome: "Catálogo para enviar", rotas: ["/catalogo"] },
+  { chave: "procuras", nome: "Produtos procurados", rotas: ["/procuras"] },
+  { chave: "produtos", nome: "Ver produtos", rotas: ["/produtos"] },
+  { chave: "produtos_editar", nome: "Cadastrar produtos, preços, kits e fotos", gestao: true,
+    rotas: ["/produtos/novo", "/produtos/precos-rapido", "/produtos/kits", "/produtos/grupos", "/produtos/fotos", "/produtos/fotos-faltando", "/estoque/precos"] },
+  { chave: "estoque", nome: "Estoque e inventário", rotas: ["/estoque"] },
+  { chave: "estoque_importar", nome: "Importar estoque do Bling", rotas: ["/estoque/importar"], gestao: true },
+  { chave: "relatorios", nome: "Relatórios", rotas: ["/relatorios"] },
+  { chave: "comissoes", nome: "Comissões", rotas: ["/comissoes"] },
+  { chave: "financeiro", nome: "Despesas, contas e parâmetros", rotas: ["/despesas", "/parametros"], gestao: true },
+  { chave: "site", nome: "Loja online (banners e destaques)", rotas: ["/site"] },
+  { chave: "abertura", nome: "Abertura da loja", rotas: ["/abertura"], gestao: true },
+  { chave: "equipe", nome: "Equipe e acessos", rotas: ["/equipe"], gestao: true },
+];
+
+const TODAS = PERMISSOES.map((p) => p.chave);
+const PADRAO: Record<Perfil, string[]> = {
+  dono: TODAS,
+  gerente: TODAS,
+  consulta: TODAS.filter((c) => c !== "caixa" && c !== "equipe"),
+  vendedora: ["pedidos", "caixa", "clientes", "metas", "promocoes", "catalogo", "procuras", "produtos", "estoque", "relatorios", "comissoes", "site"],
+  estoquista: ["pedidos", "produtos", "estoque", "relatorios", "procuras"],
+};
+
+export const PERFIL_GESTAO = (p: string) => p === "dono" || p === "gerente" || p === "consulta";
+
+/** A área pode ser ligada para este perfil? (as "só gestão" não podem para vendedora/estoquista) */
+export const permitidaParaPerfil = (perfil: string, chave: string) =>
+  !PERMISSOES.find((p) => p.chave === chave)?.gestao || PERFIL_GESTAO(perfil);
+
+export const padraoDoPerfil = (perfil: string, chave: string) =>
+  (PADRAO[perfil as Perfil] ?? []).includes(chave) && permitidaParaPerfil(perfil, chave);
+
+/** Pode usar a área? Dono: sempre. Senão: o que foi ligado/desligado para a pessoa, ou o padrão do perfil. */
+export function pode(u: { perfil: string; permissoes?: Record<string, boolean> | null }, chave: string): boolean {
+  if (u.perfil === "dono") return true;
+  if (!permitidaParaPerfil(u.perfil, chave)) return false;
+  const o = u.permissoes?.[chave];
+  return typeof o === "boolean" ? o : padraoDoPerfil(u.perfil, chave);
+}
+
+/** Qual permissão protege este caminho (a rota mais específica que bate). null = livre (Início, Minha conta, busca...). */
+export function permissaoDaRota(caminho: string): string | null {
+  let melhor: string | null = null, tam = -1;
+  for (const p of PERMISSOES) for (const r of p.rotas) {
+    if ((caminho === r || caminho.startsWith(r + "/")) && r.length > tam) { melhor = p.chave; tam = r.length; }
+  }
+  return melhor;
+}
+
+/** Permissão de um link do menu (ignora ?filtros). */
+export const permissaoDoLink = (href: string) => permissaoDaRota(href.split("?")[0]);

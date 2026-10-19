@@ -5,8 +5,9 @@ import { createHash, randomBytes } from "node:crypto";
 import { verify } from "@node-rs/argon2";
 import { pool } from "./db";
 
-export type Perfil = "dono" | "gerente" | "vendedora" | "consulta";
-export type Usuario = { id: string; nome: string; perfil: Perfil; vendedora_id: string | null };
+import { permissaoDaRota, pode, type Perfil } from "./permissoes";
+export type { Perfil };
+export type Usuario = { id: string; nome: string; perfil: Perfil; vendedora_id: string | null; permissoes: Record<string, boolean> };
 
 const COOKIE = "vc_sessao";
 const DIAS = 30;
@@ -29,6 +30,8 @@ export async function entrar(email: string, senha: string): Promise<string | nul
   }
   await pool.query("select app.registrar_tentativa($1, $2)", [email, ok]);
   if (!u || !ok) return "E-mail ou senha incorretos.";
+  const { rows: hr } = await pool.query("select app.dentro_do_horario($1) as ok", [u.id]);
+  if (!hr[0]?.ok) return "O seu acesso não está liberado neste horário. Fale com o gerente se precisar entrar agora.";
 
   const token = randomBytes(32).toString("base64url");
   const h = await headers();
@@ -48,15 +51,22 @@ export async function usuarioAtual(): Promise<Usuario | null> {
   const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return null;
   const { rows } = await pool.query(
-    "select usuario_id as id, nome, perfil, vendedora_id from app.sessao_valida($1)",
+    "select usuario_id as id, nome, perfil, vendedora_id, permissoes from app.sessao_valida($1)",
     [sha256(token)],
   );
   return (rows[0] as Usuario | undefined) ?? null;
 }
 
+/**
+ * Usuário logado (senão vai para o login). Também confere a área do sistema que está sendo aberta
+ * (o caminho vem do middleware, inclusive nas ações dos formulários): sem permissão, vai para /sem-permissao.
+ */
 export async function exigirUsuario(): Promise<Usuario> {
   const u = await usuarioAtual();
   if (!u) redirect("/login");
+  const caminho = (await headers()).get("x-caminho") ?? "";
+  const chave = caminho ? permissaoDaRota(caminho) : null;
+  if (chave && !pode(u, chave)) redirect(`/sem-permissao?area=${encodeURIComponent(chave)}`);
   return u;
 }
 

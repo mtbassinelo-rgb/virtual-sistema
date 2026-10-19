@@ -32,6 +32,7 @@ export function NovaPessoa({ dono, vendedoras }: { dono: boolean; vendedoras: { 
       <label>Perfil
         <select name="perfil" value={perfil} onChange={(e) => setPerfil(e.target.value)}>
           <option value="vendedora">Vendedora</option>
+          <option value="estoquista">Estoquista</option>
           <option value="gerente">Gerente</option>
           <option value="consulta">Consulta (só vê)</option>
           {dono && <option value="dono">Dono</option>}

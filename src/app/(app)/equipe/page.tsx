@@ -2,7 +2,8 @@ import { ehGestao, exigirUsuario } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
 import { PERFIS } from "@/lib/formato";
 import { Avisos, Selo } from "../avisos";
-import { ativarPessoa, salvarUnidadesVendedora } from "./acoes";
+import { ativarPessoa, salvarAcessos, salvarUnidadesVendedora } from "./acoes";
+import { PERMISSOES, pode, permitidaParaPerfil } from "@/lib/permissoes";
 import { BotaoLinkSenha, NovaPessoa } from "./formularios";
 
 export const metadata = { title: "Equipe" };
@@ -21,7 +22,10 @@ export default async function Equipe({ searchParams }: { searchParams: Promise<{
     vendedoras: (await c.query("select id, nome, slug from app.vendedoras where nome <> 'Marketplace' order by nome")).rows as { id: string; nome: string; slug: string | null }[],
     depositos: (await c.query("select id, nome from app.depositos where ativo order by tipo, nome")).rows as { id: string; nome: string }[],
     vinculos: (await c.query("select vendedora_id, deposito_id, padrao from app.vendedora_depositos")).rows as { vendedora_id: string; deposito_id: string; padrao: boolean }[],
+    acessos: (await c.query("select * from app.acessos_equipe()")).rows as { usuario_id: string; permissoes: Record<string, boolean>; horarios: { dia: number; inicio: string; fim: string }[]; depositos: string[] }[],
   }));
+  const DIAS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+  const editaveis = d.pessoas.filter((p) => p.ativo && p.id !== u.id && p.perfil !== "dono");
   return (
     <>
       <section>
@@ -58,6 +62,68 @@ export default async function Equipe({ searchParams }: { searchParams: Promise<{
         ))}</tbody>
       </table></div>
       <NovaPessoa dono={u.perfil === "dono"} vendedoras={d.vendedoras} />
+
+      <section className="painel" id="acessos">
+        <h2 style={{ margin: 0 }}>Acessos e horários</h2>
+        <p className="suave pequeno" style={{ margin: 0, maxWidth: 820 }}>
+          Para cada pessoa: quais áreas do sistema ela usa, em que dias e horários pode entrar e em quais unidades mexe no estoque e no caixa.
+          Fora do horário a pessoa não consegue entrar (e quem estiver dentro sai na próxima tela). O dono tem acesso a tudo, sempre.
+          Áreas marcadas <i>só gestão</i> não podem ser dadas a vendedora ou estoquista. Para bloquear de vez, use <b>Desativar</b> na tabela acima.
+        </p>
+        {editaveis.length === 0 && <div className="vazio">Ninguém para configurar.</div>}
+        <div className="acessos-lista">{editaveis.map((p) => {
+          const a = d.acessos.find((x) => x.usuario_id === p.id);
+          const alvo = { perfil: p.perfil, permissoes: a?.permissoes ?? {} };
+          const hs = a?.horarios ?? [];
+          const resumoHorario = hs.length ? `${hs.length} dia(s) com horário` : "sem limite de horário";
+          const liberadas = PERMISSOES.filter((x) => pode(alvo, x.chave)).length;
+          return (
+            <details key={p.id} id={`acesso-${p.id}`} className="acesso-pessoa">
+              <summary><b>{p.nome}</b> <span className="suave pequeno">· {PERFIS[p.perfil] ?? p.perfil} · {liberadas} áreas · {resumoHorario}</span></summary>
+              <form action={salvarAcessos} className="acesso-form-eq">
+                <input type="hidden" name="usuario_id" value={p.id} />
+                <fieldset>
+                  <legend>Áreas do sistema</legend>
+                  <div className="acesso-grade">{PERMISSOES.map((x) => {
+                    const pode_ = permitidaParaPerfil(p.perfil, x.chave);
+                    return (
+                      <label key={x.chave} className={`acesso-item ${pode_ ? "" : "desligado"}`}>
+                        <input type="checkbox" name={`perm_${x.chave}`} value="1" defaultChecked={pode(alvo, x.chave)} disabled={!pode_} />
+                        {x.nome}{!pode_ && <small> (só gestão)</small>}
+                      </label>
+                    );
+                  })}</div>
+                </fieldset>
+                <fieldset>
+                  <legend>Horário de acesso</legend>
+                  <label className="acesso-item"><input type="radio" name="limite" value="livre" defaultChecked={!hs.length} /> Sem limite de horário</label>
+                  <label className="acesso-item"><input type="radio" name="limite" value="horario" defaultChecked={hs.length > 0} /> Só nos dias e horários marcados (horário de Foz)</label>
+                  <div className="acesso-dias">{DIAS.map((nome, dia) => {
+                    const h = hs.find((x) => x.dia === dia);
+                    const padrao = !hs.length && dia >= 1 && dia <= 6;
+                    return (
+                      <div key={dia} className="acesso-dia">
+                        <label><input type="checkbox" name={`dia_${dia}`} value="1" defaultChecked={Boolean(h) || padrao} /> {nome}</label>
+                        <input type="time" name={`ini_${dia}`} defaultValue={h?.inicio ?? "08:00"} aria-label={`${nome}: entra a partir de`} />
+                        <span className="suave">às</span>
+                        <input type="time" name={`fim_${dia}`} defaultValue={h?.fim ?? (dia === 6 ? "13:00" : "18:00")} aria-label={`${nome}: até`} />
+                      </div>
+                    );
+                  })}</div>
+                </fieldset>
+                <fieldset>
+                  <legend>Unidades em que mexe no estoque e no caixa</legend>
+                  <p className="suave pequeno" style={{ margin: "0 0 6px" }}>Para estoquista e para quem opera o caixa de uma unidade. Gerente e dono mexem em todas.</p>
+                  <div className="acesso-grade">{d.depositos.map((x) => (
+                    <label key={x.id} className="acesso-item"><input type="checkbox" name="dep" value={x.id} defaultChecked={a?.depositos.includes(x.id)} /> {x.nome}</label>
+                  ))}</div>
+                </fieldset>
+                <div><button className="principal">Salvar acessos de {p.nome.split(" ")[0]}</button></div>
+              </form>
+            </details>
+          );
+        })}</div>
+      </section>
 
       <section className="painel" id="unidades">
         <h2 style={{ margin: 0 }}>Unidades de cada vendedora</h2>

@@ -100,4 +100,33 @@ select teste.ok(app.portal_redefinicao_valida('tok-1'), 'Link vale');
 select teste.ok(app.portal_redefinir_senha('tok-1', repeat('y', 40)) = '00000000-0000-0000-0000-0000000000c1', 'Senha nova gravada');
 select teste.falha($$select app.portal_redefinir_senha('tok-1', repeat('z', 40))$$, 'já foi usado', 'Link só vale uma vez');
 reset role;
+
+\echo '== Acessos: horário e estoquista =='
+reset role;
+insert into app.usuarios (id, email, nome, perfil, ativo) values ('00000000-0000-0000-0000-0000000000e1', 'estoque@teste.local', 'Estoquista Teste', 'estoquista', true);
+set role vc_app;
+select teste.como(:'KEILA');
+select teste.falha($$select app.definir_acesso_usuario('00000000-0000-0000-0000-0000000000e1', '{}', '[]', '{}')$$, 'gerente', 'Vendedora não mexe em acessos');
+select teste.como(:'GERENTE');
+select teste.falha(format($$select app.definir_acesso_usuario(%L, '{}', '[]', '{}')$$, :'GERENTE'), 'próprios acessos', 'Ninguém muda os próprios acessos');
+select app.definir_acesso_usuario('00000000-0000-0000-0000-0000000000e1', '{"caixa": false}', '[]', array[:'cde']::uuid[]);
+select teste.ok((select permissoes->>'caixa' from app.acessos_equipe() where usuario_id = '00000000-0000-0000-0000-0000000000e1') = 'false', 'Permissão desligada fica guardada');
+select teste.ok(app.dentro_do_horario('00000000-0000-0000-0000-0000000000e1'), 'Sem horário cadastrado = acesso livre');
+select teste.como('00000000-0000-0000-0000-0000000000e1');
+select teste.ok(app.pode_operar_deposito(:'cde'), 'Estoquista responsável mexe no estoque da unidade');
+select teste.ok(app.perfil_atual() = 'estoquista', 'Estoquista dentro do horário tem perfil');
+select teste.como(:'GERENTE');
+-- só um dia que nunca é hoje: fora do horário
+select app.definir_acesso_usuario('00000000-0000-0000-0000-0000000000e1', '{}',
+  jsonb_build_array(jsonb_build_object('dia', (extract(dow from now() at time zone 'America/Sao_Paulo')::int + 1) % 7, 'inicio', '00:00', 'fim', '23:59')), array[:'cde']::uuid[]);
+select teste.ok(not app.dentro_do_horario('00000000-0000-0000-0000-0000000000e1'), 'Fora do dia permitido: sem acesso');
+select teste.como('00000000-0000-0000-0000-0000000000e1');
+select teste.ok(app.perfil_atual() is null, 'Fora do horário o banco não reconhece o perfil (recusa tudo)');
+select teste.ok(not app.pode_operar_deposito(:'cde'), 'Fora do horário não mexe no estoque');
+select teste.como(:'GERENTE');
+select app.definir_acesso_usuario('00000000-0000-0000-0000-0000000000e1', '{}',
+  jsonb_build_array(jsonb_build_object('dia', extract(dow from now() at time zone 'America/Sao_Paulo')::int, 'inicio', '00:00', 'fim', '23:59')), '{}');
+select teste.ok(app.dentro_do_horario('00000000-0000-0000-0000-0000000000e1'), 'Dentro do dia e horário permitidos: entra');
+select teste.ok(app.dentro_do_horario(:'GERENTE'), 'Quem não tem horário entra sempre');
+
 \echo '== Testes do caixa passaram =='

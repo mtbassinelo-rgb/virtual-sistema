@@ -286,3 +286,15 @@ button.discreto:hover { color: var(--erro); border-color: transparent; }
   .catalogo-impresso { border: 0; padding: 0; }
   body { background: #fff !important; }
 }
+.acessos-lista { display: flex; flex-direction: column; gap: 8px; }
+.acesso-pessoa { border: 1px solid var(--linha); border-radius: 8px; padding: 10px 12px; }
+.acesso-pessoa > summary { cursor: pointer; }
+.acesso-form-eq { display: grid; gap: 12px; margin-top: 10px; }
+.acesso-form-eq fieldset { border: 1px solid var(--linha); border-radius: 8px; padding: 8px 12px; margin: 0; }
+.acesso-form-eq legend { font-weight: 700; padding: 0 4px; }
+.acesso-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 4px 12px; }
+.acesso-item { display: flex; flex-direction: row; align-items: center; gap: 6px; color: inherit; font-weight: 400; }
+.acesso-item.desligado { opacity: .5; }
+.acesso-dias { display: grid; gap: 4px; margin-top: 6px; }
+.acesso-dia { display: grid; grid-template-columns: 120px auto auto auto; gap: 8px; align-items: center; justify-content: start; }
+.acesso-dia label { display: flex; flex-direction: row; gap: 6px; align-items: center; color: inherit; }
