@@ -124,8 +124,8 @@ export async function compraUnidadeCliente(fd: FormData) {
   const liberar = texto(fd, "liberar") === "1";
   let erro: string | null = null;
   try {
-    const r = await comUsuario(u.id, (c) => c.query("update app.clientes set compra_unidade = $2 where id = $1", [id, liberar]));
-    if (!r.rowCount) throw new Error("Sem permissão para alterar este cliente.");
+    const r = await comUsuario(u.id, (c) => c.query("update app.clientes set compra_unidade = $2 where id = $1 and (pais = 'BR' or not $2)", [id, liberar]));
+    if (!r.rowCount) throw new Error("Compra por unidade é só para clientes do Brasil (em reais). Cliente do Paraguai compra sempre caixa fechada.");
   } catch (e) {
     erro = mensagemErro(e);
   }

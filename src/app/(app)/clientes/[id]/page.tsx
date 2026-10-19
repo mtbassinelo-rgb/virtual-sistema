@@ -172,13 +172,13 @@ export default async function Cliente({ params, searchParams }: {
               {cli.portal_ativo && d.temAcesso && <form action={bloquearCliente}><input type="hidden" name="cliente_id" value={cli.id} /><button className="perigo">Bloquear acesso</button></form>}
             </div>
           )}
-          {!ro && (
+          {!ro && cli.pais === "BR" && (
             <form action={compraUnidadeCliente} className="linha" style={{ alignItems: "center", gap: 10 }}>
               <input type="hidden" name="cliente_id" value={cli.id} />
               <input type="hidden" name="liberar" value={cli.compra_unidade ? "0" : "1"} />
               <span className="pequeno">{cli.compra_unidade
                 ? <>✓ <b>Compra por unidade liberada</b>: no site ele escolhe caixa fechada ou unidade.</>
-                : <>Compra no site: <b>só caixa fechada</b>.</>}</span>
+                : <>Compra no site: <b>só caixa fechada</b>. Pode liberar unidade (sortido) para cliente do Brasil.</>}</span>
               <button className={cli.compra_unidade ? "discreto" : ""}>{cli.compra_unidade ? "Voltar a só caixa" : "Liberar compra por unidade"}</button>
             </form>
           )}
