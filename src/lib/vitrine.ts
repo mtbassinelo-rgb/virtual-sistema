@@ -129,6 +129,16 @@ export const SUBLINHAS: Record<string, { chave: string; nome: string; es: string
     { chave: "condicionador", nome: "Condicionadores", es: "Acondicionadores", re: /condicionador/ },
     { chave: "oleo", nome: "Óleos capilares", es: "Aceites capilares", re: /oleo|oil/ },
   ],
+  corpo: [
+    { chave: "splash", nome: "Body splash", es: "Body splash", re: /splash|body mist|colonia/ },
+    { chave: "hidratante", nome: "Hidratantes", es: "Cremas hidratantes", re: /hidratante|hid\.|locao|creme corporal|manteiga|oleo corporal/ },
+    { chave: "intimo", nome: "Higiene íntima", es: "Higiene íntima", re: /intim|calcinha/ },
+    { chave: "sabonete", nome: "Sabonetes", es: "Jabones", re: /sabonete|jabon|banho/ },
+    { chave: "esfoliante", nome: "Esfoliantes", es: "Exfoliantes", re: /esfolia/ },
+    { chave: "desodorante", nome: "Desodorantes", es: "Desodorantes", re: /desodorant/ },
+    { chave: "pes", nome: "Pés e mãos", es: "Pies y manos", re: /\bpes\b|\bmaos\b|cuticula|rachadura|calcanhar/ },
+    { chave: "gel", nome: "Géis e massagem", es: "Geles y masajes", re: /\bgel\b|massag|arnica|cartilagem|redutor|celulite/ },
+  ],
   kits: [
     { chave: "matizador", nome: "Kit matizadores", es: "Kit matizadores", re: /\bmatiz|ativador de tons|desamarel|blond|platin|violet|loiro/ },
     { chave: "alisamento", nome: "Kit alisamento capilar", es: "Kit alisado capilar", re: /alisa|progressiva|escova progressiva|selagem|liso|botox capilar|definitiva/ },
