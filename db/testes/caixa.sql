@@ -87,4 +87,17 @@ select app.registrar_evento_site('busca', 'nav-1', 'sessao-desc', null, 'shampoo
 select teste.ok((select count(*) from app.portal_reposicao('sessao-desc')) >= 1, 'Lista de reposição traz o que o cliente comprou');
 reset role;
 select teste.ok((select count(*) from app.eventos_site where sessao = 'nav-1') = 2, 'Eventos do site registrados');
+
+\echo '== Cliente redefine a senha pelo e-mail =='
+reset role;
+update app.clientes set email = 'julisa@exemplo.com', documento = 'TESTE-12345' where id = '00000000-0000-0000-0000-0000000000c1';
+insert into app.portal_acessos (cliente_id, senha_hash) values ('00000000-0000-0000-0000-0000000000c1', repeat('x', 30)) on conflict (cliente_id) do nothing;
+set role vc_app;
+select teste.como('');
+select teste.ok((select email from app.portal_pedir_redefinicao('teste-12345', 'tok-1')) = 'julisa@exemplo.com', 'Documento com e-mail recebe o link');
+select teste.ok(not exists (select 1 from app.portal_pedir_redefinicao('nao-existe', 'tok-x')), 'Documento desconhecido não revela nada');
+select teste.ok(app.portal_redefinicao_valida('tok-1'), 'Link vale');
+select teste.ok(app.portal_redefinir_senha('tok-1', repeat('y', 40)) = '00000000-0000-0000-0000-0000000000c1', 'Senha nova gravada');
+select teste.falha($$select app.portal_redefinir_senha('tok-1', repeat('z', 40))$$, 'já foi usado', 'Link só vale uma vez');
+reset role;
 \echo '== Testes do caixa passaram =='

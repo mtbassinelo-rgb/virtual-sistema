@@ -47,6 +47,8 @@ export async function salvarCliente(fd: FormData) {
               perfil_comercial = nullif($8,''), preferencias = nullif($9,''), observacoes = nullif($10,'')
         where id = $11`,
       [...campos(fd), id]));
+    // e-mail do cliente: usado para ele mesmo redefinir a senha da loja
+    await comUsuario(u.id, (c) => c.query("update app.clientes set email = nullif(lower(trim($1)), '') where id = $2", [texto(fd, "email"), id]));
   } catch (e) {
     erro = mensagemErro(e);
   }

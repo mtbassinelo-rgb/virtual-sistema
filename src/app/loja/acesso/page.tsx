@@ -8,11 +8,11 @@ export const metadata = { title: "Área do cliente" };
 
 const T = {
   pt: { titulo: "Área do cliente", texto: "Entre com o número do seu documento e a senha que a sua vendedora enviou pelo WhatsApp. No primeiro acesso você cria a sua própria senha.",
-        doc: "CPF, CNPJ, CI ou RUC", senha: "Senha", entrar: "Entrar", esqueci: "Esqueceu a senha? Peça uma nova para a sua vendedora pelo WhatsApp.",
+        doc: "CPF, CNPJ, CI ou RUC", senha: "Senha", entrar: "Entrar", esqueci: "Esqueci minha senha",
         link: "Este link de acesso já foi usado ou expirou. Entre com o seu documento e senha, ou peça a senha para a sua vendedora.",
         novo: "Ainda não é cliente?", cadastro: "Quero ser cliente" },
   es: { titulo: "Área de clientes", texto: "Ingrese con el número de su documento y la contraseña que su vendedora le envió por WhatsApp. En el primer ingreso usted crea su propia contraseña.",
-        doc: "CI, RUC, CPF o CNPJ", senha: "Contraseña", entrar: "Ingresar", esqueci: "¿Olvidó su contraseña? Pida una nueva a su vendedora por WhatsApp.",
+        doc: "CI, RUC, CPF o CNPJ", senha: "Contraseña", entrar: "Ingresar", esqueci: "Olvidé mi contraseña",
         link: "Este enlace de acceso ya fue usado o venció. Ingrese con su documento y contraseña, o pida la contraseña a su vendedora.",
         novo: "¿Todavía no es cliente?", cadastro: "Quiero ser cliente" },
 };
@@ -44,7 +44,7 @@ export default async function Acesso({ searchParams }: { searchParams: Promise<{
           <label>{t.senha}<input name="senha" type="password" required autoComplete="current-password" maxLength={100} /></label>
           <button className="adicionar">{t.entrar}</button>
         </form>
-        <p className="suave pequeno" style={{ margin: 0 }}>{t.esqueci}</p>
+        <p style={{ margin: 0 }}><Link href="/loja/esqueci">{t.esqueci}</Link></p>
         <p style={{ margin: 0 }}>{t.novo} <Link href="/loja/cadastro">{t.cadastro}</Link></p>
       </section>
     </div>

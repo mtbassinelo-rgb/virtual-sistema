@@ -246,6 +246,7 @@ export default async function Cliente({ params, searchParams }: {
               <label className="largo">Nome ou empresa<input name="nome" required defaultValue={cli.nome} /></label>
               <label>WhatsApp<input name="whatsapp" defaultValue={cli.whatsapp ?? ""} /></label>
               <label>Telefone<input name="telefone" defaultValue={cli.telefone ?? ""} /></label>
+              <label>E-mail (para o cliente redefinir a senha da loja)<input name="email" type="email" defaultValue={cli.email ?? ""} /></label>
               <label>Cidade<input name="cidade" defaultValue={cli.cidade ?? ""} /></label>
               <label>Departamento / Estado<input name="departamento" defaultValue={cli.departamento ?? ""} /></label>
               <label>País
