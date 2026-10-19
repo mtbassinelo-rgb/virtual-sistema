@@ -7,7 +7,7 @@ import {
   type Moeda,
 } from "@/lib/formato";
 import { Avisos, Barra, Selo } from "../../avisos";
-import { atendimentoCliente, bloquearCliente, definirCredito, depositoCliente, recusarSugestaoCredito, salvarCliente, sugerirCredito } from "../acoes";
+import { atendimentoCliente, bloquearCliente, compraUnidadeCliente, definirCredito, depositoCliente, recusarSugestaoCredito, salvarCliente, sugerirCredito } from "../acoes";
 import { AcessoCliente } from "./acesso-cliente";
 
 export const metadata = { title: "Cliente" };
@@ -171,6 +171,16 @@ export default async function Cliente({ params, searchParams }: {
             <div className="linha">
               {cli.portal_ativo && d.temAcesso && <form action={bloquearCliente}><input type="hidden" name="cliente_id" value={cli.id} /><button className="perigo">Bloquear acesso</button></form>}
             </div>
+          )}
+          {!ro && (
+            <form action={compraUnidadeCliente} className="linha" style={{ alignItems: "center", gap: 10 }}>
+              <input type="hidden" name="cliente_id" value={cli.id} />
+              <input type="hidden" name="liberar" value={cli.compra_unidade ? "0" : "1"} />
+              <span className="pequeno">{cli.compra_unidade
+                ? <>✓ <b>Compra por unidade liberada</b>: no site ele escolhe caixa fechada ou unidade.</>
+                : <>Compra no site: <b>só caixa fechada</b>.</>}</span>
+              <button className={cli.compra_unidade ? "discreto" : ""}>{cli.compra_unidade ? "Voltar a só caixa" : "Liberar compra por unidade"}</button>
+            </form>
           )}
           {ehGestao(u) && (
             <form action={depositoCliente} className="campos">

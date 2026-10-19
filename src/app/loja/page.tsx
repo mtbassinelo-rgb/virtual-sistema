@@ -29,7 +29,10 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
   const cliente = await clienteAtual();
   const idioma = await idiomaAtual();
   const unidade = await unidadeLoja();
-  const vendeUnidade = unidade.vende_unidade;
+  // unidade que vende por unidade (CDE) ou cliente liberado pela vendedora: escolhe caixa fechada ou unidade
+  const sessaoCliente = cliente ? await tokenCliente() : null;
+  const vendeUnidade = unidade.vende_unidade
+    || (sessaoCliente ? Boolean((await pool.query("select app.portal_compra_unidade($1) as ok", [sha256(sessaoCliente)])).rows[0]?.ok) : false);
   // site de outra unidade (ex.: CDE): os textos de abertura falam da loja dela, não do CD de Foz
   const t: Textos = ehPrincipal(unidade) ? TEXTOS[idioma] : {
     ...TEXTOS[idioma],

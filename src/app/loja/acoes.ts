@@ -93,6 +93,16 @@ export async function enviarCarrinho(_: RespostaCarrinho, fd: FormData): Promise
 
   if (cliente) {
     const t = await tokenCliente();
+    // produto com caixa só sai por unidade se o cliente for liberado (ou a unidade vender por unidade)
+    const soltos = itens.filter((i) => !i.caixas);
+    if (soltos.length) {
+      const pode = Boolean((await pool.query("select app.portal_compra_unidade($1) as ok", [sha256(t!)])).rows[0]?.ok);
+      if (!pode) {
+        const comCaixa = (await pool.query("select nome from app.produtos where id = any($1::uuid[]) and coalesce(unidades_caixa, 0) > 1",
+          [soltos.map((i) => i.produto_id)])).rows;
+        if (comCaixa.length) return { erro: `${comCaixa[0].nome}: vendido só em caixa fechada. Fale com a sua vendedora para liberar a compra por unidade.` };
+      }
+    }
     try {
       const ped = (await pool.query("select app.portal_criar_pedido($1, $2, $3) as id",
         [sha256(t!), JSON.stringify(itens.map(({ produto_id, quantidade, encomenda }) => ({ produto_id, quantidade, encomenda: !!encomenda }))), obs])).rows[0].id;

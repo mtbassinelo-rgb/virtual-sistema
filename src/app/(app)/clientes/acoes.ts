@@ -117,6 +117,22 @@ export async function depositoCliente(fd: FormData) {
   redirect(`/clientes/${id}?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Depósito do cliente atualizado.")}`);
 }
 
+/** Libera (ou não) o cliente para comprar por unidade no site, sem ser só caixa fechada. */
+export async function compraUnidadeCliente(fd: FormData) {
+  const u = await exigirUsuario();
+  const id = texto(fd, "cliente_id");
+  const liberar = texto(fd, "liberar") === "1";
+  let erro: string | null = null;
+  try {
+    const r = await comUsuario(u.id, (c) => c.query("update app.clientes set compra_unidade = $2 where id = $1", [id, liberar]));
+    if (!r.rowCount) throw new Error("Sem permissão para alterar este cliente.");
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  revalidatePath(`/clientes/${id}`);
+  redirect(`/clientes/${id}?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent(liberar ? "Cliente liberado para comprar por unidade no site." : "Cliente volta a comprar só caixa fechada.")}`);
+}
+
 export type RespostaAcesso = { erro?: string; login?: string; senha?: string; mensagem?: string; whatsapp?: string | null };
 
 /** Cria (ou refaz) o acesso do cliente: documento + a senha que a vendedora digitar (ou 6 números sorteados se deixar em branco).
