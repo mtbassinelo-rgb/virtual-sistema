@@ -354,7 +354,7 @@ function CartaoGrupo({ p, moeda, cliente, t, vendeUnidade, linha }: { p: Produto
           {p.unidades_caixa && menorUn != null && <div className="preco-un"><b>{dinheiro(menorUn, moeda)}</b> {t.porUnidade}</div>}</div>}
         <SeletorVariantes ids={vs.map((v) => v.produto_id)} titulo={p.nome} foto={p.foto}
           subtitulo={[t.fragrancias(vs.length), p.unidades_caixa ? t.caixaCom(p.unidades_caixa) : ""].filter(Boolean).join(" · ")}
-          rotulo={t.escolherFragrancia(vs.length)} textos={{ pronto: t.pronto, verPedido: t.verPedido, escolhidas: t.escolhidas, fechar: t.fechar }}>
+          rotulo={t.escolherFragrancia(vs.length)} textos={{ pronto: t.pronto, verPedido: t.verPedido, escolhidas: t.escolhidas(9999), fechar: t.fechar }}>
           {vs.map((v) => {
             const esg = esgotado(v, cliente);
             const pv = v.p ? Number(v.p.preco) * (v.unidades_caixa || 1) : null;

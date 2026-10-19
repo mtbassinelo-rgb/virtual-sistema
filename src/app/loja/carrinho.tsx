@@ -320,12 +320,14 @@ export function AdicionarTodos({ itens, rotulo }: { itens: ItemCarrinho[]; rotul
  */
 export function SeletorVariantes({ ids, titulo, foto, subtitulo, rotulo, textos, children }: {
   ids: string[]; titulo: string; foto: string | null; subtitulo?: string; rotulo: string;
-  textos: { pronto: string; verPedido: string; escolhidas: (n: number) => string; fechar: string }; children: React.ReactNode;
+  textos: { pronto: string; verPedido: string; escolhidas: string; fechar: string }; children: React.ReactNode;
 }) {
   const { itens, abrir: abrirPedido } = useCarrinho();
   const [aberto, setAberto] = useState(false);
   const doGrupo = itens.filter((i) => ids.includes(produtoDe(i)));
   const n = doGrupo.reduce((s, i) => s + i.qtd, 0);
+  // texto vem do servidor com "9999" no lugar do número (função não passa do servidor para o navegador)
+  const escolhidas = (q: number) => textos.escolhidas.replace("9999", String(q));
   useEffect(() => {
     if (!aberto) return;
     const antes = document.body.style.overflow;
@@ -337,7 +339,7 @@ export function SeletorVariantes({ ids, titulo, foto, subtitulo, rotulo, textos,
   return (
     <>
       <button type="button" className={`abrir-variantes ${n ? "com-itens" : ""}`} onClick={() => setAberto(true)}>
-        {n ? textos.escolhidas(n) : rotulo}
+        {n ? escolhidas(n) : rotulo}
       </button>
       {aberto && (
         <div className="folha-fundo" onClick={() => setAberto(false)}>
@@ -350,7 +352,7 @@ export function SeletorVariantes({ ids, titulo, foto, subtitulo, rotulo, textos,
             </header>
             <div className="folha-lista">{children}</div>
             <footer className="folha-rodape">
-              <span>{n ? textos.escolhidas(n).split(" · ")[0] : ""}</span>
+              <span>{n ? escolhidas(n).split(" · ")[0] : ""}</span>
               {n > 0 && <button type="button" className="folha-ver" onClick={() => { setAberto(false); abrirPedido(true); }}>{textos.verPedido}</button>}
               <button type="button" className="folha-pronto" onClick={() => setAberto(false)}>{textos.pronto}</button>
             </footer>
