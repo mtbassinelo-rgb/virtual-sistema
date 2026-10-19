@@ -20,7 +20,7 @@ const sem = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCas
 
 const REGRAS: [string, RegExp][] = [
   ["kits", /\bkits?\b/],
-  ["matizadores", /matiz|desamarel|tonaliz|platinad/],
+  ["matizadores", /\bmatiz|desamarel|tonaliz|platinad/],
   ["unhas", /unha|esmalte|cilio|\blash(es)?\b|alongamento|\btips?\b|cuticula|base coat|top coat|polygel|sculpt|\bgel\b.*real love|ultra bond/],
   ["maquiagem", /gloss|\blip\b|batom|\bpo solto|maquiagem|rimel|mascara de cilios|sobrancelha|delineador|blush|iluminador|corretivo/],
   ["perfumaria", /perfume|colonia|essencia|fragranc|body mist|deo colonia/],
@@ -30,7 +30,7 @@ const REGRAS: [string, RegExp][] = [
 ];
 
 // Sex shop: linha íntima/sensual e tudo da Sexy Fantasy (inclusive kits)
-const SEXSHOP = /perfume (de|para) calcinha|desodorante (de|para) calcinha|calcinha|lubrificante|excitante|retardante|adstringente (intimo|vaginal)|vibrador|estimulante (intimo|feminino|masculino|sexual)|sensual|afrodisiac|beijavel|comestivel|esquenta|gel (intimo )?(hot|ice|quente|gelado)|\bsex\b|sexy fantasy|erotic|sex ?shop|bolinha|anestesico intimo|dessensibilizante/;
+const SEXSHOP = /perfume (de|para) calcinha|desodorante (de|para) calcinha|calcinha|lubrificante|excitante|retardante|adstringente (intimo|vaginal)|vibrador|estimulante (intimo|feminino|masculino|sexual)|sensual|afrodisiac|beijavel|comestivel|esquenta|gel (intimo )?(hot|ice|quente|gelado)|\bsex\b|sexy fantasy|erotic|sex ?shop|bolinha|aromatizante|gel (hid[^ ]* )?(bab[^ ]* )?sexy|\bgoze\b|anestesico intimo|dessensibilizante/;
 
 export function linhaDe(nome: string, marca?: string | null, tipo?: string | null): string {
   const n = sem(nome);
@@ -130,7 +130,7 @@ export const SUBLINHAS: Record<string, { chave: string; nome: string; es: string
     { chave: "oleo", nome: "Óleos capilares", es: "Aceites capilares", re: /oleo|oil/ },
   ],
   kits: [
-    { chave: "matizador", nome: "Kit matizadores", es: "Kit matizadores", re: /matiz|ativador de tons|desamarel|blond|platin|violet|loiro/ },
+    { chave: "matizador", nome: "Kit matizadores", es: "Kit matizadores", re: /\bmatiz|ativador de tons|desamarel|blond|platin|violet|loiro/ },
     { chave: "alisamento", nome: "Kit alisamento capilar", es: "Kit alisado capilar", re: /alisa|progressiva|escova progressiva|selagem|liso|botox capilar|definitiva/ },
     { chave: "intimo", nome: "Kit íntimo", es: "Kit íntimo", re: /intim|calcinha|sexy|sensual|lubrific|excitante/ },
     { chave: "spa", nome: "Kit spa", es: "Kit spa", re: /\bspa\b|\bpes\b|\bmaos\b|parafina|esfoliante|cuticula|manicure|pedicure|relax/ },

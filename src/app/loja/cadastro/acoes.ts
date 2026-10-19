@@ -16,6 +16,9 @@ export async function enviarCadastro(_: RespostaCadastro, fd: FormData): Promise
     cidade: texto(fd, "cidade"), tipo: texto(fd, "tipo"), documento: texto(fd, "documento"), mensagem: texto(fd, "mensagem"),
   };
   if (texto(fd, "site")) return { erro: "Não foi possível enviar." };   // campo-armadilha contra robôs
+  // documento obrigatório: CPF (11) ou CNPJ (14) no Brasil; CI/RUC no Paraguai (6 a 10 dígitos)
+  const digitos = d.documento.replace(/\D/g, "");
+  if (!(digitos.length === 11 || digitos.length === 14 || (idioma === "es" && digitos.length >= 6 && digitos.length <= 10))) return { erro: t.cadDocFalta };
   try {
     const r = await pool.query("select app.registrar_cadastro_site($1,$2,$3,$4,$5,$6,$7,$8,$9) as numero",
       [d.nome, d.contato, d.whatsapp, d.email, d.cidade, d.tipo, d.documento, d.mensagem, idioma]);

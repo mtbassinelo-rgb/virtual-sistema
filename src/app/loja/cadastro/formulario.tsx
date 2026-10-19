@@ -24,7 +24,7 @@ export function FormularioCadastro({ t }: { t: T }) {
           {t.tipos.map(([v, n]) => <option key={v} value={v}>{n}</option>)}
         </select>
       </label>
-      <label>{t.cadDoc}<input name="documento" maxLength={30} /></label>
+      <label>{t.cadDoc}<input name="documento" maxLength={30} required inputMode="numeric" autoComplete="off" /></label>
       <label className="largo">{t.cadMsg}<textarea name="mensagem" rows={3} maxLength={1000} /></label>
       <input name="site" tabIndex={-1} autoComplete="off" aria-hidden="true" className="armadilha" />
       {estado.erro && <div className="g-erro largo" role="alert">{estado.erro}</div>}
