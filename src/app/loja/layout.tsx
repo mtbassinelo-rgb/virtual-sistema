@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { clienteAtual } from "@/lib/portal";
 import { pool } from "@/lib/db";
 import { linkWhatsApp, telefone } from "@/lib/formato";
@@ -51,6 +52,10 @@ function Redes() {
 export default async function LayoutLoja({ children }: { children: React.ReactNode }) {
   const c = await clienteAtual();
   const unidade = await unidadeLoja();
+  // entrada da equipe: o sistema fica em app.<domínio do site>
+  const h = await headers();
+  const host = (h.get("x-forwarded-host") ?? h.get("host") ?? "").replace(/^www\./, "").replace(/^app\./, "");
+  const urlSistema = host && /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(host) && !/^\d/.test(host) ? `https://app.${host}/login` : "/login";
   const principal = ehPrincipal(unidade);
   const idioma = await idiomaAtual();
   const t = TEXTOS[idioma];
@@ -98,7 +103,7 @@ export default async function LayoutLoja({ children }: { children: React.ReactNo
               { titulo: c ? c.nome : t.clientes, links: c
                 ? [{ href: "/loja/conta", texto: t.minhaConta }, { href: "/loja/reposicao", texto: t.reposicao }, { href: "/loja/pedidos", texto: t.meusPedidos }, { href: "/loja/sair", texto: t.sair }]
                 : [{ href: "/loja/cadastro", texto: t.querSerCliente }, { href: "/loja/acesso", texto: t.jaSouCliente }] },
-              { linha: true, links: [{ href: `/loja/idioma?l=${t.idiomaCodigo}`, texto: t.idioma }, { href: INSTAGRAM, texto: "Instagram" }, { href: FACEBOOK, texto: "Facebook" }] },
+              { linha: true, links: [{ href: urlSistema, texto: t.acessoEquipe }, { href: `/loja/idioma?l=${t.idiomaCodigo}`, texto: t.idioma }, { href: INSTAGRAM, texto: "Instagram" }, { href: FACEBOOK, texto: "Facebook" }] },
             ]} />
             <Link href="/loja" className="marca" aria-label={unidade.loja_nome}>
               <img src="/marca/icone.png" width={42} height={40} alt="" />
@@ -108,6 +113,7 @@ export default async function LayoutLoja({ children }: { children: React.ReactNo
               <input name="q" type="search" placeholder={t.buscar} aria-label={t.buscar} />
             </form>
             <nav className="nav" aria-label="Menu">
+              <a className="admin-equipe" href={urlSistema} title={t.acessoEquipe} rel="nofollow">Admin</a>
               <a className="idioma" href={`/loja/idioma?l=${t.idiomaCodigo}`} hrefLang={t.idiomaCodigo} lang={t.idiomaCodigo}>{t.idioma}</a>
               {c ? <Link href="/loja/conta">{t.minhaConta}</Link> : (
                 <details className="menu-cair area-cliente">
@@ -115,6 +121,7 @@ export default async function LayoutLoja({ children }: { children: React.ReactNo
                   <div className="menu-painel">
                     <a href="/loja/acesso">{t.entrarCliente}</a>
                     <a href="/loja/cadastro">{t.querSerCliente}</a>
+                    <a href={urlSistema} rel="nofollow">{t.acessoEquipe}</a>
                   </div>
                 </details>
               )}

@@ -556,3 +556,5 @@
 .sublinhas a { font-size: .82rem; padding: 6px 12px; background: var(--roxo-suave); border-color: transparent; }
 .sublinhas a small { opacity: .65; font-weight: 500; margin-left: 2px; }
 .sublinhas a.ativa small { opacity: .85; }
+.admin-equipe { font-size: .78rem !important; font-weight: 700; color: var(--apagado) !important; border: 1.5px dashed var(--linha-l); padding: 6px 10px; border-radius: 999px; text-decoration: none; }
+.admin-equipe:hover { color: var(--roxo) !important; border-color: var(--roxo); }
