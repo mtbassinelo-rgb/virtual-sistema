@@ -20,7 +20,7 @@ const sem = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCas
 const REGRAS: [string, RegExp][] = [
   ["kits", /\bkits?\b/],
   ["matizadores", /matiz|desamarel|tonaliz|platinad/],
-  ["unhas", /unha|esmalte|cilio|lash|alongamento|\btips?\b|cuticula|base coat|top coat|polygel|sculpt|\bgel\b.*real love|ultra bond/],
+  ["unhas", /unha|esmalte|cilio|\blash(es)?\b|alongamento|\btips?\b|cuticula|base coat|top coat|polygel|sculpt|\bgel\b.*real love|ultra bond/],
   ["maquiagem", /gloss|\blip\b|batom|\bpo solto|maquiagem|rimel|mascara de cilios|sobrancelha|delineador|blush|iluminador|corretivo/],
   ["perfumaria", /perfume|colonia|essencia|fragranc|body mist|deo colonia/],
   ["rosto", /facial|rosto|skin ?care|serum|micelar|protetor solar|olheira|demaquil|labial|\blabios?\b/],
