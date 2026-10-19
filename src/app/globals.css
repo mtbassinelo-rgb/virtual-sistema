@@ -298,3 +298,8 @@ button.discreto:hover { color: var(--erro); border-color: transparent; }
 .acesso-dias { display: grid; gap: 4px; margin-top: 6px; }
 .acesso-dia { display: grid; grid-template-columns: 120px auto auto auto; gap: 8px; align-items: center; justify-content: start; }
 .acesso-dia label { display: flex; flex-direction: row; gap: 6px; align-items: center; color: inherit; }
+.resumo-compra { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.resumo-compra > div { border: 1px solid var(--linha); border-radius: 8px; padding: 8px 12px; display: flex; flex-direction: column; }
+.resumo-compra b { font-size: 1.4rem; }
+.linha-urgente td { background: #fff4e5; }
+.texto-erro { color: #b42318; }

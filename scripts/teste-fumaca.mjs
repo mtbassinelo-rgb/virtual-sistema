@@ -78,7 +78,7 @@ ok((await abrir("/loja/pedido/token-que-nao-existe-123456")).html.includes("inv"
     "Cliente abre o pedido pelo link, sem login");
 }
 
-for (const tela of ["/promocoes", "/estoque/importar", "/estoque/precos", "/produtos", "/produtos/novo", "/produtos?filtro=sem-foto", "/site"]) {
+for (const tela of ["/relatorios/compra", "/relatorios/compra?marca=Maycrene", "/relatorios/compra?marca=Maycrene&todos=1&dias=60&prazo=10", "/promocoes", "/estoque/importar", "/estoque/precos", "/produtos", "/produtos/novo", "/produtos?filtro=sem-foto", "/site"]) {
   const r = await abrir(tela, await sessao("gerente@teste.local"));
   ok(r.status === 200 && !r.html.includes("Application error"), `Gerente: ${tela} abre`);
 }

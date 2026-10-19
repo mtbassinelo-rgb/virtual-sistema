@@ -231,7 +231,7 @@ export default async function Relatorios({ searchParams }: { searchParams: Promi
         <section className="painel">
           <div className="linha entre">
             <h2 style={{ margin: 0 }}>Para comprar: no estoque mínimo ou abaixo</h2>
-            <Link className="botao" href="/produtos?filtro=sem-minimo">Definir estoque mínimo</Link>
+            <div className="linha"><Link className="botao principal" href="/relatorios/compra">Planejar compra por marca</Link><Link className="botao" href="/produtos?filtro=sem-minimo">Definir estoque mínimo</Link></div>
           </div>
           <p className="suave pequeno" style={{ margin: 0 }}>Só aparecem produtos com estoque mínimo definido (na lista de Produtos, coluna Mínimo). “Comprar” é o que falta para voltar ao mínimo, arredondado para caixas fechadas quando o produto tem peças por caixa.</p>
           {minimo.length === 0 ? <div className="vazio">Nenhum produto abaixo do mínimo.</div> : (
