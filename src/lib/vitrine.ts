@@ -39,6 +39,7 @@ const MARCAS = ["Maycrene", "Rhenuks", "Soul", "Farmax", "Naxos", "Leite de Rosa
 
 export function marcaDe(nome: string, marca?: string | null): string | null {
   const n = sem(`${nome} ${marca ?? ""}`).replace(/phallebeauty/g, "phalle beauty");
+  if (/mary ?life|bio ?instinto/.test(n)) return "Bio Instinto e Mary Life";   // as duas marcas são uma só na loja
   const conhecida = MARCAS.find((m) => n.includes(sem(m)));
   if (conhecida) return conhecida === "Phale Beauty" ? "Phalle Beauty" : conhecida;
   if (!marca || /etiqueta|papel/i.test(marca)) return null;

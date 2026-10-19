@@ -107,6 +107,10 @@ update app.produtos set marca = 'phállebeauty' where codigo = 'T-MARCA-1';
 select teste.ok((select marca from app.produtos where codigo = 'T-MARCA-1') = 'PHALLEBEAUTY', 'Acento e caixa não criam marca nova');
 update app.produtos set marca = 'Marca Nova Qualquer' where codigo = 'T-MARCA-1';
 select teste.ok((select marca from app.produtos where codigo = 'T-MARCA-1') = 'MARCA NOVA QUALQUER', 'Marca nova também fica em maiúsculas');
+update app.produtos set marca = 'Mary Life' where codigo = 'T-MARCA-1';
+select teste.ok((select marca from app.produtos where codigo = 'T-MARCA-1') = 'BIO INSTINTO E MARY LIFE', 'Mary Life vira a marca unificada');
+update app.produtos set marca = 'Bio Instinto' where codigo = 'T-MARCA-1';
+select teste.ok((select marca from app.produtos where codigo = 'T-MARCA-1') = 'BIO INSTINTO E MARY LIFE', 'Bio Instinto vira a marca unificada');
 delete from app.produtos where codigo = 'T-MARCA-1';
 
 \echo '== Unidades: loja de CDE vê só o próprio estoque =='
