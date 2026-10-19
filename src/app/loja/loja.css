@@ -516,7 +516,7 @@
 .abrir-variantes { width: 100%; margin-top: 6px; padding: 10px 12px; border-radius: 10px; border: 1.5px solid var(--roxo); background: #fff; color: var(--roxo); font-weight: 700; font-size: .88rem; cursor: pointer; }
 .abrir-variantes.com-itens { background: var(--roxo); color: #fff; }
 .folha-fundo { position: fixed; inset: 0; background: rgba(20, 8, 30, .5); z-index: 80; display: flex; align-items: flex-end; justify-content: center; animation: folha-fade .15s ease-out; }
-.folha { background: #fff; width: 100%; max-width: 560px; max-height: 88vh; border-radius: 18px 18px 0 0; display: flex; flex-direction: column; box-shadow: 0 -8px 30px rgba(0,0,0,.2); animation: folha-sobe .2s ease-out; padding-bottom: env(safe-area-inset-bottom); }
+.folha { text-align: left; background: #fff; width: 100%; max-width: 560px; max-height: 88vh; border-radius: 18px 18px 0 0; display: flex; flex-direction: column; box-shadow: 0 -8px 30px rgba(0,0,0,.2); animation: folha-sobe .2s ease-out; padding-bottom: env(safe-area-inset-bottom); }
 .folha-alca { width: 42px; height: 4px; border-radius: 4px; background: #d9d2e3; margin: 8px auto 2px; }
 .folha-topo { display: flex; align-items: center; gap: 12px; padding: 8px 16px 12px; border-bottom: 1px solid var(--linha-l); }
 .folha-topo img { width: 52px; height: 52px; object-fit: contain; border-radius: 10px; background: #faf7fc; }
@@ -530,7 +530,7 @@
 .var-linha.esgotada .var-info b { color: #9a8fa5; }
 .var-foto { width: 40px; height: 40px; border-radius: 50%; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); }
 .var-foto img { width: 100%; height: 100%; object-fit: cover; background: #fff; }
-.var-linha .var-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.var-linha .var-info { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; text-align: left; }
 .var-linha .var-info b { font-size: .92rem; line-height: 1.25; }
 .var-linha .var-info > span { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: .78rem; }
 .var-linha .var-preco { color: #5a4a68; font-weight: 600; }
