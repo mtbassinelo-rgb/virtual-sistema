@@ -24,13 +24,13 @@ const REGRAS: [string, RegExp][] = [
   ["unhas", /unha|esmalte|cilio|\blash(es)?\b|alongamento|\btips?\b|cuticula|base coat|top coat|polygel|sculpt|\bgel\b.*real love|ultra bond/],
   ["maquiagem", /gloss|\blip\b|batom|\bpo solto|maquiagem|rimel|mascara de cilios|sobrancelha|delineador|blush|iluminador|corretivo/],
   ["perfumaria", /perfume|colonia|essencia|fragranc|body mist|deo colonia/],
-  ["rosto", /facial|rosto|skin ?care|serum|micelar|protetor solar|olheira|demaquil|labial|\blabios?\b/],
-  ["corpo", /hidratante|body|splash|sabonete|jabon|esfoliant|corporal|desodorant|\bmaos?\b|\bpes\b|intimo|massage|oleo de massagem|sebo de carneiro|creme dental|pomada|clareador|higiene|mosqueta|leite de rosas/],
+  ["rosto", /facial|rosto|skin ?care|serum|micelar|protetor solar|olheira|demaquil|labial|\blabios?\b|peel off|black mask|tonico adstringente/],
+  ["corpo", /hidratante|body|splash|sabonete|jabon|esfoliant|corporal|desodorant|\bmaos?\b|\bpes\b|intimo|massage|oleo de massagem|oleo (de )?banho|sebo de carneiro|creme dental|pomada|clareador|higiene|leite de rosas|body spray|oleo (de )?rosa mosqueta|oleo corporal/],
   ["cabelo", /shampoo|condicionador|mascara|capilar|cabelo|leave|finaliz|gelatina|ativador|cachos|progressiva|tonico|queratina|reconstru|hidrata..o capilar|pentear|oleo|escova|mechas|siliconizado|pontas|protetor termico|tintura|coloracao|descolor/],
 ];
 
 // Sex shop: linha íntima/sensual e tudo da Sexy Fantasy (inclusive kits)
-const SEXSHOP = /perfume (de|para) calcinha|desodorante (de|para) calcinha|calcinha|lubrificante|excitante|retardante|adstringente (intimo|vaginal)|vibrador|estimulante (intimo|feminino|masculino|sexual)|sensual|afrodisiac|beijavel|comestivel|esquenta|gel (intimo )?(hot|ice|quente|gelado)|\bsex\b|sexy fantasy|erotic|sex ?shop|bolinha|aromatizante|gel (hid[^ ]* )?(bab[^ ]* )?sexy|\bgoze\b|anestesico intimo|dessensibilizante/;
+const SEXSHOP = /perfume (de|para) calcinha|desodorante (de|para) calcinha|calcinha|lubrificante|excitante|retardante|adstringente (intimo|vaginal)|vibrador|estimulante (intimo|feminino|masculino|sexual)|sensual|afrodisiac|beijavel|comestivel|esquenta|gel (intimo )?(hot|ice|quente|gelado)|\bsex\b|sexy fantasy|erotic|sex ?shop|bolinha|aromatizante|yummy|\bfantasy\b|gel (hid[^ ]* )?(bab[^ ]* )?sexy|\bgoze\b|anestesico intimo|dessensibilizante/;
 
 export function linhaDe(nome: string, marca?: string | null, tipo?: string | null): string {
   const n = sem(nome);
@@ -39,7 +39,9 @@ export function linhaDe(nome: string, marca?: string | null, tipo?: string | nul
   if (tipo === "kit") return "kits";
   for (const [chave, re] of REGRAS) {
     // maquiagem só se não for hidratante/corpo/cabelo (ex.: "hidratante corporal iluminador" é Corpo e banho)
-    if (chave === "maquiagem" && /hidrat|hid\.|corporal|\bcorpo\b|capilar|cabelo|shampoo|splash/.test(n)) continue;
+    if (chave === "maquiagem" && /condicionante|reparador|capilar|cabelo|corporal|\bcorpo\b|shampoo|splash|desodorante|hid\./.test(n)) continue;
+    // cabelo antes de corpo quando o nome é claramente de cabelo (ex.: "protetor térmico spray rosa mosqueta", "máscara ... rosa mosqueta")
+    if (chave === "corpo" && /protetor termico|shampoo|condicionador|\bmascara\b(?! de cilios)|capilar|cabelo/.test(n) && !/intim|corporal|facial|sabonete|corpo/.test(n)) continue;
     if (re.test(n)) return chave;
   }
   return "outros";
@@ -118,34 +120,34 @@ export function corMarca(marca: string) {
 /** Subcategorias dentro de uma linha (filtro de segundo nível no site). A ordem é a ordem dos botões; a primeira regra que bate vale. */
 export const SUBLINHAS: Record<string, { chave: string; nome: string; es: string; re: RegExp; p?: number }[]> = {
   cabelo: [
-    { chave: "ativador", nome: "Ativador de cachos", es: "Activador de rizos", re: /ativador|cachos/ },
+    { chave: "ativador", nome: "Ativador de cachos", es: "Activador de rizos", re: /ativador|cachos/, p: 6 },
     { chave: "pentear", nome: "Creme para pentear", es: "Crema para peinar", re: /pentear|para peinar/ },
     { chave: "leite", nome: "Leite siliconizado", es: "Leche siliconada", re: /leite|siliconizad/ },
-    { chave: "protetor", nome: "Protetor térmico", es: "Protector térmico", re: /protetor termico|termoprotetor|protetor term/ },
-    { chave: "pontas", nome: "Reparador de pontas", es: "Reparador de puntas", re: /reparador|pontas/ },
-    { chave: "spray", nome: "Spray condicionante", es: "Spray acondicionador", re: /spray/ },
+    { chave: "protetor", nome: "Protetor térmico", es: "Protector térmico", re: /protetor termico|termoprotetor|protetor term/, p: 3 },
+    { chave: "pontas", nome: "Reparador de pontas", es: "Reparador de puntas", re: /reparador|pontas/, p: 3 },
+    { chave: "spray", nome: "Spray condicionante", es: "Spray acondicionador", re: /spray/, p: 4 },
     { chave: "gelatina", nome: "Gelatina capilar", es: "Gelatina capilar", re: /gelatina/ },
     { chave: "shampoo", nome: "Shampoos", es: "Champús", re: /shampoo/ },
     { chave: "escova", nome: "Escova de pentear", es: "Cepillo", re: /escova(?! progressiva)|pente\b/ },
     { chave: "serum", nome: "Sérum capilar", es: "Sérum capilar", re: /serum/ },
     { chave: "mechas", nome: "Papel para mechas", es: "Papel para mechas", re: /mechas|papel/ },
-    { chave: "mascara", nome: "Máscaras", es: "Mascarillas", re: /mascara/ },
+    { chave: "mascara", nome: "Máscaras", es: "Mascarillas", re: /mascara/, p: 4 },
     { chave: "condicionador", nome: "Condicionadores", es: "Acondicionadores", re: /condicionador/ },
     { chave: "oleo", nome: "Óleos capilares", es: "Aceites capilares", re: /oleo|oil/ },
   ],
   // Ordem = ordem dos botões; "p" = prioridade na hora de classificar (menor ganha; sem p = 5, empate pela ordem)
   corpo: [
-    { chave: "splash", nome: "Body splash", es: "Body splash", re: /splash|body mist/, p: 2 },
+    { chave: "splash", nome: "Body splash", es: "Body splash", re: /splash|body mist|body spray/, p: 2 },
     { chave: "oleo", nome: "Óleo corporal", es: "Aceite corporal", re: /\boleo\b/, p: 6 },
     { chave: "skin", nome: "Skin care", es: "Skin care", re: /skin ?care|serum|vitamina c|niacinamida|retinol|olheira|acne|micelar|tonico|acido hialuronico/, p: 4 },
-    { chave: "hidratante", nome: "Hidratante facial / corporal", es: "Hidratante facial / corporal", re: /hidratante|hidrantante|hid\.|locao|creme corporal|creme facial|manteiga/, p: 7 },
+    { chave: "hidratante", nome: "Hidratante facial / corporal", es: "Hidratante facial / corporal", re: /hidratante|hidrantante|hid\.|locao|creme corporal|creme facial|manteiga|sebo de carneiro/, p: 7 },
     { chave: "esfoliante", nome: "Esfoliante facial / corporal", es: "Exfoliante facial / corporal", re: /esfolia/, p: 3 },
     { chave: "geleia", nome: "Geleia corporal", es: "Jalea corporal", re: /geleia/, p: 1 },
-    { chave: "sab_intimo", nome: "Sabonete íntimo", es: "Jabón íntimo", re: /sabonete.*intim|intim.*sabonete/, p: 1 },
+    { chave: "sab_intimo", nome: "Sabonete íntimo", es: "Jabón íntimo", re: /sabonete.*intim|intim.*sabonete|higiene intim/, p: 1 },
     { chave: "sabonete", nome: "Sabonete facial / corporal", es: "Jabón facial / corporal", re: /sabonete|jabon/, p: 4 },
     { chave: "barra", nome: "Sabonete em barra", es: "Jabón en barra", re: /sabonete.*barra|\bbarra\b/, p: 2 },
     { chave: "oleo_banho", nome: "Óleo de banho", es: "Aceite de baño", re: /oleo (de )?banho/, p: 1 },
-    { chave: "tratamento", nome: "Tratamento corpo e rosto", es: "Tratamiento cuerpo y rostro", re: /tratamento|redutor|celulite|estria|clareador|firmador|colageno|cartilagem|arnica|\bgel\b|massag/, p: 8 },
+    { chave: "tratamento", nome: "Tratamento corpo e rosto", es: "Tratamiento cuerpo y rostro", re: /tratamento|redutor|celulite|estria|clareador|firmador|colageno|cartilagem|arnica|\bgel\b|massag|leite de rosas/, p: 8 },
     { chave: "spa", nome: "Linha spa", es: "Línea spa", re: /\bspa\b|parafina|sais? de banho|ofuro/, p: 2 },
     { chave: "pes", nome: "Pés, mãos, cotovelos, axilas e virilha", es: "Pies, manos, codos, axilas e ingles", re: /\bpes\b|\bmaos\b|cotovelo|axila|virilha|cuticula|calcanhar|rachadura|aspereza/, p: 2 },
     { chave: "perf_intimo", nome: "Perfume íntimo", es: "Perfume íntimo", re: /perfume (de |para )?(calcinha|intim)/, p: 1 },
@@ -157,9 +159,9 @@ export const SUBLINHAS: Record<string, { chave: string; nome: string; es: string
     { chave: "matizador", nome: "Kit matizadores", es: "Kit matizadores", re: /\bmatiz|ativador de tons|desamarel|blond|platin|violet|loiro/ },
     { chave: "alisamento", nome: "Kit alisamento capilar", es: "Kit alisado capilar", re: /alisa|progressiva|escova progressiva|selagem|liso|botox capilar|definitiva/ },
     { chave: "intimo", nome: "Kit íntimo", es: "Kit íntimo", re: /intim|calcinha|sexy|sensual|lubrific|excitante/ },
-    { chave: "spa", nome: "Kit spa", es: "Kit spa", re: /\bspa\b|\bpes\b|\bmaos\b|parafina|esfoliante|cuticula|manicure|pedicure|relax/ },
+    { chave: "spa", nome: "Kit spa", es: "Kit spa", re: /\bspa\b|\bpes\b|\bmaos\b|parafina|cuticula|manicure|pedicure|relax|podolog/ },
     { chave: "skin", nome: "Kit skin care", es: "Kit skin care", re: /skin|facial|rosto|serum|mousse|micelar|olheira|acne|vitamina c|niacinamida|colageno/ },
-    { chave: "corporal", nome: "Kit corporal", es: "Kit corporal", re: /hidratante|sabonete|corpo|corporal|body|splash|locao|desodorante|colonia/ },
+    { chave: "corporal", nome: "Kit corporal", es: "Kit corporal", re: /hidratante|sabonete|corpo|corporal|body|splash|locao|desodorante|colonia|glow|iluminador|esfoliante/ },
     { chave: "tratamento", nome: "Kit tratamento capilar", es: "Kit tratamiento capilar", re: /tratamento|reconstru|hidratac|nutric|cronograma|\bsos\b|queratina|ampola|terapia|repara|antiqueda|crescimento|biotina|recupera|\d passos/ },
     { chave: "diario", nome: "Kit capilar de uso diário", es: "Kit capilar de uso diario", re: /shampoo|condicionador|mascara|capilar|cabelo|cachos|leave/ },
   ],
@@ -171,12 +173,12 @@ export function subLinhaDe(linha: string, nome: string): string | null {
   const n = sem(nome);
   let melhor: string | null = null, pm = 99;
   for (const s of subs) if ((s.p ?? 5) < pm && s.re.test(n)) { melhor = s.chave; pm = s.p ?? 5; }
-  return melhor ?? "outros";
+  return melhor ?? (linha === "kits" ? "diario" : "outros");   // kit sem pista no nome é o kit capilar comum
 }
 
 /** Linhas a mais em que o produto também aparece (ex.: perfume de calcinha fica em Sex shop e também em Corpo e banho). */
 export function linhasExtras(nome: string, linha: string): string[] {
   const n = sem(nome);
-  if (linha !== "corpo" && /splash|body mist|perfume capilar|hair (perfume|mist)|perfume (de |para )?(calcinha|intim)|desodorante (de |para )?(intim|calcinha)|sabonete.*intim/.test(n)) return ["corpo"];
+  if (linha !== "corpo" && linha !== "kits" && /splash|body mist|perfume capilar|hair (perfume|mist)|perfume (de |para )?(calcinha|intim)|desodorante (de |para )?(intim|calcinha)|sabonete.*intim/.test(n)) return ["corpo"];
   return [];
 }
