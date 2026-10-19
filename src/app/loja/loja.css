@@ -552,3 +552,7 @@
 .var-nome { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 8px; row-gap: 0; }
 .var-un { color: var(--roxo); font-weight: 800; font-size: .95rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .var-un small { font-weight: 600; font-size: .72rem; color: var(--apagado); margin-left: 1px; }
+.sublinhas { margin-top: -8px; }
+.sublinhas a { font-size: .82rem; padding: 6px 12px; background: var(--roxo-suave); border-color: transparent; }
+.sublinhas a small { opacity: .65; font-weight: 500; margin-left: 2px; }
+.sublinhas a.ativa small { opacity: .85; }

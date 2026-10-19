@@ -2,7 +2,7 @@ import Link from "next/link";
 import { pool } from "@/lib/db";
 import { clienteAtual, sha256, tokenCliente } from "@/lib/portal";
 import { dinheiro, data, type Moeda } from "@/lib/formato";
-import { LINHAS, corRotulo, interno, linhaDe, marcaDe, nomeCurto } from "@/lib/vitrine";
+import { LINHAS, SUBLINHAS, corRotulo, interno, linhaDe, marcaDe, nomeCurto, subLinhaDe } from "@/lib/vitrine";
 import { Quantidade, SeletorVariantes } from "./carrinho";
 import { QueroProduto } from "./quero-produto";
 import { TEXTOS, idiomaAtual, type Textos } from "@/lib/idioma";
@@ -24,7 +24,7 @@ type Produto = Publico & { linha: string; marcaNome: string | null; p?: Preco; x
 const POR_PAGINA = 60;
 const sem = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
-export default async function Vitrine({ searchParams }: { searchParams: Promise<{ q?: string; linha?: string; marca?: string; promocao?: string; novidade?: string; vista?: string; pagina?: string; erro?: string }> }) {
+export default async function Vitrine({ searchParams }: { searchParams: Promise<{ q?: string; linha?: string; sub?: string; marca?: string; promocao?: string; novidade?: string; vista?: string; pagina?: string; erro?: string }> }) {
   const f = await searchParams;
   const cliente = await clienteAtual();
   const idioma = await idiomaAtual();
@@ -76,6 +76,11 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
   const soNovidade = f.novidade === "1";
   const novidades = todos.filter((p) => p.novidade);
   if (linha) todos = todos.filter((p) => p.linha === linha);
+  // subcategorias da linha (ex.: Cabelo → Ativador de cachos, Shampoos…)
+  const contagemSub = new Map<string, number>();
+  if (linha && SUBLINHAS[linha]) for (const p of todos) { const k = subLinhaDe(linha, p.grupo ?? p.nome) ?? "outros"; contagemSub.set(k, (contagemSub.get(k) ?? 0) + 1); }
+  const sub = linha && f.sub && (contagemSub.has(f.sub)) ? f.sub : null;
+  if (sub && linha) todos = todos.filter((p) => (subLinhaDe(linha, p.grupo ?? p.nome) ?? "outros") === sub);
   if (marca) todos = todos.filter((p) => p.marcaNome === marca);
   if (soPromo) todos = todos.filter((p) => pct(p) > 0);
   if (soNovidade) todos = todos.filter((p) => p.novidade);
@@ -114,7 +119,7 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
   const filtrando = Boolean(q || linha || marca || soPromo || soNovidade);
   const url = (mud: Record<string, string | number | null>) => {
     const u = new URLSearchParams();
-    const v = { q: q || null, linha, marca, promocao: soPromo ? "1" : null, novidade: soNovidade ? "1" : null, vista: vista === "lista" ? "lista" : null, pagina: null as string | number | null, ...mud };
+    const v = { q: q || null, linha, sub: "linha" in mud ? null : sub, marca, promocao: soPromo ? "1" : null, novidade: soNovidade ? "1" : null, vista: vista === "lista" ? "lista" : null, pagina: null as string | number | null, ...mud };
     for (const [k, x] of Object.entries(v)) if (x !== null && x !== "" && !(k === "pagina" && x === 1)) u.set(k, String(x));
     const s = u.toString();
     return `/loja${s ? "?" + s : ""}#catalogo`;
@@ -123,7 +128,8 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
 
   const n = (x: number) => `${x.toLocaleString(idioma === "es" ? "es-PY" : "pt-BR")} ${x === 1 ? t.produto : t.produtos}`;
   const cartao = (p: Produto) => <Cartao key={p.produto_id} p={p} moeda={moeda} cliente={Boolean(cliente)} t={t} vendeUnidade={vendeUnidade} />;
-  const titulo = marca ?? (soPromo ? t.promocoes : soNovidade ? t.novidades : linha ? t.linhas[linha] : q ? t.resultados(q) : t.catalogo);
+  const nomeSub = sub ? [...(SUBLINHAS[linha ?? ""] ?? []), { chave: "outros", nome: "Outros", es: "Otros" }].find((s) => s.chave === sub) : null;
+  const titulo = marca ?? (soPromo ? t.promocoes : soNovidade ? t.novidades : linha ? (nomeSub ? (idioma === "es" ? nomeSub.es : nomeSub.nome) : t.linhas[linha]) : q ? t.resultados(q) : t.catalogo);
 
   return (
     <>
@@ -236,6 +242,16 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
             <Link key={l.chave} href={url({ linha: l.chave })} className={linha === l.chave ? "ativa" : ""}>{t.linhas[l.chave] ?? l.nome}</Link>
           ))}
         </nav>
+        {linha && SUBLINHAS[linha] && contagemSub.size > 1 && (
+          <nav className="linhas sublinhas" aria-label={t.linhas[linha]}>
+            <Link href={url({ sub: null })} className={!sub ? "ativa" : ""}>{t.tudo}</Link>
+            {[...SUBLINHAS[linha], { chave: "outros", nome: "Outros", es: "Otros" }].filter((s) => contagemSub.get(s.chave)).map((s) => (
+              <Link key={s.chave} href={url({ sub: s.chave })} className={sub === s.chave ? "ativa" : ""}>
+                {idioma === "es" ? s.es : s.nome} <small>{contagemSub.get(s.chave)}</small>
+              </Link>
+            ))}
+          </nav>
+        )}
         {f.erro && <div className="aviso-erro" role="alert">{f.erro}</div>}
         {(q || marca || soPromo || soNovidade) && (
           <p className="limpar">

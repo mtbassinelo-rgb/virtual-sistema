@@ -110,3 +110,40 @@ export function corMarca(marca: string) {
   for (const ch of marca) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return PALETA_MARCAS[h % PALETA_MARCAS.length];
 }
+
+/** Subcategorias dentro de uma linha (filtro de segundo nível no site). A ordem é a ordem dos botões; a primeira regra que bate vale. */
+export const SUBLINHAS: Record<string, { chave: string; nome: string; es: string; re: RegExp }[]> = {
+  cabelo: [
+    { chave: "ativador", nome: "Ativador de cachos", es: "Activador de rizos", re: /ativador|cachos/ },
+    { chave: "pentear", nome: "Creme para pentear", es: "Crema para peinar", re: /pentear|para peinar/ },
+    { chave: "leite", nome: "Leite siliconizado", es: "Leche siliconada", re: /leite|siliconizad/ },
+    { chave: "protetor", nome: "Protetor térmico", es: "Protector térmico", re: /protetor termico|termoprotetor|protetor term/ },
+    { chave: "pontas", nome: "Reparador de pontas", es: "Reparador de puntas", re: /reparador|pontas/ },
+    { chave: "spray", nome: "Spray condicionante", es: "Spray acondicionador", re: /spray/ },
+    { chave: "gelatina", nome: "Gelatina capilar", es: "Gelatina capilar", re: /gelatina/ },
+    { chave: "shampoo", nome: "Shampoos", es: "Champús", re: /shampoo/ },
+    { chave: "escova", nome: "Escova de pentear", es: "Cepillo", re: /escova(?! progressiva)|pente\b/ },
+    { chave: "serum", nome: "Sérum capilar", es: "Sérum capilar", re: /serum/ },
+    { chave: "mechas", nome: "Papel para mechas", es: "Papel para mechas", re: /mechas|papel/ },
+    { chave: "mascara", nome: "Máscaras", es: "Mascarillas", re: /mascara/ },
+    { chave: "condicionador", nome: "Condicionadores", es: "Acondicionadores", re: /condicionador/ },
+    { chave: "oleo", nome: "Óleos capilares", es: "Aceites capilares", re: /oleo|oil/ },
+  ],
+  kits: [
+    { chave: "matizador", nome: "Kit matizadores", es: "Kit matizadores", re: /matiz|ativador de tons|desamarel|blond|platin|violet|loiro/ },
+    { chave: "alisamento", nome: "Kit alisamento capilar", es: "Kit alisado capilar", re: /alisa|progressiva|escova progressiva|selagem|liso|botox capilar|definitiva/ },
+    { chave: "intimo", nome: "Kit íntimo", es: "Kit íntimo", re: /intim|calcinha|sexy|sensual|lubrific|excitante/ },
+    { chave: "spa", nome: "Kit spa", es: "Kit spa", re: /\bspa\b|\bpes\b|\bmaos\b|parafina|esfoliante|cuticula|manicure|pedicure|relax/ },
+    { chave: "skin", nome: "Kit skin care", es: "Kit skin care", re: /skin|facial|rosto|serum|mousse|micelar|olheira|acne|vitamina c|niacinamida|colageno/ },
+    { chave: "corporal", nome: "Kit corporal", es: "Kit corporal", re: /hidratante|sabonete|corpo|corporal|body|splash|locao|desodorante|colonia/ },
+    { chave: "tratamento", nome: "Kit tratamento capilar", es: "Kit tratamiento capilar", re: /tratamento|reconstru|hidratac|nutric|cronograma|\bsos\b|queratina|ampola|terapia|repara|antiqueda|crescimento|biotina|recupera|\d passos/ },
+    { chave: "diario", nome: "Kit capilar de uso diário", es: "Kit capilar de uso diario", re: /shampoo|condicionador|mascara|capilar|cabelo|cachos|leave/ },
+  ],
+};
+
+export function subLinhaDe(linha: string, nome: string): string | null {
+  const subs = SUBLINHAS[linha];
+  if (!subs) return null;
+  const n = sem(nome);
+  return subs.find((s) => s.re.test(n))?.chave ?? "outros";
+}
