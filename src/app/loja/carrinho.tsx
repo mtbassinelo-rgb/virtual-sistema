@@ -350,7 +350,7 @@ export function SeletorVariantes({ ids, titulo, foto, subtitulo, rotulo, textos,
             </header>
             <div className="folha-lista">{children}</div>
             <footer className="folha-rodape">
-              <span>{n ? textos.escolhidas(n) : ""}</span>
+              <span>{n ? textos.escolhidas(n).split(" · ")[0] : ""}</span>
               {n > 0 && <button type="button" className="folha-ver" onClick={() => { setAberto(false); abrirPedido(true); }}>{textos.verPedido}</button>}
               <button type="button" className="folha-pronto" onClick={() => setAberto(false)}>{textos.pronto}</button>
             </footer>
