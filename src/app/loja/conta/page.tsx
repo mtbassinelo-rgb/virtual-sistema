@@ -22,7 +22,7 @@ const T = {
     prazo: (d: number) => `Prazo de ${d} dias para pagar cada pedido.`, conferencia: (v: string) => `${v} em pagamentos enviados aguardando aprovação do gerente.`,
     extrato: "Extrato", data: "Data", descricao: "Descrição", valor: "Valor", situacao: "Situação", vence: "Vence",
     sit: { pago: "Pago", vencido: "Vencido", em_aberto: "Em aberto", aprovado: "Aprovado", recusado: "Recusado", em_conferencia: "Aguardando aprovação" } as Record<string, string>, verTodos: "Ver todos os pedidos e pagamentos", nenhum: "Você ainda não fez pedidos por aqui.",
-    maisComprados: "O que você mais compra", comprarNovo: "Ver catálogo", troca: "Trocar senha", atual: "Senha atual",
+    maisComprados: "O que você mais compra", comprarNovo: "Ver catálogo", troca: "Trocar senha", senhaVendedora: "Você está usando a senha que a sua vendedora criou. Se quiser, troque por uma sua (é opcional).", atual: "Senha atual",
     nova: "Nova senha (mínimo 6 caracteres)", repetir: "Repita a nova senha", salvar: "Trocar senha", ok: "Senha trocada. Use a nova senha da próxima vez.",
     curta: "A nova senha precisa ter pelo menos 6 caracteres.", diferente: "As duas senhas novas não são iguais.", atualErrada: "A senha atual não confere.",
     etapas: { aguardando_vendedora: "Aguardando a vendedora", em_separacao: "Em separação", aguardando_pagamento: "Aguardando pagamento",
@@ -38,7 +38,7 @@ const T = {
     prazo: (d: number) => `Plazo de ${d} días para pagar cada pedido.`, conferencia: (v: string) => `${v} en pagos enviados esperando aprobación del gerente.`,
     extrato: "Estado de cuenta", data: "Fecha", descricao: "Descripción", valor: "Monto", situacao: "Estado", vence: "Vence",
     sit: { pago: "Pagado", vencido: "Vencido", em_aberto: "Pendiente", aprovado: "Aprobado", recusado: "Rechazado", em_conferencia: "Esperando aprobación" } as Record<string, string>, verTodos: "Ver todos los pedidos y pagos", nenhum: "Todavía no hizo pedidos por aquí.",
-    maisComprados: "Lo que más compra", comprarNovo: "Ver catálogo", troca: "Cambiar contraseña", atual: "Contraseña actual",
+    maisComprados: "Lo que más compra", comprarNovo: "Ver catálogo", troca: "Cambiar contraseña", senhaVendedora: "Usted está usando la contraseña que creó su vendedora. Si quiere, cámbiela por una suya (es opcional).", atual: "Contraseña actual",
     nova: "Nueva contraseña (mínimo 6 caracteres)", repetir: "Repita la nueva contraseña", salvar: "Cambiar contraseña", ok: "Contraseña cambiada. Use la nueva la próxima vez.",
     curta: "La nueva contraseña debe tener al menos 6 caracteres.", diferente: "Las dos contraseñas nuevas no son iguales.", atualErrada: "La contraseña actual no es correcta.",
     etapas: { aguardando_vendedora: "Esperando a la vendedora", em_separacao: "En preparación", aguardando_pagamento: "Esperando pago",
@@ -77,7 +77,7 @@ async function trocar(fd: FormData) {
 
 export default async function MinhaArea({ searchParams }: { searchParams: Promise<{ ok?: string; erro?: string }> }) {
   const { cliente, sessao } = await exigirCliente();
-  if ((await pool.query("select app.portal_senha_provisoria($1) as p", [sessao])).rows[0]?.p) redirect("/loja/criar-senha");
+  const senhaDaVendedora = Boolean((await pool.query("select app.portal_senha_provisoria($1) as p", [sessao])).rows[0]?.p);
   const f = await searchParams;
   const idioma = await idiomaAtual();
   const t = T[idioma];
@@ -211,6 +211,7 @@ export default async function MinhaArea({ searchParams }: { searchParams: Promis
 
       <details className="painel area-bloco" id="senha" open={Boolean(f.ok || f.erro)}>
         <summary><b>{t.troca}</b></summary>
+        {senhaDaVendedora && !f.ok && <p className="pequeno" style={{ margin: "8px 0 0" }}>{t.senhaVendedora}</p>}
         {f.ok && <div className="aviso-ok" role="status">{f.ok}</div>}
         {f.erro && <div className="aviso-erro" role="alert">{f.erro}</div>}
         <form action={trocar} className="acesso-form" style={{ maxWidth: 420, marginTop: 12 }}>

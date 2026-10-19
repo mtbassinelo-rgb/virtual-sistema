@@ -119,7 +119,8 @@ export async function depositoCliente(fd: FormData) {
 
 export type RespostaAcesso = { erro?: string; login?: string; senha?: string; mensagem?: string; whatsapp?: string | null };
 
-/** Cria (ou refaz) o acesso do cliente: documento + senha de 6 números sorteada, mostrada uma única vez. */
+/** Cria (ou refaz) o acesso do cliente: documento + a senha que a vendedora digitar (ou 6 números sorteados se deixar em branco).
+ *  O cliente usa essa senha normalmente; trocar por uma dele é opcional (Minha área). */
 export async function criarAcessoCliente(_: RespostaAcesso, fd: FormData): Promise<RespostaAcesso> {
   const u = await exigirUsuario();
   const id = texto(fd, "cliente_id");
@@ -129,7 +130,10 @@ export async function criarAcessoCliente(_: RespostaAcesso, fd: FormData): Promi
     const { hash } = await import("@node-rs/argon2");
     const { headers } = await import("next/headers");
     const { urlPortal } = await import("@/lib/portal");
-    const senha = String(randomInt(0, 1_000_000)).padStart(6, "0");
+    const digitada = String(fd.get("senha") ?? "").trim();
+    if (digitada && digitada.length < 6) return { erro: "A senha precisa ter pelo menos 6 caracteres." };
+    if (digitada.length > 64) return { erro: "Senha longa demais." };
+    const senha = digitada || String(randomInt(0, 1_000_000)).padStart(6, "0");
     const senhaHash = await hash(senha, { memoryCost: 19456, timeCost: 2, parallelism: 1 });
     const cli = await comUsuario(u.id, async (c) => {
       await c.query("select app.definir_acesso_cliente($1, $2, $3)", [id, documento, senhaHash]);
@@ -140,8 +144,8 @@ export async function criarAcessoCliente(_: RespostaAcesso, fd: FormData): Promi
     const host = (h.get("x-forwarded-host") ?? h.get("host") ?? "").replace(/^app\.|^teste\./, "");
     const site = `${urlPortal(host || null, h.get("x-forwarded-proto"))}/loja/acesso`;
     const mensagem = cli.pais === "PY"
-      ? `¡Hola ${cli.nome}! Soy ${cli.vendedora}, de Virtual Cosméticos. Ya puede ver el catálogo con sus precios y hacer pedidos:\n${site}\nUsuario: ${documento}\nContraseña: ${senha}\nEs una contraseña provisoria: en el primer ingreso usted crea la suya.`
-      : `Olá ${cli.nome}! Aqui é a ${cli.vendedora}, da Virtual Cosméticos. Agora você pode ver o catálogo com os seus preços e fazer pedidos:\n${site}\nUsuário: ${documento}\nSenha: ${senha}\nÉ uma senha provisória: no primeiro acesso você cria a sua.`;
+      ? `¡Hola ${cli.nome}! Soy ${cli.vendedora}, de Virtual Cosméticos. Ya puede ver el catálogo con sus precios y hacer pedidos:\n${site}\nUsuario: ${documento}\nContraseña: ${senha}\nSi quiere, puede cambiar la contraseña en "Mi área".`
+      : `Olá ${cli.nome}! Aqui é a ${cli.vendedora}, da Virtual Cosméticos. Agora você pode ver o catálogo com os seus preços e fazer pedidos:\n${site}\nUsuário: ${documento}\nSenha: ${senha}\nSe quiser, você pode trocar a senha em "Minha área".`;
     revalidatePath(`/clientes/${id}`);
     return { login: documento, senha, mensagem, whatsapp: cli.whatsapp ?? cli.telefone };
   } catch (e) {
