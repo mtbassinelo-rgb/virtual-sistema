@@ -12,6 +12,7 @@ export const LINHAS: Linha[] = [
   { chave: "maquiagem", nome: "Maquiagem" },
   { chave: "unhas", nome: "Unhas e cílios" },
   { chave: "perfumaria", nome: "Perfumaria" },
+  { chave: "sexshop", nome: "Sex shop" },
   { chave: "outros", nome: "Outros" },
 ];
 
@@ -28,8 +29,14 @@ const REGRAS: [string, RegExp][] = [
   ["cabelo", /shampoo|condicionador|mascara|capilar|cabelo|leave|finaliz|gelatina|ativador|cachos|progressiva|tonico|queratina|reconstru|hidrata..o capilar|pentear|oleo|escova|mechas|siliconizado|pontas|protetor termico|tintura|coloracao|descolor/],
 ];
 
-export function linhaDe(nome: string): string {
+// Sex shop: linha íntima/sensual e tudo da Sexy Fantasy (inclusive kits)
+const SEXSHOP = /perfume (de|para) calcinha|desodorante (de|para) calcinha|calcinha|lubrificante|excitante|retardante|adstringente|vibrador|estimulante|sensual|afrodisiac|beijavel|comestivel|esquenta|gel (intimo )?(hot|ice|quente|gelado)|\bsexy?\b|erotic|sex ?shop|bolinha|anestesico intimo|dessensibilizante/;
+
+export function linhaDe(nome: string, marca?: string | null, tipo?: string | null): string {
   const n = sem(nome);
+  const m = sem(marca ?? "");
+  if (/sexy fantasy|fantasy sexy/.test(m) || SEXSHOP.test(n)) return "sexshop";
+  if (tipo === "kit") return "kits";
   for (const [chave, re] of REGRAS) if (re.test(n)) return chave;
   return "outros";
 }
@@ -69,6 +76,7 @@ export function corRotulo(nome: string, linha: string): { fundo: string; tinta: 
     case "rosto": return { fundo: "#A9D6C6", tinta: "#123326" };
     case "unhas": return { fundo: "#E7889A", tinta: "#3A0E18" };
     case "perfumaria": return { fundo: "#BBA6DD", tinta: "#24123A" };
+    case "sexshop": return { fundo: "#8E1F3F", tinta: "#FFE8EF" };
     default: return { fundo: "#E3DEEC", tinta: "#2B1638" };
   }
 }

@@ -66,7 +66,7 @@ export default async function LayoutLoja({ children }: { children: React.ReactNo
   const porLinha = new Map<string, number>(), porMarca = new Map<string, number>();
   for (const p of produtos) {
     if (interno(p.nome)) continue;
-    const l = p.tipo === "kit" ? "kits" : linhaDe(p.nome);
+    const l = linhaDe(p.nome, p.marca, p.tipo);
     porLinha.set(l, (porLinha.get(l) ?? 0) + 1);
     const m = marcaDe(p.nome, p.marca);
     if (m) porMarca.set(m, (porMarca.get(m) ?? 0) + 1);

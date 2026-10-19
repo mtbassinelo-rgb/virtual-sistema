@@ -64,7 +64,7 @@ export default async function QuemSomos() {
     produtos++;
     const m = marcaDe(r.nome, r.marca);
     if (m) marcas.add(m);
-    const l = r.tipo === "kit" ? "kits" : linhaDe(r.nome);
+    const l = linhaDe(r.nome, r.marca, r.tipo);
     linhas.set(l, (linhas.get(l) ?? 0) + 1);
   }
   const listaLinhas = LINHAS.filter((l) => linhas.get(l.chave) && l.chave !== "outros");

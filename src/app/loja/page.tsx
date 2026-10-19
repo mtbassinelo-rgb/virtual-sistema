@@ -57,7 +57,7 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
   const grupos = new Map<string, { grupo: string; variante: string | null }>(
     ((await pool.query("select * from app.grupos_publicos()")).rows as { produto_id: string; grupo: string; variante: string | null }[]).map((g) => [g.produto_id, g]));
   let todos: Produto[] = publicos.filter((p) => !interno(p.nome)).map((p) => ({
-    ...p, grupo: grupos.get(p.produto_id)?.grupo ?? null, variante: grupos.get(p.produto_id)?.variante ?? null, linha: p.tipo === "kit" ? "kits" : linhaDe(p.nome), marcaNome: marcaDe(p.nome, p.marca), p: precos.get(p.produto_id), x: extras.get(p.produto_id),
+    ...p, grupo: grupos.get(p.produto_id)?.grupo ?? null, variante: grupos.get(p.produto_id)?.variante ?? null, linha: linhaDe(p.nome, p.marca, p.tipo), marcaNome: marcaDe(p.nome, p.marca), p: precos.get(p.produto_id), x: extras.get(p.produto_id),
   }));
   const contagem = new Map<string, number>();
   for (const p of todos) contagem.set(p.linha, (contagem.get(p.linha) ?? 0) + 1);
