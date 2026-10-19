@@ -30,7 +30,7 @@ const REGRAS: [string, RegExp][] = [
 ];
 
 // Sex shop: linha íntima/sensual e tudo da Sexy Fantasy (inclusive kits)
-const SEXSHOP = /perfume (de|para) calcinha|desodorante (de|para) calcinha|calcinha|lubrificante|excitante|retardante|adstringente|vibrador|estimulante (intimo|feminino|masculino|sexual)|sensual|afrodisiac|beijavel|comestivel|esquenta|gel (intimo )?(hot|ice|quente|gelado)|\bsexy?\b|erotic|sex ?shop|bolinha|anestesico intimo|dessensibilizante/;
+const SEXSHOP = /perfume (de|para) calcinha|desodorante (de|para) calcinha|calcinha|lubrificante|excitante|retardante|adstringente|vibrador|estimulante (intimo|feminino|masculino|sexual)|sensual|afrodisiac|beijavel|comestivel|esquenta|gel (intimo )?(hot|ice|quente|gelado)|\bsex\b|sexy fantasy|erotic|sex ?shop|bolinha|anestesico intimo|dessensibilizante/;
 
 export function linhaDe(nome: string, marca?: string | null, tipo?: string | null): string {
   const n = sem(nome);
