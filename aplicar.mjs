@@ -35,7 +35,9 @@ select p.id, p.codigo, p.nome, p.marca, p.ativo, p.foto, p.tipo::text as tipo, p
        (case when p.tipo::text = 'kit' or exists (select 1 from app.kit_componentes k where k.kit_id = p.id) then 'KIT:' else '' end) ||
        (select string_agg(distinct w, ' ' order by w) from regexp_split_to_table(
           regexp_replace(regexp_replace(app.nome_normal(p.nome), '(\\d)\\s+(ml|g|kg|l|gr)\\M', '\\1\\2', 'g'), '[^a-z0-9]+', ' ', 'g'), ' ') w
-         where w not in ('', 'de','da','do','das','dos','e','com','para','p','c','o','a','em','-') and w not in (select w from marcas)) as k
+         where w not in ('', 'de','da','do','das','dos','e','com','para','p','c','o','a','em','-') and w not in (select w from marcas)) as k,
+       (select string_agg(distinct w, ' ' order by w) from regexp_split_to_table(regexp_replace(app.nome_normal(p.nome), '[^a-z0-9]+', ' ', 'g'), ' ') w
+         where w in (select w from marcas)) as marca_nome
   from app.produtos p`;
 
 try {
@@ -56,6 +58,14 @@ try {
     let p = await pk(id);
     if (!p) { rel.lista.push(`NÃO ACHEI ${id}`); continue; }
     const r = { produto: `${p.codigo} ${p.nome}`, ativo_antes: p.ativo };
+    const NAX = { "BLING-16711843664": "nax-ruivo", "BLING-16707872483": "nax-black" };
+    if (NAX[p.codigo]) {
+      const kit = (await q("select * from pk where codigo = $1", [NAX[p.codigo]]))[0];
+      if (!kit.foto && p.foto) await c.query("update app.produtos set foto = $2 where id = $1", [kit.id, p.foto]);
+      await c.query("update app.produtos set ativo = false, grupo = null, variante = null where id = $1", [p.id]);
+      r.naxos = `vai para o kit ${kit.codigo} ${kit.nome} (shampoo + máscara); cadastro do Bling desativado${!kit.foto && p.foto ? ", foto copiada" : ""}`;
+      p = kit;
+    }
     // se está inativo e há um repetido ativo (mesma chave e marca), a entrada vai para o ativo
     if (!p.ativo) {
       const irmao = (await q("select * from pk where k = $1 and id <> $2 and ativo and coalesce(marca,'') in (coalesce($3,''), '') order by est desc limit 1", [p.k, p.id, p.marca]))[0];
@@ -104,6 +114,8 @@ try {
     if (g.length < 2) continue;
     const marcas = new Set(g.map((x) => x.marca).filter(Boolean));
     if (marcas.size > 1) { rel.dup.pulados.push(`${g[0].nome} — marcas diferentes (${[...marcas].join(", ")})`); continue; }
+    const mn = new Set(g.map((x) => x.marca_nome).filter(Boolean));
+    if (mn.size > 1) { rel.dup.pulados.push(`${g[0].nome} — marcas diferentes no nome (${[...mn].join(" / ")})`); continue; }
     const comEst = g.filter((x) => Number(x.est) > 0);
     if (comEst.length > 1) { rel.dup.pulados.push(`${g[0].nome} — ${comEst.length} cadastros com estoque: ${comEst.map((x) => `${x.codigo}=${x.est}`).join(", ")}`); continue; }
     const ord = [...g].sort((a, b) => (Number(b.est) > 0) - (Number(a.est) > 0) || b.tem_componentes - a.tem_componentes || b.ativo - a.ativo || (b.foto != null) - (a.foto != null) || b.tem_preco - a.tem_preco);
