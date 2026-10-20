@@ -22,6 +22,7 @@ export const PERMISSOES: Permissao[] = [
   { chave: "estoque_importar", nome: "Importar estoque do Bling", rotas: ["/estoque/importar"], gestao: true },
   { chave: "relatorios", nome: "Relatórios", rotas: ["/relatorios"] },
   { chave: "comissoes", nome: "Comissões", rotas: ["/comissoes"] },
+  { chave: "inteligencia", nome: "Inteligência comercial (rentabilidade e custos)", rotas: ["/inteligencia"], gestao: true },
   { chave: "financeiro", nome: "Despesas, contas e parâmetros", rotas: ["/despesas", "/parametros"], gestao: true },
   // Área exclusiva do dono: ninguém recebe por padrão e só o dono libera para alguém (Equipe → Acessos)
   { chave: "saude_financeira", nome: "Saúde financeira (área do dono)", rotas: ["/saude-financeira"], gestao: true, soDono: true },

@@ -78,6 +78,11 @@ export default async function AreaInterna({ children }: { children: React.ReactN
         { href: "/relatorios?aba=site", texto: "Funil do site", dica: "Visitas, carrinhos, pedidos e o que os clientes procuram" },
       ] : []),
     ] },
+    ...(gestao ? [{ id: "inteligencia", titulo: "Inteligência", icone: "relatorios", itens: [
+      { href: "/inteligencia", texto: "Saúde dos dados", dica: "O que falta no cadastro para calcular margem e preço mínimo" },
+      { href: "/inteligencia?aba=rentabilidade", texto: "Rentabilidade PY", dica: "Margem e preço mínimo por produto nas tabelas do Paraguai" },
+      { href: "/inteligencia?aba=custos", texto: "Custos e frete", dica: "Frete por marca, imposto e entrega usados nos cálculos" },
+    ] }] : []),
     gestao
       ? { id: "financeiro", titulo: "Financeiro", icone: "financeiro", itens: [
           { href: "/saude-financeira", texto: "Saúde financeira", dica: "Levantamento de vendas, compras, despesas, margens e plano de ação (área do dono)" },

@@ -11,6 +11,7 @@ export const metadata = { title: "Parâmetros" };
 const GRUPOS: { titulo: string; chaves: string[] }[] = [
   { titulo: "Vendas e lucro", chaves: ["cambio_custo_gs", "pedido_exige_estoque", "link_pedido_validade_dias", "arredondamento_gs"] },
   { titulo: "Envios ao Paraguai", chaves: ["passeiro_custo_volume"] },
+  { titulo: "Inteligência comercial", chaves: ["cambio_compra_gs", "margem_minima_contribuicao"] },
   { titulo: "Promoções", chaves: ["promo_desconto_maximo", "promo_sugerida_desconto"] },
   { titulo: "Estoque", chaves: ["giro_janela_dias", "giro_parado_cobertura", "giro_baixo_cobertura", "giro_ultimas_unidades"] },
   { titulo: "Área do cliente", chaves: ["convite_validade_dias", "sessao_cliente_dias"] },
@@ -25,7 +26,8 @@ async function salvar(fd: FormData) {
     const valor = numero(fd, "valor");
     if (valor === null || valor < 0) throw new Error("Informe um número válido.");
     if (chave === "pedido_exige_estoque" && valor !== 0 && valor !== 1) throw new Error("Use 1 (sim) ou 0 (não).");
-    if (chave === "cambio_custo_gs" && (valor < 100 || valor > 100000)) throw new Error("Câmbio fora do esperado (Gs por R$).");
+    if ((chave === "cambio_custo_gs" || chave === "cambio_compra_gs") && (valor < 100 || valor > 100000)) throw new Error("Câmbio fora do esperado (Gs por R$).");
+    if (chave === "margem_minima_contribuicao" && valor >= 90) throw new Error("Margem mínima deve ficar abaixo de 90%.");
     const r = await comUsuario(u.id, (c) => c.query("update app.parametros set valor = $2 where chave = $1", [chave, valor]));
     if (r.rowCount === 0) throw new Error("Você não tem permissão para alterar este parâmetro.");
   } catch (e) {
