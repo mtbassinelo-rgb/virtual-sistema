@@ -19,20 +19,34 @@ const carregar = (uid: string) => comUsuario(uid, async (c) => {
 });
 
 const UUID = /^[0-9a-f-]{36}$/i;
-/** Campo "adicionar produto": aceita o texto da lista ("CÓDIGO · nome") ou só o código. */
-function acharProdutos(fd: FormData, campo: string, ativos: Ativo[]): Ativo[] {
-  const porCodigo = new Map(ativos.map((p) => [p.codigo.toUpperCase(), p]));
-  return fd.getAll(campo).map(String).flatMap((v) => v.split(/[\n;]/)).map((v) => v.split(" · ")[0].trim().toUpperCase())
-    .filter(Boolean).map((cod) => porCodigo.get(cod)).filter((p): p is Ativo => !!p);
+const normal = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/\s+/g, " ").trim();
+/** Campo "adicionar produto": aceita o texto da lista ("CÓDIGO · nome"), só o código ou o nome (se só um produto bater). */
+function acharProdutos(fd: FormData, campo: string, ativos: Ativo[], naoAchados?: string[]): Ativo[] {
+  const porCodigo = new Map(ativos.map((p) => [normal(p.codigo), p]));
+  const achados: Ativo[] = [];
+  for (const bruto of fd.getAll(campo).map(String).flatMap((v) => v.split(/[\n;]/)).map((v) => v.trim()).filter(Boolean)) {
+    const cod = normal(bruto.split(" · ")[0]);
+    let p = porCodigo.get(cod);
+    if (!p) {
+      const txt = normal(bruto.includes(" · ") ? bruto.split(" · ").slice(1).join(" · ") : bruto);
+      const iguais = ativos.filter((x) => normal(x.nome) === txt);
+      const contem = iguais.length ? iguais : ativos.filter((x) => normal(x.nome).includes(txt));
+      if (contem.length === 1) p = contem[0];
+      else naoAchados?.push(contem.length > 1 ? `"${bruto}" (${contem.length} produtos com esse nome — escolha na lista)` : `"${bruto}" (não encontrado entre os produtos ativos)`);
+    }
+    if (p) achados.push(p);
+  }
+  return achados;
 }
 
 async function gravar(uid: string, linhas: { produto_id: string; grupo: string; variante?: string }[]) {
   return comUsuario(uid, async (c) => Number((await c.query("select app.definir_grupos($1::jsonb) as n", [JSON.stringify(linhas)])).rows[0].n));
 }
 
-function voltar(q: string) {
+function voltar(q: string, busca?: FormDataEntryValue | null) {
   revalidatePath("/produtos/grupos"); revalidatePath("/loja");
-  redirect(`/produtos/grupos?${q}`);
+  const b = String(busca ?? "").trim();
+  redirect(`/produtos/grupos?${q}${b ? `&q=${encodeURIComponent(b)}` : ""}`);
 }
 
 async function aplicar(fd: FormData) {
@@ -55,6 +69,7 @@ async function aplicar(fd: FormData) {
       return atual;
     };
     const linhas = new Map<string, { produto_id: string; grupo: string; variante: string }>();
+    const naoSug: string[] = [];
     let grupos = 0;
     for (const g of sugestoes.filter((x) => marcados.has(x.chave))) {
       const alvo = destino(g.chave);
@@ -62,48 +77,64 @@ async function aplicar(fd: FormData) {
       if (alvo === g.chave) grupos++;
       for (const i of g.itens.filter((i) => fd.get(`fora:${i.id}`) !== "1"))
         linhas.set(i.id, { produto_id: i.id, grupo: nome, variante: String(fd.get(`var:${i.id}`) ?? i.variante).trim() || i.variante });
-      for (const p of acharProdutos(fd, `add:${g.chave}`, ativos))
+      for (const p of acharProdutos(fd, `add:${g.chave}`, ativos, naoSug))
         if (!linhas.has(p.id)) linhas.set(p.id, { produto_id: p.id, grupo: nome, variante: varianteNoGrupo(g.itens.map((x) => x.nome), p) });
     }
+    if (naoSug.length) throw new Error(`Nada foi agrupado. Não consegui identificar: ${naoSug.join("; ")}. Escolha o produto na lista que aparece ao digitar.`);
     const n = await gravar(u.id, [...linhas.values()]);
     q = "ok=" + encodeURIComponent(`${grupos} grupo(s) criado(s), ${n} produto(s) agrupado(s). No site eles já aparecem como um cartão só.`);
   } catch (e) { q = "erro=" + encodeURIComponent(mensagemErro(e)); }
   voltar(q);
 }
 
-/** Salva um grupo do site: nome, fragrâncias, tirar produtos, adicionar produtos e juntar outro grupo nele. */
-async function salvarGrupo(fd: FormData) {
+/**
+ * Salva TODOS os grupos que estão na tela de uma vez (nome, fragrâncias, tirar, adicionar, juntar).
+ * Antes cada grupo tinha o seu botão e só aquele era salvo: quem mexia em dois grupos perdia o primeiro.
+ */
+async function salvarGrupos(fd: FormData) {
   "use server";
   const u = await exigirUsuario();
   let q: string;
   try {
     const { ativos, grupos } = await carregar(u.id);
-    const original = String(fd.get("original") ?? "");
-    const g = grupos.find((x) => x.grupo === original);
-    if (!g) throw new Error("Esse grupo não existe mais. Atualize a página.");
-    const nome = String(fd.get("grupo") ?? "").trim() || g.grupo;
-    const linhas: { produto_id: string; grupo: string; variante?: string }[] = [];
-    const ficam: string[] = [];
-    for (const i of g.itens) {
-      if (fd.get(`fora:${i.id}`) === "1") linhas.push({ produto_id: i.id, grupo: "" });
-      else { linhas.push({ produto_id: i.id, grupo: nome, variante: String(fd.get(`var:${i.id}`) ?? i.variante ?? "").trim() || i.nome }); ficam.push(i.nome); }
+    const linhas = new Map<string, { produto_id: string; grupo: string; variante?: string }>();
+    // o que foi adicionado/juntado vale por cima do que o grupo de origem (também na tela) mandaria
+    const extras = new Map<string, { produto_id: string; grupo: string; variante?: string }>();
+    const naoAchados: string[] = [];
+    const feitos: string[] = [];
+    const juntados = new Set<string>();
+    const idxs = fd.getAll("idx").map(String);
+    for (const i of idxs) {
+      const original = String(fd.get(`original:${i}`) ?? "");
+      if (juntados.has(original)) continue;
+      const g = grupos.find((x) => x.grupo === original);
+      if (!g) continue;
+      const nome = String(fd.get(`grupo:${i}`) ?? "").trim() || g.grupo;
+      const ficam: string[] = [];
+      let tirados = 0, novos = 0, juntou = "";
+      for (const it of g.itens) {
+        if (fd.get(`fora:${it.id}`) === "1") { linhas.set(it.id, { produto_id: it.id, grupo: "" }); tirados++; }
+        else { linhas.set(it.id, { produto_id: it.id, grupo: nome, variante: String(fd.get(`var:${it.id}`) ?? it.variante ?? "").trim() || it.nome }); ficam.push(it.nome); }
+      }
+      const outro = grupos.find((x) => x.grupo === String(fd.get(`juntar:${i}`) ?? "") && x.grupo !== g.grupo);
+      if (outro) {
+        for (const it of outro.itens) { extras.set(it.id, { produto_id: it.id, grupo: nome, variante: it.variante ?? it.nome }); ficam.push(it.nome); }
+        juntados.add(outro.grupo); juntou = outro.grupo;
+      }
+      for (const p of acharProdutos(fd, `add:${i}`, ativos, naoAchados)) {
+        if (!UUID.test(p.id) || g.itens.some((x) => x.id === p.id)) continue;
+        extras.set(p.id, { produto_id: p.id, grupo: nome, variante: varianteNoGrupo(ficam, p) });
+        ficam.push(p.nome); novos++;
+      }
+      if (tirados || novos || juntou || nome !== g.grupo)
+        feitos.push(`${nome}: ${[novos && `${novos} adicionado(s)`, tirados && `${tirados} tirado(s)`, juntou && `juntou "${juntou}"`, nome !== g.grupo && "nome mudou"].filter(Boolean).join(", ")}`);
     }
-    let juntou = 0;
-    const outro = grupos.find((x) => x.grupo === String(fd.get("juntar") ?? "") && x.grupo !== g.grupo);
-    if (outro) for (const i of outro.itens) { linhas.push({ produto_id: i.id, grupo: nome, variante: i.variante ?? i.nome }); ficam.push(i.nome); juntou++; }
-    const ja = new Set(linhas.map((l) => l.produto_id));
-    let novos = 0;
-    for (const p of acharProdutos(fd, "add", ativos)) {
-      if (ja.has(p.id) || !UUID.test(p.id)) continue;
-      linhas.push({ produto_id: p.id, grupo: nome, variante: varianteNoGrupo(ficam, p) });
-      ja.add(p.id); ficam.push(p.nome); novos++;
-    }
-    await gravar(u.id, linhas);
-    const tirados = linhas.filter((l) => l.grupo === "").length;
-    q = "ok=" + encodeURIComponent(["Grupo salvo", novos && `${novos} produto(s) adicionado(s)`, tirados && `${tirados} tirado(s)`,
-      juntou && `grupo "${outro?.grupo}" juntado`].filter(Boolean).join(", ") + ".");
+    if (naoAchados.length) throw new Error(`Nada foi salvo. Não consegui identificar: ${naoAchados.join("; ")}. Escolha o produto na lista que aparece ao digitar.`);
+    for (const [id, l] of extras) linhas.set(id, l);
+    const n = await gravar(u.id, [...linhas.values()]);
+    q = "ok=" + encodeURIComponent(n === 0 ? "Nada mudou nos grupos." : `Salvo. ${feitos.length ? feitos.join(" · ") : `${n} produto(s) atualizado(s)`}.`);
   } catch (e) { q = "erro=" + encodeURIComponent(mensagemErro(e)); }
-  voltar(q);
+  voltar(q, fd.get("q"));
 }
 
 async function desfazer(fd: FormData) {
@@ -111,11 +142,13 @@ async function desfazer(fd: FormData) {
   const u = await exigirUsuario();
   let q: string;
   try {
-    const ids = fd.getAll("id").map(String).filter((x) => UUID.test(x));
-    await gravar(u.id, ids.map((id) => ({ produto_id: id, grupo: "" })));
-    q = "ok=" + encodeURIComponent("Grupo desfeito: os produtos voltam a aparecer separados.");
+    const { grupos } = await carregar(u.id);
+    const g = grupos.find((x) => x.grupo === String(fd.get("desfazer") ?? ""));
+    if (!g) throw new Error("Esse grupo não existe mais. Atualize a página.");
+    await gravar(u.id, g.itens.map((i) => ({ produto_id: i.id, grupo: "" })));
+    q = "ok=" + encodeURIComponent(`Grupo "${g.grupo}" desfeito: os produtos voltam a aparecer separados.`);
   } catch (e) { q = "erro=" + encodeURIComponent(mensagemErro(e)); }
-  voltar(q);
+  voltar(q, fd.get("q"));
 }
 
 async function criarGrupo(fd: FormData) {
@@ -126,7 +159,9 @@ async function criarGrupo(fd: FormData) {
     const nome = String(fd.get("grupo") ?? "").trim();
     if (!nome) throw new Error("Dê um nome ao grupo.");
     const { ativos } = await carregar(u.id);
-    const ps = [...new Map(acharProdutos(fd, "add", ativos).map((p) => [p.id, p])).values()];
+    const nao: string[] = [];
+    const ps = [...new Map(acharProdutos(fd, "add", ativos, nao).map((p) => [p.id, p])).values()];
+    if (nao.length) throw new Error(`Não consegui identificar: ${nao.join("; ")}. Escolha o produto na lista que aparece ao digitar.`);
     if (ps.length < 2) throw new Error("Escolha pelo menos 2 produtos para o grupo.");
     const nomes = ps.map((p) => p.nome);
     await gravar(u.id, ps.map((p, i) => ({ produto_id: p.id, grupo: nome, variante: varianteNoGrupo(nomes.filter((_, k) => k !== i), p) })));
@@ -222,40 +257,47 @@ export default async function Grupos({ searchParams }: { searchParams: Promise<{
             <button>Buscar</button>
           </form>
         </div>
-        <p className="suave pequeno" style={{ margin: 0 }}>Em cada grupo: mude nomes, marque <b>tirar</b>, adicione produtos ou <b>junte outro grupo</b> dentro dele, e clique em Salvar.</p>
+        <p className="suave pequeno" style={{ margin: 0 }}>Em cada grupo: mude nomes, marque <b>tirar</b>, adicione produtos (digite o nome ou código e escolha na lista) ou <b>junte outro grupo</b> dentro dele.</p>
         {gruposVistos.length === 0 ? <div className="vazio">{busca ? "Nenhum grupo com esse nome." : "Nenhum grupo ainda."}</div> : (
-          <div className="grupos-lista">{gruposVistos.map((g) => {
-            const outros = d.grupos.filter((x) => x.grupo !== g.grupo && x.marca === g.marca);
-            return (
-              <fieldset key={g.grupo} className="grupo-sugerido">
-                <form action={salvarGrupo}>
-                  <input type="hidden" name="original" value={g.grupo} />
+          <form action={salvarGrupos}>
+            <input type="hidden" name="q" value={f.q ?? ""} />
+            <div className="linha entre" style={{ position: "sticky", top: 0, zIndex: 5, background: "var(--superficie, #fff)", padding: "8px 0" }}>
+              <span className="suave pequeno">Mexa em quantos grupos quiser e clique em <b>Salvar alterações</b> (qualquer botão Salvar grava tudo).</span>
+              <button className="principal">Salvar alterações</button>
+            </div>
+            <div className="grupos-lista">{gruposVistos.map((g, n) => {
+              const outros = d.grupos.filter((x) => x.grupo !== g.grupo && x.marca === g.marca);
+              return (
+                <fieldset key={g.grupo} className="grupo-sugerido">
+                  <input type="hidden" name="idx" value={n} />
+                  <input type="hidden" name={`original:${n}`} value={g.grupo} />
                   <legend className="linha" style={{ gap: 8 }}>
-                    <input name="grupo" defaultValue={g.grupo} aria-label="Nome do grupo" style={{ minWidth: 260, fontWeight: 700 }} />
+                    <input name={`grupo:${n}`} defaultValue={g.grupo} aria-label="Nome do grupo" style={{ minWidth: 260, fontWeight: 700 }} />
                     <span className="suave pequeno">{g.itens.length} fragrâncias</span>
                     <button className="principal">Salvar</button>
                   </legend>
                   <ul>{g.itens.map((i) => (
                     <li key={i.id}>
                       <input name={`var:${i.id}`} defaultValue={i.variante ?? ""} aria-label={`Fragrância de ${i.nome}`} />
-                      <span className="pequeno suave">{i.nome}</span>
+                      <span className="pequeno suave">{i.codigo} · {i.nome}</span>
                       <label className="pequeno" style={{ flexDirection: "row", gap: 4 }}><input type="checkbox" name={`fora:${i.id}`} value="1" /> tirar</label>
                     </li>
                   ))}</ul>
                   <div className="grupo-acoes">
-                    <CampoAdicionar name="add" />
+                    <CampoAdicionar name={`add:${n}`} />
                     {outros.length > 0 && (
-                      <select name="juntar" defaultValue="" aria-label="Juntar outro grupo neste">
+                      <select name={`juntar:${n}`} defaultValue="" aria-label="Juntar outro grupo neste">
                         <option value="">Juntar outro grupo aqui… (não)</option>
                         {outros.map((x) => <option key={x.grupo} value={x.grupo}>{x.grupo} ({x.itens.length})</option>)}
                       </select>
                     )}
+                    <button className="discreto" formAction={desfazer} name="desfazer" value={g.grupo}>Desfazer grupo</button>
                   </div>
-                </form>
-                <form action={desfazer} style={{ marginTop: 6 }}>{g.itens.map((i) => <input key={i.id} type="hidden" name="id" value={i.id} />)}<button className="discreto">Desfazer grupo</button></form>
-              </fieldset>
-            );
-          })}</div>
+                </fieldset>
+              );
+            })}</div>
+            <div className="linha" style={{ justifyContent: "flex-end", marginTop: 8 }}><button className="principal">Salvar alterações</button></div>
+          </form>
         )}
       </section>
     </>
