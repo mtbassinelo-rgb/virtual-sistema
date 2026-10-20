@@ -49,3 +49,49 @@ export async function salvarCustoVariavel(fd: FormData) {
   }
   voltar("custos", erro, "Custo salvo. Vale a partir da data informada.");
 }
+
+/** Cadastra ou altera um fornecedor (prazo de reposição em dias, pedido mínimo em R$). */
+export async function salvarFornecedor(fd: FormData) {
+  const u = await exigirUsuario();
+  let erro: string | null = null;
+  try {
+    if (!ehGestao(u)) throw new Error("Só gerente ou dono altera fornecedores.");
+    const prazo = numero(fd, "prazo");
+    if (prazo !== null && (prazo < 0 || prazo > 365 || !Number.isInteger(prazo))) throw new Error("Prazo de reposição em dias inteiros (0 a 365).");
+    await comUsuario(u.id, (c) => c.query("select app.definir_fornecedor($1, $2, $3, $4, $5, $6)",
+      [texto(fd, "id") || null, texto(fd, "nome"), prazo, numero(fd, "pedido_minimo"), texto(fd, "obs") || null, fd.get("ativo") !== "0"]));
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  voltar("compras", erro, "Fornecedor salvo.");
+}
+
+/** Registra uma compra: valor dos produtos e frete em R$, câmbio em Gs por R$. Não movimenta estoque. */
+export async function registrarCompra(fd: FormData) {
+  const u = await exigirUsuario();
+  let erro: string | null = null;
+  try {
+    if (!ehGestao(u)) throw new Error("Só gerente ou dono registra compras.");
+    const fornecedor = texto(fd, "fornecedor");
+    if (!fornecedor) throw new Error("Escolha o fornecedor.");
+    const valor = numero(fd, "valor");
+    if (valor === null || valor <= 0) throw new Error("Informe o valor dos produtos em R$.");
+    await comUsuario(u.id, (c) => c.query("select app.registrar_compra($1, $2, $3, $4, $5, $6)",
+      [fornecedor, texto(fd, "data") || null, valor, numero(fd, "frete") ?? 0, numero(fd, "cambio"), texto(fd, "obs") || null]));
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  voltar("compras", erro, "Compra registrada.");
+}
+
+export async function excluirCompra(fd: FormData) {
+  const u = await exigirUsuario();
+  let erro: string | null = null;
+  try {
+    if (!ehGestao(u)) throw new Error("Só gerente ou dono exclui compras.");
+    await comUsuario(u.id, (c) => c.query("select app.excluir_compra($1)", [texto(fd, "id")]));
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  voltar("compras", erro, "Compra excluída.");
+}

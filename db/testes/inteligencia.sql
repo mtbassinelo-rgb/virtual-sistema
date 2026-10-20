@@ -89,4 +89,44 @@ select teste.ok((select count(*) from app.auditoria where tabela = 'custos_varia
 update app.parametros set valor = 0 where chave = 'margem_minima_contribuicao';
 update app.parametros set valor = (select valor from cambio_antes) where chave = 'cambio_custo_gs';
 
+
+\echo '== Fornecedores e compras =='
+set role vc_app;
+select teste.como(:'KEILA');
+select teste.falha($$select app.definir_fornecedor(null, 'Fornecedor X', 7, null, null)$$, 'gerente ou dono', 'Vendedora não cadastra fornecedor');
+select teste.ok((select count(*) from app.compras) = 0, 'Vendedora não lê compras');
+select teste.como(:'GERENTE');
+select app.definir_fornecedor(null, 'Fornecedor Teste', 10, 1000, 'teste') as forn \gset
+select teste.ok((select prazo_reposicao_dias from app.fornecedores where id = :'forn') = 10, 'Gerente cadastra fornecedor com prazo de reposição');
+select app.registrar_compra(:'forn', current_date - 3, 1000, 100, 1150, 'nota 1') as compra1 \gset
+select app.registrar_compra(:'forn', current_date - 2, 500, 0, 1120, null) as compra2 \gset
+select teste.ok((select total from app.compras where id = :'compra1') = 1100, 'Total da compra = produtos + frete');
+select teste.ok((select total_brl from app.v_compras_mensal where mes = to_char(current_date - 2, 'YYYY-MM')) >= 1600, 'Resumo mensal soma as compras do mês');
+select teste.ok((select total_gs from app.v_compras_mensal where mes = to_char(current_date - 2, 'YYYY-MM')) >= 1100 * 1150 + 500 * 1120, 'Resumo mensal converte em Gs pelo câmbio de cada compra');
+select teste.falha($$select app.registrar_compra('$$ || :'forn' || $$', current_date + 30, 10, 0, null, null)$$, 'data', 'Compra com data no futuro é recusada');
+select app.excluir_compra(:'compra2');
+select teste.ok((select count(*) from app.compras where id = :'compra2') = 0, 'Gerente exclui compra lançada errada');
+reset role;
+select teste.ok((select count(*) from app.auditoria where tabela = 'compras' and acao = 'DELETE') >= 1, 'Exclusão de compra fica na auditoria');
+
+\echo '== Classificação dos produtos =='
+-- Kit com preços: diferenciação. Produto com estoque e sem venda: parado. Shampoo sem dados: incompleto.
+insert into app.precos (produto_id, tabela, valor, vigente_desde) values
+  (:'KIT', 'py_normal', 30000, current_date - 10), (:'KIT', 'py_vip', 28000, current_date - 10),
+  (:'PI3', 'py_normal', 15000, current_date - 10), (:'PI3', 'py_vip', 14000, current_date - 10);
+insert into app.estoque_movimentos (deposito_id, produto_id, tipo, quantidade, observacao)
+values ((select id from app.depositos where codigo = 'cd-foz'), :'PI3', 'ajuste_entrada', 48, 'teste');
+set role vc_app;
+select teste.como(:'KEILA');
+select teste.falha($$select * from app.classificacao_py()$$, 'gestão', 'Vendedora não vê a classificação');
+select teste.como(:'GERENTE');
+select teste.ok((select categoria from app.classificacao_py() where produto_id = :'KIT') = 'diferenciacao', 'Kit completo é produto de diferenciação');
+select teste.ok((select categoria from app.classificacao_py() where produto_id = :'PI3') = 'parado', 'Com estoque e sem venda em 90 dias: estoque parado');
+select teste.ok((select categoria from app.classificacao_py() where produto_id = :'PI2') = 'incompleto', 'Sem dados completos: não classifica');
+select teste.ok((select recomendacao is not null from app.classificacao_py() where produto_id = :'PI3'), 'Todo produto recebe uma recomendação');
+select teste.ok(app.registrar_classificacao_py() > 0, 'Foto do dia é gravada');
+select teste.ok(app.registrar_classificacao_py() = 0, 'Foto do dia é gravada uma vez só');
+select teste.ok((select categoria from app.produto_classificacao where data = current_date and produto_id = :'KIT') = 'diferenciacao', 'Foto guarda a categoria');
+reset role;
+
 \echo '== Testes da inteligência comercial passaram =='

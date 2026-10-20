@@ -3,7 +3,7 @@ import { ehGestao, exigirUsuario } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
 import { data, dinheiro, pct } from "@/lib/formato";
 import { Avisos, Selo } from "../avisos";
-import { salvarCustoVariavel, salvarFreteMarca } from "./acoes";
+import { excluirCompra, registrarCompra, salvarCustoVariavel, salvarFornecedor, salvarFreteMarca } from "./acoes";
 
 export const metadata = { title: "Inteligência comercial" };
 
@@ -18,6 +18,8 @@ type Linha = {
 const ABAS = [
   { k: "saude", t: "Saúde dos dados", d: "O que falta no cadastro para calcular custo, margem e preço mínimo de cada produto vendido ao Paraguai." },
   { k: "rentabilidade", t: "Rentabilidade PY", d: "Margem bruta, margem de contribuição e preço mínimo por produto, nas tabelas Normal e VIP do Paraguai. Só leitura: nada aqui muda preço." },
+  { k: "classificacao", t: "Classificação", d: "Cada produto do Paraguai classificado em atração, rentabilidade, diferenciação ou estoque parado, com uma recomendação. Recalculado ao abrir; uma foto por dia fica guardada para comparar." },
+  { k: "compras", t: "Compras e fornecedores", d: "Compras com frete e câmbio, por mês, e o prazo de reposição de cada fornecedor." },
   { k: "custos", t: "Custos e frete", d: "Frete de compra por marca, imposto e entrega usados nos cálculos. Cada mudança fica na auditoria." },
 ];
 
@@ -31,6 +33,15 @@ const ALERTAS: Record<string, { t: string; cor: string }> = {
   abaixo_minimo: { t: "VIP abaixo do mínimo", cor: "erro" },
 };
 
+const CATEGORIAS: Record<string, { t: string; d: string; cor: string }> = {
+  atracao: { t: "Atração", d: "Os que mais vendem: trazem o cliente", cor: "info" },
+  rentabilidade: { t: "Rentabilidade", d: "Margem acima da mediana", cor: "ok" },
+  diferenciacao: { t: "Diferenciação", d: "Kits e fragrâncias: vendem pelo valor", cor: "marca" },
+  parado: { t: "Estoque parado", d: "Com estoque e sem giro", cor: "aviso" },
+  acompanhar: { t: "Acompanhar", d: "Margem e venda medianas", cor: "" },
+  incompleto: { t: "Incompleto", d: "Faltam dados para classificar", cor: "erro" },
+};
+
 const TIPOS: Record<string, string> = { imposto: "Imposto", comissao: "Comissão", taxa_pagamento: "Taxa de pagamento", taxa_canal: "Taxa do canal", entrega: "Entrega (pasero)" };
 const BASES: Record<string, string> = { venda: "% sobre a venda", caixa: "Gs por caixa", pedido: "Gs por pedido" };
 
@@ -38,7 +49,7 @@ const n = (v: string | number | null | undefined) => (v === null || v === undefi
 const gs = (v: string | number | null | undefined) => dinheiro(v ?? null, "GS");
 
 export default async function Inteligencia({ searchParams }: {
-  searchParams: Promise<{ aba?: string; q?: string; marca?: string; alerta?: string; ok?: string; erro?: string }>;
+  searchParams: Promise<{ aba?: string; q?: string; marca?: string; alerta?: string; cat?: string; ok?: string; erro?: string }>;
 }) {
   const u = await exigirUsuario();
   const f = await searchParams;
@@ -55,6 +66,17 @@ export default async function Inteligencia({ searchParams }: {
         count(*) filter (where p.frete_unidade_brl is not null)::int excecoes, f.frete_unidade_brl, f.observacao
         from app.produtos p left join app.frete_marca f on f.marca = p.marca
         where p.ativo group by 1, f.frete_unidade_brl, f.observacao order by (f.frete_unidade_brl is null) desc, produtos desc`)).rows : [],
+    classes: aba.k === "classificacao" ? await (async () => {
+      await c.query("select app.registrar_classificacao_py()");
+      return (await c.query("select * from app.classificacao_py()")).rows as
+        { produto_id: string; codigo: string; nome: string; marca: string | null; categoria: string; margem_baixa: boolean | null;
+          contribuicao_vip: string | null; preco_vip: string | null; preco_minimo: string | null; vendido_90: string; saldo: string | null; recomendacao: string }[];
+    })() : [],
+    fornecedores: aba.k === "compras" ? (await c.query(`select f.*, (select count(*) from app.compras c where c.fornecedor_id = f.id)::int compras,
+        (select max(data) from app.compras c where c.fornecedor_id = f.id) ultima from app.fornecedores f order by f.ativo desc, f.nome`)).rows : [],
+    compras: aba.k === "compras" ? (await c.query(`select c.*, f.nome fornecedor from app.compras c join app.fornecedores f on f.id = c.fornecedor_id
+        order by c.data desc, c.criado_em desc limit 60`)).rows : [],
+    meses: aba.k === "compras" ? (await c.query("select * from app.v_compras_mensal order by mes desc limit 12")).rows : [],
     params: Object.fromEntries((await c.query("select chave, valor from app.parametros where chave in ('cambio_custo_gs','cambio_compra_gs','margem_minima_contribuicao')")).rows
       .map((r) => [r.chave as string, Number(r.valor)])),
   }));
@@ -205,6 +227,141 @@ export default async function Inteligencia({ searchParams }: {
               Margem bruta = (preço − custo real) ÷ preço. Contribuição = (preço − custo real − imposto − entrega por unidade) ÷ preço.
               Preço mínimo = custo real + entrega, dividido por (1 − imposto − margem mínima), arredondado para cima. Margem, não markup.
             </p>
+          </section>
+        </>
+      )}
+
+
+      {aba.k === "classificacao" && (() => {
+        const cls = d.classes;
+        const lista = cls.filter((x) => (!f.cat || x.categoria === f.cat) && (!q || `${x.codigo} ${x.nome} ${x.marca ?? ""}`.toLowerCase().includes(q)))
+          .sort((a, b) => Number(b.vendido_90) - Number(a.vendido_90));
+        return (
+          <>
+            <section className="indicadores">
+              {Object.entries(CATEGORIAS).map(([k, c]) => (
+                <a key={k} className="indicador" href={`/inteligencia?aba=classificacao&cat=${k}`} style={{ textDecoration: "none", color: "inherit" }}
+                   aria-current={f.cat === k ? "true" : undefined}>
+                  <span className="rotulo">{c.t}</span><span className="valor">{cls.filter((x) => x.categoria === k).length}</span>
+                  <span className="pequeno suave">{c.d}</span>
+                </a>
+              ))}
+              <div className="indicador"><span className="rotulo">Margem baixa</span><span className="valor">{cls.filter((x) => x.margem_baixa).length}</span>
+                <span className="pequeno suave">Contribuição VIP abaixo do limite</span></div>
+            </section>
+            <form className="painel filtros" method="get">
+              <input type="hidden" name="aba" value="classificacao" />
+              <label>Buscar<input name="q" defaultValue={f.q ?? ""} placeholder="Código, nome ou marca" /></label>
+              <label>Categoria<select name="cat" defaultValue={f.cat ?? ""}>
+                <option value="">Todas</option>{Object.entries(CATEGORIAS).map(([k, c]) => <option key={k} value={k}>{c.t}</option>)}
+              </select></label>
+              <button className="principal">Filtrar</button>
+            </form>
+            <section className="painel">
+              <div className="linha entre"><h2>{lista.length} produto(s)</h2><span className="pequeno suave">Ordenado pelo que mais vendeu em 90 dias</span></div>
+              <div className="tabela"><table>
+                <thead><tr><th>Produto</th><th>Categoria</th><th>Contribuição VIP</th><th>Preço VIP</th><th>Preço mínimo</th><th>Vendido 90 dias</th><th>Estoque</th><th>Recomendação</th></tr></thead>
+                <tbody>{lista.slice(0, LIMITE).map((x) => (
+                  <tr key={x.produto_id}>
+                    <td><Link href={`/produtos/${x.produto_id}`}>{x.nome}</Link><div className="pequeno suave">{x.codigo} · {x.marca ?? "Sem marca"}</div></td>
+                    <td><Selo cor={CATEGORIAS[x.categoria]?.cor}>{CATEGORIAS[x.categoria]?.t ?? x.categoria}</Selo>{x.margem_baixa && <> <Selo cor="aviso">Margem baixa</Selo></>}</td>
+                    <td className="num">{pct(x.contribuicao_vip)}</td><td className="num">{gs(x.preco_vip)}</td><td className="num">{gs(x.preco_minimo)}</td>
+                    <td className="num">{Number(x.vendido_90).toLocaleString("pt-BR")}</td><td className="num">{x.saldo === null ? "—" : Number(x.saldo).toLocaleString("pt-BR")}</td>
+                    <td className="pequeno" style={{ minWidth: 260, whiteSpace: "normal" }}>{x.recomendacao}</td>
+                  </tr>))}</tbody>
+              </table></div>
+              {lista.length > LIMITE && <p className="pequeno suave">Mostrando os {LIMITE} primeiros. Use a busca ou a categoria.</p>}
+              <p className="pequeno suave" style={{ margin: 0 }}>
+                Regras: parado = estoque sem giro (ou sem venda em 90 dias com saldo); diferenciação = kit ou grupo de fragrâncias;
+                atração = entre os que mais vendem (ajuste em Parâmetros); rentabilidade = contribuição VIP acima da mediana. Vendas contam só pedidos enviados ou entregues.
+              </p>
+            </section>
+          </>
+        );
+      })()}
+
+      {aba.k === "compras" && (
+        <>
+          <section className="painel">
+            <h2>Compras por mês</h2>
+            {d.meses.length === 0 ? <div className="vazio">Nenhuma compra registrada ainda.</div> : (
+              <div className="tabela"><table style={{ minWidth: 0 }}>
+                <thead><tr><th>Mês</th><th>Compras</th><th>Produtos</th><th>Frete</th><th>Frete / produtos</th><th>Total</th><th>Total em Gs</th></tr></thead>
+                <tbody>{d.meses.map((m) => (
+                  <tr key={m.mes}><td>{m.mes}</td><td className="num">{m.compras}</td><td className="num">{dinheiro(m.produtos_brl, "BRL")}</td>
+                    <td className="num">{dinheiro(m.frete_brl, "BRL")}</td><td className="num">{pct(m.frete_pct)}</td><td className="num">{dinheiro(m.total_brl, "BRL")}</td>
+                    <td className="num">{gs(m.total_gs)}{m.sem_cambio > 0 && <div className="pequeno suave">{m.sem_cambio} sem câmbio</div>}</td></tr>
+                ))}</tbody>
+              </table></div>
+            )}
+          </section>
+
+          {gerir && (
+            <section className="painel">
+              <h2>Registrar compra</h2>
+              <form action={registrarCompra} className="linha" style={{ flexWrap: "wrap", alignItems: "end" }}>
+                <label>Fornecedor<select name="fornecedor" required defaultValue="">
+                  <option value="" disabled>Escolha</option>
+                  {d.fornecedores.filter((x) => x.ativo).map((x) => <option key={x.id} value={x.id}>{x.nome}</option>)}
+                </select></label>
+                <label>Data<input type="date" name="data" required /></label>
+                <label>Produtos (R$)<input name="valor" inputMode="decimal" required style={{ width: 120 }} /></label>
+                <label>Frete (R$)<input name="frete" inputMode="decimal" style={{ width: 100 }} /></label>
+                <label>Câmbio (Gs por R$)<input name="cambio" inputMode="decimal" style={{ width: 100 }} /></label>
+                <label>Observação<input name="obs" style={{ width: 200 }} /></label>
+                <button className="principal">Registrar</button>
+              </form>
+              <p className="pequeno suave" style={{ margin: 0 }}>Registrar a compra não mexe no estoque: o estoque continua vindo do Bling e dos lançamentos de estoque.</p>
+            </section>
+          )}
+
+          <section className="painel">
+            <h2>Últimas compras</h2>
+            {d.compras.length === 0 ? <div className="vazio">Nenhuma compra registrada.</div> : (
+              <div className="tabela"><table>
+                <thead><tr><th>Data</th><th>Fornecedor</th><th>Produtos</th><th>Frete</th><th>Total</th><th>Câmbio</th><th>Total em Gs</th><th></th></tr></thead>
+                <tbody>{d.compras.map((x) => (
+                  <tr key={x.id}><td>{data(x.data)}</td><td>{x.fornecedor}{x.observacao && <div className="pequeno suave">{x.observacao}</div>}</td>
+                    <td className="num">{dinheiro(x.valor_produtos, "BRL")}</td><td className="num">{dinheiro(x.frete, "BRL")}</td><td className="num">{dinheiro(x.total, "BRL")}</td>
+                    <td className="num">{x.cambio ? Number(x.cambio).toLocaleString("pt-BR") : "—"}</td>
+                    <td className="num">{x.cambio ? gs(Number(x.total) * Number(x.cambio)) : "—"}</td>
+                    <td>{gerir && <form action={excluirCompra}><input type="hidden" name="id" value={x.id} /><button className="pequeno">Excluir</button></form>}</td></tr>
+                ))}</tbody>
+              </table></div>
+            )}
+          </section>
+
+          <section className="painel">
+            <h2>Fornecedores</h2>
+            <p className="pequeno suave" style={{ margin: 0 }}>O prazo de reposição será usado para avisar o risco de faltar produto antes da próxima compra chegar.</p>
+            <div className="tabela"><table style={{ minWidth: 0 }}>
+              <thead><tr><th>Fornecedor</th><th>Compras</th><th>Prazo (dias)</th><th>Pedido mínimo (R$)</th><th></th></tr></thead>
+              <tbody>{d.fornecedores.map((x) => (
+                <tr key={x.id}>
+                  <td>{x.nome}{!x.ativo && <> <Selo>Inativo</Selo></>}{x.ultima && <div className="pequeno suave">última compra {data(x.ultima)}</div>}</td>
+                  <td className="num">{x.compras}</td>
+                  {gerir ? (
+                    <td colSpan={3}>
+                      <form action={salvarFornecedor} className="linha">
+                        <input type="hidden" name="id" value={x.id} /><input type="hidden" name="nome" value={x.nome} />
+                        <input name="prazo" inputMode="numeric" defaultValue={x.prazo_reposicao_dias ?? ""} aria-label={`Prazo de ${x.nome}`} style={{ width: 70 }} />
+                        <input name="pedido_minimo" inputMode="decimal" defaultValue={x.pedido_minimo_brl === null ? "" : Number(x.pedido_minimo_brl).toLocaleString("pt-BR")}
+                          aria-label={`Pedido mínimo de ${x.nome}`} style={{ width: 100 }} />
+                        <select name="ativo" defaultValue={x.ativo ? "1" : "0"} aria-label="Situação"><option value="1">Ativo</option><option value="0">Inativo</option></select>
+                        <button>Salvar</button>
+                      </form>
+                    </td>
+                  ) : (<><td className="num">{x.prazo_reposicao_dias ?? "—"}</td><td className="num">{x.pedido_minimo_brl ? dinheiro(x.pedido_minimo_brl, "BRL") : "—"}</td><td /></>)}
+                </tr>))}</tbody>
+            </table></div>
+            {gerir && (
+              <form action={salvarFornecedor} className="linha" style={{ flexWrap: "wrap", alignItems: "end" }}>
+                <label>Novo fornecedor<input name="nome" required style={{ width: 200 }} /></label>
+                <label>Prazo (dias)<input name="prazo" inputMode="numeric" style={{ width: 80 }} /></label>
+                <label>Pedido mínimo (R$)<input name="pedido_minimo" inputMode="decimal" style={{ width: 110 }} /></label>
+                <button className="principal">Adicionar</button>
+              </form>
+            )}
           </section>
         </>
       )}

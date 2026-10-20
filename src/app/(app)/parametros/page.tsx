@@ -11,7 +11,7 @@ export const metadata = { title: "Parâmetros" };
 const GRUPOS: { titulo: string; chaves: string[] }[] = [
   { titulo: "Vendas e lucro", chaves: ["cambio_custo_gs", "pedido_exige_estoque", "link_pedido_validade_dias", "arredondamento_gs"] },
   { titulo: "Envios ao Paraguai", chaves: ["passeiro_custo_volume"] },
-  { titulo: "Inteligência comercial", chaves: ["cambio_compra_gs", "margem_minima_contribuicao"] },
+  { titulo: "Inteligência comercial", chaves: ["cambio_compra_gs", "margem_minima_contribuicao", "classif_atracao_pct", "classif_margem_baixa"] },
   { titulo: "Promoções", chaves: ["promo_desconto_maximo", "promo_sugerida_desconto"] },
   { titulo: "Estoque", chaves: ["giro_janela_dias", "giro_parado_cobertura", "giro_baixo_cobertura", "giro_ultimas_unidades"] },
   { titulo: "Área do cliente", chaves: ["convite_validade_dias", "sessao_cliente_dias"] },

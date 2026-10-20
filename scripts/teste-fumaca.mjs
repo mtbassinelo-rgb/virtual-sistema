@@ -67,7 +67,7 @@ for (const tela of ["/despesas", "/parametros"]) {
   ok([302, 303, 307, 308].includes(r.status) || !r.html.includes("Lançar conta"), `Vendedora não vê ${tela}`);
 }
 // Inteligência comercial: gestão vê as três abas; vendedora não entra.
-for (const tela of ["/inteligencia", "/inteligencia?aba=rentabilidade", "/inteligencia?aba=custos", "/inteligencia?aba=rentabilidade&alerta=sem_frete"]) {
+for (const tela of ["/inteligencia", "/inteligencia?aba=rentabilidade", "/inteligencia?aba=custos", "/inteligencia?aba=rentabilidade&alerta=sem_frete", "/inteligencia?aba=classificacao", "/inteligencia?aba=classificacao&cat=parado", "/inteligencia?aba=compras"]) {
   const r = await abrir(tela, await sessao("gerente@teste.local"));
   ok(r.status === 200 && !r.html.includes("Application error") && r.html.includes("Inteligência comercial"), `Gerente: ${tela} abre`);
 }
