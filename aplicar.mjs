@@ -76,24 +76,22 @@ try {
     if (!p.ativo) await c.query("update app.produtos set ativo = true where id = $1", [p.id]);
     rel.talco = `${p.codigo} ${p.nome}: ${antes} -> ${await saldo(p.id)}`; }
 
-  // 3) Papel Ecológico p/ Mechas: 1 ativo por tamanho, com 180
-  const papeis = await q("select * from pk where app.nome_normal(nome) ~ 'papel' and app.nome_normal(nome) ~ 'ecolog' order by ativo desc, (foto is not null) desc, est desc, codigo");
-  const tam = (n) => { const s = n.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-    if (/\b1\s*kg\b|\b1000\s*g\b/.test(s)) return "1kg"; const m = s.match(/\b(30|120|180|200)\s*(folhas|fls|f)\b/); return m ? m[1] + " folhas" : null; };
-  const porTam = new Map();
-  for (const p of papeis) { const t = tam(p.nome); rel.papel.produtos.push(`${t ?? "??"} | ${p.ativo ? "A" : "i"} | ${p.foto ? "F" : "-"} | est ${p.est} | ${p.codigo} ${p.nome}`); if (t) porTam.set(t, [...(porTam.get(t) ?? []), p]); }
-  for (const [t, g] of porTam) {
-    const fica = g[0];
-    if (!fica.ativo) await c.query("update app.produtos set ativo = true where id = $1", [fica.id]);
-    if (!fica.foto) { const d = g.find((x) => x.foto); if (d) await c.query("update app.produtos set foto = $2 where id = $1", [fica.id, d.foto]); }
-    const antes = await ajustarPara(fica.id, 180, `Papel ${t}: 180`);
-    rel.papel.acoes.push(`${t}: fica ${fica.codigo} (${antes} -> 180)`);
-    for (const x of g.slice(1)) {
-      if (x.componente) { rel.papel.acoes.push(`  ${x.codigo} é componente de kit, não mexi`); continue; }
-      const s = await saldo(x.id); if (s > 0) await lancar(x.id, -s, `Papel ${t}: repetido retirado`);
-      await c.query("update app.produtos set ativo = false, grupo = null, variante = null where id = $1", [x.id]);
-      rel.papel.acoes.push(`  desativado ${x.codigo}${x.ativo ? "" : " (já inativo)"}${s > 0 ? ` (tinha ${s} no CD Foz, zerado)` : ""}`);
-    }
+  // 3) Papel para Mechas: fica 1 por tamanho (o cadastro com foto e estoque), com 180 no CD Foz; os demais papéis para mechas saem
+  const FICA = { "30 folhas": "2407202683", "120 folhas": "papel120", "180 folhas": "papel180", "200 folhas": "papel200", "1kg": "papel1000" };
+  const papeis = await q("select * from pk where app.nome_normal(nome) ~ 'papel.*mecha' order by codigo");
+  const ficaCods = new Set(Object.values(FICA));
+  for (const [t, cod] of Object.entries(FICA)) {
+    const p = papeis.find((x) => x.codigo === cod);
+    if (!p) { rel.papel.acoes.push(`${t}: NÃO ACHEI ${cod}`); continue; }
+    if (!p.ativo) await c.query("update app.produtos set ativo = true where id = $1", [p.id]);
+    const antes = await ajustarPara(p.id, 180, `Papel ${t}: 180`);
+    rel.papel.acoes.push(`${t}: fica ${cod} ${p.nome} (CD Foz ${antes} -> 180)`);
+  }
+  for (const x of papeis.filter((x) => !ficaCods.has(x.codigo))) {
+    if (x.componente || x.tem_componentes) { rel.papel.acoes.push(`${x.codigo} é kit/componente, não mexi`); continue; }
+    const s = await saldo(x.id); if (s > 0) await lancar(x.id, -s, "Papel repetido retirado");
+    await c.query("update app.produtos set ativo = false, grupo = null, variante = null where id = $1", [x.id]);
+    rel.papel.acoes.push(`desativado ${x.codigo} ${x.nome.slice(0, 70)}${x.ativo ? "" : " (já inativo)"}${s > 0 ? ` (tinha ${s}, zerado)` : ""}`);
   }
   const papelIds = new Set(papeis.map((p) => p.id));
 
