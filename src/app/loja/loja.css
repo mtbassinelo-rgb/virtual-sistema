@@ -135,8 +135,8 @@
 .preco { font-family: var(--titulo); font-weight: 700; font-size: 1.15rem; font-variant-numeric: tabular-nums; }
 .preco s { font-family: var(--texto-f); font-weight: 400; font-size: .82rem; color: var(--apagado); margin-left: 6px; }
 .preco-consulta, .estoque { font-size: .8rem; color: var(--apagado); }
-.adicionar { margin-top: auto; font: inherit; font-weight: 700; cursor: pointer; border-radius: 999px; padding: 9px 12px; border: 1.5px solid var(--roxo); background: var(--papel); color: var(--roxo); }
-.adicionar:hover { background: var(--roxo); color: #fff; }
+.adicionar { margin-top: auto; font: inherit; font-weight: 700; cursor: pointer; border-radius: 999px; padding: 9px 12px; border: 1.5px solid var(--roxo); background: var(--roxo); color: #fff; }
+.adicionar:hover { background: var(--roxo-escuro); border-color: var(--roxo-escuro); }
 .passo { margin-top: auto; display: grid; grid-template-columns: 38px 1fr 38px; align-items: center; border-radius: 999px; background: var(--roxo); color: #fff; overflow: hidden; }
 .passo button { font: inherit; font-size: 1.15rem; font-weight: 700; background: transparent; color: inherit; border: 0; height: 38px; cursor: pointer; }
 .passo button:disabled { opacity: .4; cursor: default; }
@@ -513,8 +513,9 @@
 .g-descontos li.g-descontos-nota { background: transparent; color: var(--apagado); padding: 0 2px; font-size: .74rem; }
 
 /* Escolha de fragrâncias: botão no cartão + folha que sobe de baixo */
-.abrir-variantes { width: 100%; margin-top: 6px; padding: 10px 12px; border-radius: 10px; border: 1.5px solid var(--roxo); background: #fff; color: var(--roxo); font-weight: 700; font-size: .88rem; cursor: pointer; }
-.abrir-variantes.com-itens { background: var(--roxo); color: #fff; }
+.abrir-variantes { width: 100%; margin-top: 6px; padding: 10px 12px; border-radius: 10px; border: 1.5px solid var(--roxo); background: var(--roxo); color: #fff; font-weight: 700; font-size: .88rem; cursor: pointer; }
+.abrir-variantes:hover { background: var(--roxo-escuro); border-color: var(--roxo-escuro); }
+.abrir-variantes.com-itens { background: var(--roxo-escuro); border-color: var(--roxo-escuro); }
 .folha-fundo { position: fixed; inset: 0; background: rgba(20, 8, 30, .5); z-index: 80; display: flex; align-items: flex-end; justify-content: center; animation: folha-fade .15s ease-out; }
 .folha { text-align: left; background: #fff; width: 100%; max-width: 560px; max-height: 88vh; border-radius: 18px 18px 0 0; display: flex; flex-direction: column; box-shadow: 0 -8px 30px rgba(0,0,0,.2); animation: folha-sobe .2s ease-out; padding-bottom: env(safe-area-inset-bottom); }
 .folha-alca { width: 42px; height: 4px; border-radius: 4px; background: #d9d2e3; margin: 8px auto 2px; }

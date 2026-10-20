@@ -380,11 +380,11 @@ function CartaoGrupo({ p, moeda, cliente, t, vendeUnidade, linha }: { p: Produto
       </div>
       <div className="cartao-corpo">
         <h3>{p.nome}</h3>
-        <div className="caixa-info">{t.fragrancias(vs.length)}{p.unidades_caixa ? ` · ${t.caixaCom(p.unidades_caixa)}` : ""}</div>
+        {p.unidades_caixa ? <div className="caixa-info">{t.caixaCom(p.unidades_caixa)}</div> : null}
         {cliente && menor != null && <div className="precos"><div className="preco"><small>{t.aPartirDe}</small> {dinheiro(menor, moeda)} <small>{p.unidades_caixa ? t.porCaixa : t.porUnidade}</small></div>
           {p.unidades_caixa && menorUn != null && <div className="preco-un"><b>{dinheiro(menorUn, moeda)}</b> {t.porUnidade}</div>}</div>}
         <SeletorVariantes ids={vs.map((v) => v.produto_id)} titulo={p.nome} foto={p.foto}
-          subtitulo={[t.fragrancias(vs.length), p.unidades_caixa ? t.caixaCom(p.unidades_caixa) : ""].filter(Boolean).join(" · ")}
+          subtitulo={p.unidades_caixa ? t.caixaCom(p.unidades_caixa) : ""}
           rotulo={t.escolherFragrancia(vs.length)} textos={{ pronto: t.pronto, verPedido: t.verPedido, escolhidas: t.escolhidas(9999), fechar: t.fechar }}>
           {vs.map((v) => {
             const esg = esgotado(v, cliente);
