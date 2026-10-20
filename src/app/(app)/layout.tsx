@@ -80,6 +80,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
     ] },
     gestao
       ? { id: "financeiro", titulo: "Financeiro", icone: "financeiro", itens: [
+          { href: "/saude-financeira", texto: "Saúde financeira", dica: "Levantamento de vendas, compras, despesas, margens e plano de ação (área do dono)" },
           { href: "/despesas", texto: "Despesas e contas", contador: n.contas_vencidas, dica: "Contas vencidas" },
           { href: "/relatorios?aba=resultado", texto: "Resultado do mês" },
           { href: "/comissoes", texto: "Comissões" },

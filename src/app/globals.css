@@ -303,3 +303,17 @@ button.discreto:hover { color: var(--erro); border-color: transparent; }
 .resumo-compra b { font-size: 1.4rem; }
 .linha-urgente td { background: #fff4e5; }
 .texto-erro { color: #b42318; }
+
+/* ---------- Saúde financeira (área do dono) ---------- */
+.saude-alertas { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: .9rem; }
+.saude-legenda { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.saude-legenda .ponto { position: static; transform: none; display: inline-block; margin-left: 8px; }
+.saude-faixa { position: relative; height: 14px; border-radius: 999px; background: var(--afundado); }
+.saude-faixa .trilho { position: absolute; top: 6px; height: 2px; background: var(--linha); }
+.saude-faixa .ponto, .saude-legenda .ponto { width: 10px; height: 10px; border-radius: 50%; }
+.saude-faixa .ponto { position: absolute; top: 2px; transform: translateX(-50%); }
+.ponto.planilha { background: #b8bec7; }
+.ponto.real { background: var(--marca); }
+.saude-plano { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 20px; }
+.saude-plano h3 { margin: 0 0 4px; font-size: .95rem; }
+.saude-plano ul { margin: 0; padding-left: 18px; font-size: .88rem; display: flex; flex-direction: column; gap: 4px; }

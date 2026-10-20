@@ -3,7 +3,7 @@ import { comUsuario } from "@/lib/db";
 import { PERFIS } from "@/lib/formato";
 import { Avisos, Selo } from "../avisos";
 import { ativarPessoa, salvarAcessos, salvarUnidadesVendedora } from "./acoes";
-import { PERMISSOES, pode, permitidaParaPerfil } from "@/lib/permissoes";
+import { PERMISSOES, pode, permitidaParaPerfil, soDono } from "@/lib/permissoes";
 import { BotaoLinkSenha, NovaPessoa } from "./formularios";
 
 export const metadata = { title: "Equipe" };
@@ -86,10 +86,11 @@ export default async function Equipe({ searchParams }: { searchParams: Promise<{
                   <legend>Áreas do sistema</legend>
                   <div className="acesso-grade">{PERMISSOES.map((x) => {
                     const pode_ = permitidaParaPerfil(p.perfil, x.chave);
+                    const bloqueadoDono = soDono(x.chave) && u.perfil !== "dono";
                     return (
-                      <label key={x.chave} className={`acesso-item ${pode_ ? "" : "desligado"}`}>
-                        <input type="checkbox" name={`perm_${x.chave}`} value="1" defaultChecked={pode(alvo, x.chave)} disabled={!pode_} />
-                        {x.nome}{!pode_ && <small> (só gestão)</small>}
+                      <label key={x.chave} className={`acesso-item ${pode_ && !bloqueadoDono ? "" : "desligado"}`}>
+                        <input type="checkbox" name={`perm_${x.chave}`} value="1" defaultChecked={pode(alvo, x.chave)} disabled={!pode_ || bloqueadoDono} />
+                        {x.nome}{!pode_ ? <small> (só gestão)</small> : bloqueadoDono ? <small> (só o dono libera)</small> : null}
                       </label>
                     );
                   })}</div>

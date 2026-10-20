@@ -5,7 +5,7 @@
  */
 export type Perfil = "dono" | "gerente" | "vendedora" | "consulta" | "estoquista";
 
-export type Permissao = { chave: string; nome: string; rotas: string[]; gestao?: boolean };
+export type Permissao = { chave: string; nome: string; rotas: string[]; gestao?: boolean; soDono?: boolean };
 
 export const PERMISSOES: Permissao[] = [
   { chave: "pedidos", nome: "Pedidos (ver, criar e separar)", rotas: ["/pedidos"] },
@@ -23,12 +23,14 @@ export const PERMISSOES: Permissao[] = [
   { chave: "relatorios", nome: "Relatórios", rotas: ["/relatorios"] },
   { chave: "comissoes", nome: "Comissões", rotas: ["/comissoes"] },
   { chave: "financeiro", nome: "Despesas, contas e parâmetros", rotas: ["/despesas", "/parametros"], gestao: true },
+  // Área exclusiva do dono: ninguém recebe por padrão e só o dono libera para alguém (Equipe → Acessos)
+  { chave: "saude_financeira", nome: "Saúde financeira (área do dono)", rotas: ["/saude-financeira"], gestao: true, soDono: true },
   { chave: "site", nome: "Loja online (banners e destaques)", rotas: ["/site"] },
   { chave: "abertura", nome: "Abertura da loja", rotas: ["/abertura"], gestao: true },
   { chave: "equipe", nome: "Equipe e acessos", rotas: ["/equipe"], gestao: true },
 ];
 
-const TODAS = PERMISSOES.map((p) => p.chave);
+const TODAS = PERMISSOES.filter((p) => !p.soDono).map((p) => p.chave);
 const PADRAO: Record<Perfil, string[]> = {
   dono: TODAS,
   gerente: TODAS,
@@ -36,6 +38,9 @@ const PADRAO: Record<Perfil, string[]> = {
   vendedora: ["pedidos", "caixa", "clientes", "metas", "promocoes", "catalogo", "procuras", "produtos", "estoque", "relatorios", "comissoes", "site"],
   estoquista: ["pedidos", "produtos", "estoque", "relatorios", "procuras"],
 };
+
+/** Só o dono pode ligar ou desligar esta área para alguém. */
+export const soDono = (chave: string) => Boolean(PERMISSOES.find((p) => p.chave === chave)?.soDono);
 
 export const PERFIL_GESTAO = (p: string) => p === "dono" || p === "gerente" || p === "consulta";
 

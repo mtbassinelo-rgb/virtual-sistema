@@ -66,6 +66,17 @@ for (const tela of ["/despesas", "/parametros"]) {
   const r = await abrir(tela, await sessao("keila@teste.local"));
   ok([302, 303, 307, 308].includes(r.status) || !r.html.includes("Lançar conta"), `Vendedora não vê ${tela}`);
 }
+// Saúde financeira: área do dono. Gerente e vendedora não entram; gerente liberado pelo dono entra.
+for (const email of ["gerente@teste.local", "keila@teste.local"]) {
+  const r = await abrir("/saude-financeira", await sessao(email));
+  ok([302, 303, 307, 308].includes(r.status) || !r.html.includes("Plano de ação"), `${email}: não vê /saude-financeira sem liberação`);
+}
+await db.query(`update app.usuarios set permissoes = permissoes || '{"saude_financeira": true}' where email = 'gerente@teste.local'`);
+{
+  const r = await abrir("/saude-financeira", await sessao("gerente@teste.local"));
+  ok(r.status === 200 && r.html.includes("Plano de ação") && !r.html.includes("Application error"), "Gerente liberado: /saude-financeira abre");
+}
+await db.query(`update app.usuarios set permissoes = permissoes - 'saude_financeira' where email = 'gerente@teste.local'`);
 ok((await fetch(base + "/comissoes/planilha", { headers: { cookie: await sessao("keila@teste.local") } })).status === 403,
   "Vendedora não baixa a planilha de comissões");
 ok((await abrir("/loja/pedido/token-que-nao-existe-123456")).html.includes("inv"), "Link de pedido inválido é recusado");

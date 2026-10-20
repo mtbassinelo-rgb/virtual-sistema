@@ -86,12 +86,18 @@ export async function salvarAcessos(fd: FormData) {
   let q: string;
   try {
     if (!ehGestao(u)) throw new Error("Só gerente ou dono cuida dos acessos.");
-    const perfil = await comUsuario(u.id, async (c) => String((await c.query("select perfil from app.usuarios where id = $1", [id])).rows[0]?.perfil ?? ""));
+    const alvo = await comUsuario(u.id, async (c) => (await c.query("select perfil, permissoes from app.usuarios where id = $1", [id])).rows[0] as { perfil: string; permissoes: Record<string, boolean> | null } | undefined);
+    const perfil = String(alvo?.perfil ?? "");
     if (!perfil) throw new Error("Pessoa não encontrada.");
     // guarda só o que difere do padrão do perfil
     const permissoes: Record<string, boolean> = {};
     for (const p of PERMISSOES) {
       if (!permitidaParaPerfil(perfil, p.chave)) continue;
+      // área exclusiva do dono: quem não é dono não muda (mantém o que já estava)
+      if (p.soDono && u.perfil !== "dono") {
+        if (typeof alvo?.permissoes?.[p.chave] === "boolean") permissoes[p.chave] = alvo.permissoes[p.chave];
+        continue;
+      }
       const marcado = fd.get(`perm_${p.chave}`) === "1";
       if (marcado !== padraoDoPerfil(perfil, p.chave)) permissoes[p.chave] = marcado;
     }
