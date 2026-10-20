@@ -50,7 +50,7 @@ export default async function Produtos({ searchParams }: { searchParams: Promise
     "sem-preco": "x.py_normal is null and x.py_vip is null and x.br_normal is null and x.br_vip is null",
     "sem-preco-gs": "x.py_normal is null",
     "sem-preco-br": "x.br_normal is null",
-    "sem-foto": "p.foto is null",
+    "sem-foto": "p.foto is null and p.mostrar_no_site",
     "em-promocao": "exists (select 1 from app.promocoes pr where pr.produto_id = p.id and pr.status = 'aprovada' and current_date between pr.inicio and pr.fim)",
     "sem-caixa": "p.unidades_caixa is null",
   };

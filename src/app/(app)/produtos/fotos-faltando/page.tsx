@@ -24,7 +24,7 @@ export default async function FotosFaltando({ searchParams }: { searchParams: Pr
   const lista = await comUsuario(u.id, async (c) => (await c.query(`
     select p.id, p.codigo, p.nome, p.marca, coalesce((select sum(e.saldo) from app.v_estoque e where e.produto_id = p.id), 0)::int as saldo
       from app.produtos p
-     where p.ativo and p.foto is null and p.nome !~* $1
+     where p.ativo and p.mostrar_no_site and p.foto is null and p.nome !~* $1
        and ($2::text is null or coalesce(p.marca, '') = $2)
      order by 5 desc, p.marca nulls last, p.nome`, [NAO_VENDA, f.marca || null])).rows as Linha[]);
   const mostrar = comEstoque ? lista.filter((p) => p.saldo > 0) : lista;

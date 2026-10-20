@@ -96,7 +96,7 @@ export default async function Relatorios({ searchParams }: { searchParams: Promi
         count(*) filter (where ativo and not exists (select 1 from app.precos z where z.produto_id = p.id))::int sem_preco,
         count(*) filter (where ativo and not exists (select 1 from app.precos z where z.produto_id = p.id and z.tabela = 'py_normal'))::int sem_gs,
         count(*) filter (where ativo and not exists (select 1 from app.precos z where z.produto_id = p.id and z.tabela = 'br_normal'))::int sem_brl,
-        count(*) filter (where ativo and foto is null)::int sem_foto,
+        count(*) filter (where ativo and mostrar_no_site and foto is null)::int sem_foto,
         count(*) filter (where ativo and unidades_caixa is null)::int sem_caixa,
         count(*) filter (where not ativo)::int inativos
       from app.produtos p`)).rows[0];

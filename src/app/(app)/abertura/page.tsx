@@ -52,7 +52,7 @@ export default async function Abertura({ searchParams }: { searchParams: Promise
   const d = await comUsuario(u.id, async (c) => ({
     sug: (await c.query("select * from app.sugestoes_preco()")).rows as Sugestao[],
     prov: (await c.query("select * from app.estoque_provisorio()")).rows as Provisorio[],
-    semFoto: Number((await c.query("select count(*) n from app.produtos where ativo and foto is null")).rows[0].n),
+    semFoto: Number((await c.query("select count(*) n from app.produtos where ativo and mostrar_no_site and foto is null")).rows[0].n),
   }));
   const comCat = d.sug.filter((s) => s.categoria);
   const semCat = d.sug.filter((s) => !s.categoria);
