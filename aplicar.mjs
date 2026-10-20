@@ -114,7 +114,7 @@ try {
     if (g.length < 2) continue;
     const marcas = new Set(g.map((x) => x.marca).filter(Boolean));
     if (marcas.size > 1) { rel.dup.pulados.push(`${g[0].nome} — marcas diferentes (${[...marcas].join(", ")})`); continue; }
-    const mn = new Set(g.map((x) => x.marca_nome).filter(Boolean));
+    const mn = new Set(g.map((x) => x.marca_nome?.replace(/rhenunks|rheunks/g, "rhenuks")).filter(Boolean));
     if (mn.size > 1) { rel.dup.pulados.push(`${g[0].nome} — marcas diferentes no nome (${[...mn].join(" / ")})`); continue; }
     const comEst = g.filter((x) => Number(x.est) > 0);
     if (comEst.length > 1) { rel.dup.pulados.push(`${g[0].nome} — ${comEst.length} cadastros com estoque: ${comEst.map((x) => `${x.codigo}=${x.est}`).join(", ")}`); continue; }
