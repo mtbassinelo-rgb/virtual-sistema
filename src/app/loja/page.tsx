@@ -381,8 +381,8 @@ function CartaoGrupo({ p, moeda, cliente, t, vendeUnidade, linha }: { p: Produto
       <div className="cartao-corpo">
         <h3>{p.nome}</h3>
         {p.unidades_caixa ? <div className="caixa-info">{t.caixaCom(p.unidades_caixa)}</div> : null}
-        {cliente && menor != null && <div className="precos"><div className="preco"><small>{t.aPartirDe}</small> {dinheiro(menor, moeda)} <small>{p.unidades_caixa ? t.porCaixa : t.porUnidade}</small></div>
-          {p.unidades_caixa && menorUn != null && <div className="preco-un"><b>{dinheiro(menorUn, moeda)}</b> {t.porUnidade}</div>}</div>}
+        {cliente && menorUn != null && <div className="precos"><div className="preco"><small>{t.aPartirDe}</small> {dinheiro(menorUn, moeda)} <small>{t.porUnidade}</small></div>
+          {p.unidades_caixa && menor != null && <div className="preco-un"><b>{dinheiro(menor, moeda)}</b> {t.porCaixa}</div>}</div>}
         <SeletorVariantes ids={vs.map((v) => v.produto_id)} titulo={p.nome} foto={p.foto}
           subtitulo={p.unidades_caixa ? t.caixaCom(p.unidades_caixa) : ""}
           rotulo={t.escolherFragrancia(vs.length)} textos={{ pronto: t.pronto, verPedido: t.verPedido, escolhidas: t.escolhidas(9999), fechar: t.fechar }}>
@@ -427,7 +427,7 @@ function itemCarrinho(p: Produto, encomenda = false) {
            limite: pr?.limite_qtd ? Number(pr.limite_qtd) : null, caixa: p.unidades_caixa, encomenda, marcaDb: p.marca };
 }
 
-/** Preço principal = caixa fechada (unidade × peças); embaixo, o preço da unidade. */
+/** Preço em destaque = unidade (o cliente vê primeiro o menor valor); embaixo, menor, o preço da caixa fechada. */
 function Precos({ p, moeda, cliente, t }: { p: Produto; moeda: Moeda; cliente: boolean; t: Textos }) {
   const pr = p.p;
   if (!cliente) return null;
@@ -436,10 +436,10 @@ function Precos({ p, moeda, cliente, t }: { p: Produto; moeda: Moeda; cliente: b
   return (
     <div className="precos">
       <div className="preco">
-        {dinheiro(cx ? un * cx : un, moeda)} <small>{cx ? t.porCaixa : t.porUnidade}</small>
-        {pr.desconto_pct && <s>{dinheiro(cx ? Number(pr.preco_tabela) * cx : pr.preco_tabela, moeda)}</s>}
+        {dinheiro(un, moeda)} <small>{t.porUnidade}</small>
+        {pr.desconto_pct && <s>{dinheiro(pr.preco_tabela, moeda)}</s>}
       </div>
-      {cx && <div className="preco-un"><b>{dinheiro(un, moeda)}</b> {t.porUnidade}</div>}
+      {cx && <div className="preco-un"><b>{dinheiro(un * cx, moeda)}</b> {t.porCaixa}</div>}
     </div>
   );
 }
