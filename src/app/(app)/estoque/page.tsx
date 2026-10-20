@@ -10,7 +10,7 @@ export const metadata = { title: "Estoque" };
 
 const COR: Record<string, string> = { rascunho: "", enviada: "aviso", recebida: "ok", recebida_com_divergencia: "erro", cancelada: "" };
 
-export default async function Estoque({ searchParams }: { searchParams: Promise<{ q?: string; ok?: string; erro?: string }> }) {
+export default async function Estoque({ searchParams }: { searchParams: Promise<{ q?: string; situacao?: string; deposito?: string; ok?: string; erro?: string }> }) {
   const u = await exigirUsuario();
   const f = await searchParams;
   const d = await comUsuario(u.id, async (c) => {
@@ -55,6 +55,16 @@ export default async function Estoque({ searchParams }: { searchParams: Promise<
     p.dep[String(s.deposito_id)] = { saldo: Number(s.saldo), aReceber: Number(s.a_receber) };
     porProduto.set(chave, p);
   }
+  // Filtro de situação: "zerado" = sem estoque; "com" = com estoque. Com um depósito escolhido,
+  // vale o saldo daquele depósito; sem depósito, vale o total de todos.
+  const situacao = f.situacao === "zerado" || f.situacao === "com" ? f.situacao : "";
+  const depFiltro = d.depositos.some((x) => x.id === f.deposito) ? String(f.deposito) : "";
+  const saldoFiltro = (p: Linha) =>
+    depFiltro ? (p.dep[depFiltro]?.saldo ?? 0) : Object.values(p.dep).reduce((s, v) => s + v.saldo, 0);
+  const todas = [...porProduto.values()];
+  const visiveis = todas.filter((p) =>
+    situacao === "zerado" ? saldoFiltro(p) <= 0 : situacao === "com" ? saldoFiltro(p) > 0 : true);
+  const nomeDep = d.depositos.find((x) => x.id === depFiltro)?.nome;
   const operaAlgum = d.depositos.some((x) => x.opera);
   const linhas = Array.from({ length: 6 }, (_, i) => i);
   // Um único catálogo para todos os campos de produto (digite código ou nome e escolha)
@@ -69,12 +79,21 @@ export default async function Estoque({ searchParams }: { searchParams: Promise<
       </datalist>
       <section className="linha entre">
         <h1>Estoque</h1>
-        {ehGestao(u) && (
-          <div className="linha">
-            <a className="botao" href="/estoque/precos">Tabela de preços</a>
-            <a className="botao" href="/estoque/importar">Importar produtos do Bling</a>
-          </div>
-        )}
+        <div className="linha">
+          {operaAlgum && (
+            <>
+              <a className="botao principal" href="/estoque/inventario">Fazer inventário</a>
+              <a className="botao" href="#entrada">Adicionar estoque</a>
+            </>
+          )}
+          {ehGestao(u) && (
+            <>
+              <a className="botao" href="#ajuste">Ajuste manual</a>
+              <a className="botao" href="/estoque/precos">Tabela de preços</a>
+              <a className="botao" href="/estoque/importar">Importar produtos do Bling</a>
+            </>
+          )}
+        </div>
       </section>
       <section>
         <div className="suave pequeno">
@@ -85,13 +104,39 @@ export default async function Estoque({ searchParams }: { searchParams: Promise<
 
       <form className="painel linha" method="get">
         <label style={{ flex: 1 }}>Produto<input name="q" defaultValue={f.q} placeholder="Código ou nome" /></label>
-        <button className="principal">Buscar</button>
+        <label>Situação
+          <select name="situacao" defaultValue={situacao}>
+            <option value="">Todos</option>
+            <option value="zerado">Sem estoque (zerado)</option>
+            <option value="com">Com estoque</option>
+          </select>
+        </label>
+        <label>Depósito
+          <select name="deposito" defaultValue={depFiltro}>
+            <option value="">Todos (soma)</option>
+            {d.depositos.map((x) => <option key={x.id} value={x.id}>{x.nome}</option>)}
+          </select>
+        </label>
+        <button className="principal">Filtrar</button>
+        {(f.q || situacao || depFiltro) && <a className="botao" href="/estoque">Limpar</a>}
       </form>
 
-      {porProduto.size === 0 ? <div className="painel vazio">Nenhum produto cadastrado ainda.</div> : (
+      {porProduto.size > 0 && (
+        <p className="pequeno suave">
+          {situacao === "zerado"
+            ? `${visiveis.length} produto(s) sem estoque${nomeDep ? " em " + nomeDep : " (somando todos os depósitos)"}.`
+            : situacao === "com"
+              ? `${visiveis.length} produto(s) com estoque${nomeDep ? " em " + nomeDep : ""}.`
+              : `${visiveis.length} produto(s).`}
+          {situacao !== "zerado" && <> <a href={`/estoque?situacao=zerado${depFiltro ? "&deposito=" + depFiltro : ""}`}>Ver os sem estoque</a></>}
+        </p>
+      )}
+
+      {porProduto.size === 0 ? <div className="painel vazio">Nenhum produto cadastrado ainda.</div> :
+       visiveis.length === 0 ? <div className="painel vazio">Nenhum produto nessa situação.</div> : (
         <div className="tabela"><table>
           <thead><tr><th>Código</th><th>Produto</th>{d.depositos.map((x) => <th key={x.id}>{x.nome}</th>)}<th>Total</th></tr></thead>
-          <tbody>{[...porProduto.values()].map((p) => {
+          <tbody>{visiveis.map((p) => {
             const total = Object.values(p.dep).reduce((s, v) => s + v.saldo, 0);
             return (
               <tr key={p.codigo}>
@@ -230,7 +275,7 @@ export default async function Estoque({ searchParams }: { searchParams: Promise<
 
       {operaAlgum && (
         <div className="duas-colunas">
-          <section className="painel">
+          <section className="painel" id="entrada">
             <h2>Entrada de mercadoria (compra)</h2>
             <form action={entradaCompra} className="campos">
               <label>Depósito
@@ -249,7 +294,7 @@ export default async function Estoque({ searchParams }: { searchParams: Promise<
             </form>
           </section>
           {ehGestao(u) && (
-            <section className="painel">
+            <section className="painel" id="ajuste">
               <h2>Ajuste de inventário</h2>
               <form action={ajustarEstoque} className="campos">
                 <label>Depósito
