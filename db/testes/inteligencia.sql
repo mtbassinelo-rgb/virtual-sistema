@@ -217,6 +217,18 @@ select teste.ok((select count(*) = 1 and bool_and(preco_unitario = 0 and descric
 select teste.ok(not exists (select 1 from app.vitrine_com_preco() x where x = '00000000-0000-0000-0000-00000000f1a9'), 'Produto sem preço fica fora da vitrine');
 delete from app.portal_sessoes where token_hash = 'teste-sem-preco';
 
+\echo '== Cliente ativo / inativo =='
+set role vc_app;
+select teste.como(:'KEILA');
+select teste.falha($$select app.ativar_cliente('00000000-0000-0000-0000-0000000000c1', false)$$, 'gerente ou dono', 'Vendedora não desativa cliente');
+select teste.falha($$update app.clientes set ativo = false where id = '00000000-0000-0000-0000-0000000000c1'$$, null, 'Vendedora não desativa direto');
+select teste.como(:'GERENTE');
+select app.ativar_cliente('00000000-0000-0000-0000-0000000000c1', false, 'Parou de comprar');
+select teste.ok((select not ativo and motivo_inativo = 'Parou de comprar' and inativado_em is not null from app.clientes where id = '00000000-0000-0000-0000-0000000000c1'), 'Gerente desativa com motivo');
+select app.ativar_cliente('00000000-0000-0000-0000-0000000000c1', true);
+select teste.ok((select ativo and inativado_em is null from app.clientes where id = '00000000-0000-0000-0000-0000000000c1'), 'Gerente reativa');
+reset role;
+
 \echo '== Compra por unidade: vendedora pede, gerente aprova; VIP só caixa =='
 select categoria_preco as cat_c1 from app.clientes where id = '00000000-0000-0000-0000-0000000000c1' \gset
 update app.clientes set categoria_preco = 'normal', compra_unidade = false where id = '00000000-0000-0000-0000-0000000000c1';

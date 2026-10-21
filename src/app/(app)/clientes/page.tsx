@@ -7,7 +7,7 @@ import { criarCliente, decidirCompraUnidade, trocarVendedoraCliente } from "./ac
 
 export const metadata = { title: "Clientes" };
 
-export default async function Clientes({ searchParams }: { searchParams: Promise<{ q?: string; vendedora?: string; compra?: string; erro?: string; ok?: string }> }) {
+export default async function Clientes({ searchParams }: { searchParams: Promise<{ q?: string; vendedora?: string; compra?: string; situacao?: string; erro?: string; ok?: string }> }) {
   const u = await exigirUsuario();
   const f = await searchParams;
   const par: unknown[] = [];
@@ -17,10 +17,11 @@ export default async function Clientes({ searchParams }: { searchParams: Promise
   if (f.compra === "aguardando") cond.push("c.compra_unidade_sugerido_em is not null and not c.compra_unidade and c.categoria_preco = 'normal'");
   if (f.compra === "unidade") cond.push("c.compra_unidade and c.categoria_preco = 'normal'");
   if (f.compra === "caixa") cond.push("not (c.compra_unidade and c.categoria_preco = 'normal')");
+  if (f.situacao === "inativos") cond.push("not c.ativo"); else if (f.situacao !== "todos") cond.push("c.ativo");
 
   const d = await comUsuario(u.id, async (c) => ({
     clientes: (await c.query(
-      `select c.id, c.nome, c.cidade, c.pais, c.categoria_preco, c.moeda, c.vendedora_id, v.nome as vendedora, c.compra_unidade, c.compra_unidade_sugerido_em,
+      `select c.id, c.nome, c.cidade, c.pais, c.categoria_preco, c.moeda, c.vendedora_id, v.nome as vendedora, c.compra_unidade, c.compra_unidade_sugerido_em, c.ativo,
               x.pedidos, x.total, x.ultima, x.saldo
          from app.clientes c join app.vendedoras v on v.id = c.vendedora_id
          left join lateral (
@@ -34,7 +35,7 @@ export default async function Clientes({ searchParams }: { searchParams: Promise
   }));
 
   // volta para a mesma lista (com os filtros) depois de trocar a vendedora
-  const voltaLista = "/clientes?" + new URLSearchParams(Object.entries({ q: f.q, vendedora: f.vendedora, compra: f.compra })
+  const voltaLista = "/clientes?" + new URLSearchParams(Object.entries({ q: f.q, vendedora: f.vendedora, compra: f.compra, situacao: f.situacao })
     .filter((x): x is [string, string] => Boolean(x[1]))).toString();
   return (
     <>
@@ -50,6 +51,11 @@ export default async function Clientes({ searchParams }: { searchParams: Promise
       )}
       <form className="painel campos" method="get">
         <label>Nome ou telefone<input name="q" defaultValue={f.q} /></label>
+        <label>Situação
+          <select name="situacao" defaultValue={f.situacao ?? ""}>
+            <option value="">Ativos</option><option value="inativos">Inativos</option><option value="todos">Todos</option>
+          </select>
+        </label>
         {ehGestao(u) && (
           <label>Vendedora
             <select name="vendedora" defaultValue={f.vendedora ?? ""}>
@@ -74,7 +80,7 @@ export default async function Clientes({ searchParams }: { searchParams: Promise
           <thead><tr><th>Cliente</th><th>Preço</th><th>Compra no site</th>{ehGestao(u) && <th>Vendedora (trocar)</th>}<th>Pedidos</th><th>Total</th><th>Saldo</th><th>Última compra</th></tr></thead>
           <tbody>{d.clientes.map((c) => (
             <tr key={c.id}>
-              <td><Link href={`/clientes/${c.id}`}>{c.nome}</Link>{c.cidade && <div className="pequeno suave">{c.cidade}</div>}</td>
+              <td><Link href={`/clientes/${c.id}`}>{c.nome}</Link>{!c.ativo && <> <Selo cor="erro">Inativo</Selo></>}{c.cidade && <div className="pequeno suave">{c.cidade}</div>}</td>
               <td><Selo cor={c.categoria_preco === "vip" ? "marca" : ""}>{c.pais} · {c.categoria_preco === "vip" ? "VIP" : "Normal"}</Selo></td>
               <td>
                 {c.categoria_preco === "vip" || (!c.compra_unidade && !c.compra_unidade_sugerido_em) ? <span className="pequeno suave">Só caixa</span>

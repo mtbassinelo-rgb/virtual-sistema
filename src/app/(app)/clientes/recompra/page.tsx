@@ -37,7 +37,7 @@ export default async function Recompra({ searchParams }: { searchParams: Promise
   const u = await exigirUsuario();
   const f = await searchParams;
   const gestao = ehGestao(u);
-  const todos = await comUsuario(u.id, async (c) => (await c.query("select * from app.recompra_clientes()")).rows as Linha[]);
+  const todos = await comUsuario(u.id, async (c) => (await c.query("select r.* from app.recompra_clientes() r where exists (select 1 from app.clientes c where c.id = r.cliente_id and c.ativo)")).rows as Linha[]);
   const sit = f.s && SITUACOES[f.s] ? f.s : "atrasado";
   const q = (f.q ?? "").trim().toLowerCase();
   const base = todos.filter((l) => !f.v || l.vendedora_id === f.v);

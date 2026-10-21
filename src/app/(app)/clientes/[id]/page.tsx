@@ -7,7 +7,7 @@ import {
   type Moeda,
 } from "@/lib/formato";
 import { Avisos, Barra, Selo } from "../../avisos";
-import { atendimentoCliente, pedirCompraUnidade, trocarVendedoraCliente, bloquearCliente, decidirCompraUnidade, decidirClienteLocal, definirCredito, depositoCliente, recusarSugestaoCredito, salvarCliente, sugerirClienteLocal, sugerirCredito } from "../acoes";
+import { ativarCliente, atendimentoCliente, pedirCompraUnidade, trocarVendedoraCliente, bloquearCliente, decidirCompraUnidade, decidirClienteLocal, definirCredito, depositoCliente, recusarSugestaoCredito, salvarCliente, sugerirClienteLocal, sugerirCredito } from "../acoes";
 import { AcessoCliente } from "./acesso-cliente";
 
 export const metadata = { title: "Cliente" };
@@ -64,7 +64,8 @@ export default async function Cliente({ params, searchParams }: {
       <section className="linha entre">
         <div>
           <Link href="/clientes">← Clientes</Link>
-          <h1 style={{ marginTop: 4 }}>{cli.nome}</h1>
+          <h1 style={{ marginTop: 4 }}>{cli.nome} {!cli.ativo && <Selo cor="erro">Inativo</Selo>}</h1>
+          {!cli.ativo && <div className="pequeno suave">Desativado{cli.inativado_em ? ` em ${new Date(cli.inativado_em).toLocaleDateString("pt-BR")}` : ""}{cli.motivo_inativo ? ` · ${cli.motivo_inativo}` : ""}. Continua no sistema e sendo atualizado; não aparece nas listas do dia a dia.</div>}
           <div className="linha pequeno suave">
             <span>Vendedora: <b>{cli.vendedora}</b></span>
             <Selo cor={cli.categoria_preco === "vip" ? "marca" : ""}>{cli.pais === "PY" ? "Paraguai · Gs" : "Brasil · R$"} · {cli.categoria_preco === "vip" ? "VIP" : "Normal"}</Selo>
@@ -82,6 +83,14 @@ export default async function Cliente({ params, searchParams }: {
                 levar os pedidos em andamento
               </label>
               <button className="principal">Trocar</button>
+            </form>
+          )}
+          {gestao && (
+            <form action={ativarCliente} className="linha" style={{ gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 8 }}>
+              <input type="hidden" name="cliente_id" value={cli.id} />
+              <input type="hidden" name="ativo" value={cli.ativo ? "0" : "1"} />
+              {cli.ativo && <input name="motivo" placeholder="Motivo (opcional)" maxLength={300} style={{ minWidth: 220 }} aria-label="Motivo para desativar" />}
+              <button className={cli.ativo ? "discreto" : "principal"}>{cli.ativo ? "Desativar cliente" : "Ativar cliente"}</button>
             </form>
           )}
         </div>

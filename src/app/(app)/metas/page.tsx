@@ -22,7 +22,7 @@ export default async function Metas({ searchParams }: {
       `select * from app.v_metas ${f.status ? "where status = $1::app.status_meta" : ""}
         order by case status when 'proposta' then 0 when 'aprovada' then 1 when 'atingida' then 2 else 3 end, fim`,
       f.status ? [f.status] : [])).rows,
-    clientes: (await c.query("select id, nome, moeda from app.clientes where mesclado_em is null order by nome")).rows,
+    clientes: (await c.query("select id, nome, moeda from app.clientes where mesclado_em is null and ativo order by nome")).rows,
   }));
 
   return (

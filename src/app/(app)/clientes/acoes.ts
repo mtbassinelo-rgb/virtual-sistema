@@ -305,3 +305,19 @@ export async function registrarContatoRecompra(fd: FormData) {
   revalidatePath("/clientes/recompra");
   redirect(`${volta}${volta.includes("?") ? "&" : "?"}${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Contato registrado.")}`);
 }
+
+/** Ativa ou desativa o cliente (só gerente ou dono). Inativo some das listas, mas continua no sistema e sendo atualizado. */
+export async function ativarCliente(fd: FormData) {
+  const u = await exigirUsuario();
+  const id = texto(fd, "cliente_id");
+  const ativo = texto(fd, "ativo") === "1";
+  let erro: string | null = null;
+  try {
+    await comUsuario(u.id, (c) => c.query("select app.ativar_cliente($1, $2, $3)", [id, ativo, texto(fd, "motivo") || null]));
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  revalidatePath(`/clientes/${id}`);
+  revalidatePath("/clientes");
+  redirect(`/clientes/${id}?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent(ativo ? "Cliente ativado: volta a aparecer nas listas." : "Cliente desativado: sai das listas do dia a dia, mas continua no sistema e sendo atualizado.")}`);
+}
