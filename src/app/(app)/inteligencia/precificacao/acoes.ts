@@ -66,3 +66,20 @@ export async function produtosLotePrecificacao(ids: string[], op: "inativar" | "
     return { erro: mensagemErro(e) };
   }
 }
+
+/** Edição em massa: troca a marca dos produtos escolhidos. */
+export async function marcaEmMassa(ids: string[], marca: string): Promise<{ ok?: string; erro?: string }> {
+  const u = await exigirUsuario();
+  try {
+    if (!ehGestao(u)) throw new Error("Só gerente ou dono altera a marca.");
+    const m = marca.trim().toUpperCase();
+    if (m.length < 1 || m.length > 80) throw new Error("Informe a marca.");
+    const lista = ids.filter((x) => /^[0-9a-f-]{36}$/i.test(x)).slice(0, 1000);
+    if (!lista.length) throw new Error("Nenhum produto escolhido.");
+    const n = await comUsuario(u.id, async (c) => (await c.query("update app.produtos set marca = $2 where id = any($1::uuid[]) and marca is distinct from $2", [lista, m])).rowCount ?? 0);
+    revalidatePath("/inteligencia/precificacao"); revalidatePath("/produtos"); revalidatePath("/loja");
+    return { ok: `Marca ${m} aplicada em ${n} produto(s).` };
+  } catch (e) {
+    return { erro: mensagemErro(e) };
+  }
+}

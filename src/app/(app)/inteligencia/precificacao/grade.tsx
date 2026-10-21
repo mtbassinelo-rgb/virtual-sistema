@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { produtosLotePrecificacao } from "./acoes";
+import { marcaEmMassa, produtosLotePrecificacao } from "./acoes";
 
 export type LinhaPrec = {
   produto_id: string; codigo: string; nome: string; marca: string | null; foto: string | null; tipo: string; caixa: number | null;
@@ -139,6 +139,46 @@ export function GradePrecificacao({ linhas, premissas, acao }: {
   });
   const desfazer = () => { setEdits({}); setMsg(null); };
 
+  // Edição em massa nos selecionados: marca grava na hora; preço, custo, frete e caixa preenchem a tabela (grava no Salvar)
+  const [massaCampo, setMassaCampo] = useState("normal");
+  const [massaValor, setMassaValor] = useState("");
+  const marcasLista = useMemo(() => [...new Set(linhas.map((l) => l.marca).filter(Boolean) as string[])].sort(), [linhas]);
+  function aplicarMassa(ls: LinhaPrec[]) {
+    const v = massaValor.trim();
+    if (!ls.length || !v) { setMsg({ erro: "Escolha os produtos e informe o valor." }); return; }
+    if (massaCampo === "marca") {
+      if (!window.confirm(`Aplicar a marca "${v.toUpperCase()}" em ${ls.length} produto(s)?`)) return;
+      iniciar(async () => {
+        const r = await marcaEmMassa(ls.map((l) => l.produto_id), v);
+        setMsg(r);
+        if (r.ok) { setMassaValor(""); router.refresh(); }
+      });
+      return;
+    }
+    // R$ aceita 2,35 ou 2.35; Gs, caixa e % tiram o ponto de milhar (15.000 = 15000)
+    const n = massaCampo === "custo" || massaCampo === "frete"
+      ? Number(v.includes(",") ? v.replace(/\./g, "").replace(",", ".") : v)
+      : Number(v.replace(/\./g, "").replace(",", "."));
+    if (!Number.isFinite(n)) { setMsg({ erro: "Valor inválido." }); return; }
+    const arred = (x: number) => Math.max(premissas.arred, Math.round(x / premissas.arred) * premissas.arred);
+    setEdits((m) => {
+      const novo = { ...m };
+      for (const l of ls) {
+        const e = { ...novo[l.produto_id] };
+        if (massaCampo === "pct") {
+          const atualN = Number(e.normal ?? l.preco_normal ?? 0), atualV = Number(e.vip ?? l.preco_vip ?? 0);
+          if (atualN > 0) e.normal = String(arred(atualN * (1 + n / 100)));
+          if (atualV > 0) e.vip = String(arred(atualV * (1 + n / 100)));
+        } else if (massaCampo === "normal" || massaCampo === "vip") e[massaCampo] = String(Math.round(n));
+        else if (massaCampo === "caixa") e.caixa = String(Math.round(n));
+        else if (massaCampo === "custo" || massaCampo === "frete") e[massaCampo] = brl(n);
+        novo[l.produto_id] = e;
+      }
+      return novo;
+    });
+    setMsg({ ok: `Valor aplicado em ${ls.length} produto(s) na tabela. Confira e clique em Salvar para gravar.` });
+  }
+
   function salvar() {
     const dados = alterados.map(([id, e]) => {
       const l = linhas.find((x) => x.produto_id === id)!;
@@ -225,6 +265,23 @@ export function GradePrecificacao({ linhas, premissas, acao }: {
           <button type="button" onClick={() => usarSugestao(selecionados)}>Usar preço sugerido</button>
           <button type="button" onClick={() => usarPlanilha(selecionados)}>Usar custo da planilha</button>
           <button type="button" onClick={() => setSel({})}>Limpar seleção</button>
+          <span className="linha" style={{ gap: 6, alignItems: "center", flexWrap: "wrap", borderLeft: "1px solid var(--linha, #e6dcec)", paddingLeft: 10 }}>
+            <b className="pequeno">Edição em massa:</b>
+            <select value={massaCampo} onChange={(e) => { setMassaCampo(e.target.value); setMassaValor(""); }} aria-label="Campo para editar em massa" style={{ width: "auto" }}>
+              <option value="normal">Preço Normal (Gs)</option>
+              <option value="vip">Preço VIP (Gs)</option>
+              <option value="pct">Ajustar Normal e VIP em %</option>
+              <option value="custo">Custo (R$)</option>
+              <option value="frete">Frete (R$)</option>
+              <option value="caixa">Peças por caixa</option>
+              <option value="marca">Marca</option>
+            </select>
+            <input value={massaValor} onChange={(e) => setMassaValor(e.target.value)} list={massaCampo === "marca" ? "marcas-prec" : undefined}
+              inputMode={massaCampo === "marca" ? "text" : "decimal"} style={{ width: massaCampo === "marca" ? 180 : 110 }} aria-label="Valor para aplicar"
+              placeholder={massaCampo === "pct" ? "ex.: 5 ou -3" : massaCampo === "marca" ? "Marca" : massaCampo === "custo" || massaCampo === "frete" ? "ex.: 2,35" : "ex.: 15000"} />
+            <datalist id="marcas-prec">{marcasLista.map((m) => <option key={m} value={m} />)}</datalist>
+            <button type="button" className="principal" disabled={salvando} onClick={() => aplicarMassa(selecionados)}>Aplicar nos {selecionados.length}</button>
+          </span>
           <button type="button" className="discreto" onClick={() => remover(selecionados.map((l) => l.produto_id), selecionados.map((l) => l.nome), "inativar")}>Inativar selecionados</button>
           <button type="button" className="perigo" onClick={() => remover(selecionados.map((l) => l.produto_id), selecionados.map((l) => l.nome), "excluir")}>Excluir selecionados</button>
           <span className="pequeno suave">Só preenche a tabela. Nada é gravado até você clicar em Salvar.</span>
