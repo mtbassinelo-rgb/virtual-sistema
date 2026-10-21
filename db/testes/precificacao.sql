@@ -48,3 +48,24 @@ select app.registrar_compra('00000000-0000-0000-0000-00000000f701', current_date
 select teste.ok(app.frete_produto('00000000-0000-0000-0000-00000000c701') = 0.40, 'Duas notas: média ponderada (80 ÷ 200)');
 select teste.ok((select notas = 2 and frete_unidade = 0.40 from app.frete_medio_notas() where marca = 'MARCA NOTA'), 'Resumo de frete por marca');
 \echo '== Testes de frete por nota passaram =='
+
+\echo '== Notas a chegar =='
+reset role;
+insert into app.produtos (id, codigo, nome, marca) values ('00000000-0000-0000-0000-00000000c801', 'NOTA-1', 'Pimenta Negra Teste', 'MARCA CHEGA');
+select id as dep from app.depositos where codigo = 'cd-foz' \gset
+set role vc_app;
+select teste.como(:'KEILA');
+select teste.falha($$select app.lancar_nota('00000000-0000-0000-0000-00000000f701', current_date, '9992', 'MARCA CHEGA', 861, 10, null, '[{"descricao":"X","quantidade":1,"valor_unit":1}]')$$, 'gerente ou dono', 'Vendedora não lança nota');
+select teste.como(:'GERENTE');
+select app.lancar_nota('00000000-0000-0000-0000-00000000f701', current_date, '9992', 'MARCA CHEGA', 861, 10, null,
+  '[{"codigo":"05","descricao":"PIMENTA NEGRA","quantidade":1200,"valor_unit":2.60,"produto_id":"00000000-0000-0000-0000-00000000c801"},
+    {"codigo":"066","descricao":"SPRAY SEM CADASTRO","quantidade":648,"valor_unit":5.00}]') as nota \gset
+select teste.ok((select coalesce(sum(quantidade), 0) from app.estoque_saldos where produto_id = '00000000-0000-0000-0000-00000000c801') = 0, 'Nota lançada não sobe estoque');
+select teste.ok((select custo_unit from app.compra_itens where compra_id = :'nota' and codigo_nota = '05') = 2.34, 'Custo do item já com o desconto da nota');
+select teste.ok((select count(*) from app.frete_medio_notas() where marca = 'MARCA CHEGA') = 0, 'Frete da nota a caminho ainda não entra na média');
+select teste.ok((select count(*) from app.produtos where nome = 'SPRAY SEM CADASTRO') = 0, 'Nenhum produto novo é criado');
+select teste.ok((app.receber_nota(:'nota', :'dep') ->> 'sem_produto')::int = 1, 'Chegada: avisa o item sem produto ligado');
+select teste.ok((select quantidade from app.estoque_saldos where produto_id = '00000000-0000-0000-0000-00000000c801' and deposito_id = :'dep') = 1200, 'Chegada sobe o estoque do item ligado');
+select teste.ok((select frete_unidade from app.frete_medio_notas() where marca = 'MARCA CHEGA') = round(861.0 / 1848, 4), 'Frete da nota entra na média da marca (861 ÷ 1848)');
+select teste.falha($$select app.receber_nota('$$ || :'nota' || $$', '$$ || :'dep' || $$')$$, 'já foi recebida', 'Não recebe duas vezes');
+\echo '== Testes de notas passaram =='

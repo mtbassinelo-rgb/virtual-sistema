@@ -57,6 +57,17 @@ function calcular(l: LinhaPrec, e: Edit, p: Premissas) {
     semFrete: frete == null };
 }
 
+/** Cabeçalho clicável: 1º clique ordena por k, 2º por k2 (inverso). */
+function Ord({ k, k2, atual, set, children }: { k: string; k2?: string; atual: string; set: (v: string) => void; children: React.ReactNode }) {
+  const ativo = atual === k || atual === k2;
+  return (
+    <button type="button" onClick={() => set(atual === k && k2 ? k2 : k)}
+      style={{ all: "unset", cursor: "pointer", fontWeight: ativo ? 700 : undefined, whiteSpace: "nowrap" }} title="Clique para ordenar">
+      {children} {ativo ? (atual === k ? "▼" : "▲") : <span className="suave">↕</span>}
+    </button>
+  );
+}
+
 export function GradePrecificacao({ linhas, premissas, acao }: {
   linhas: LinhaPrec[]; premissas: Premissas;
   acao: (fd: FormData) => Promise<{ ok?: string; erro?: string }>;
@@ -70,23 +81,42 @@ export function GradePrecificacao({ linhas, premissas, acao }: {
   const [soMotor, setSoMotor] = useState(false);
   const [soPlanilha, setSoPlanilha] = useState(false);
   const [ordem, setOrdem] = useState("vendas");
+  const [faixaM, setFaixaM] = useState("");
   const [limite, setLimite] = useState(150);
   const [msg, setMsg] = useState<{ ok?: string; erro?: string } | null>(null);
   const [salvando, iniciar] = useTransition();
 
   const marcas = useMemo(() => [...new Set(linhas.map((l) => l.marca ?? "Sem marca"))].sort(), [linhas]);
+  // valores calculados sem as edições (para ordenar e filtrar sem a lista "pular" enquanto digita)
+  const base = useMemo(() => new Map(linhas.map((l) => [l.produto_id, calcular(l, {}, premissas)])), [linhas, premissas]);
   const filtradas = useMemo(() => {
     const t = q.trim().toLowerCase();
+    const faixa = (m: number | null) => {
+      if (!faixaM) return true;
+      if (m == null) return faixaM === "sem";
+      return faixaM === "neg" ? m < 0 : faixaM === "0-20" ? m >= 0 && m < 0.2 : faixaM === "20-35" ? m >= 0.2 && m < 0.35
+        : faixaM === "35-50" ? m >= 0.35 && m < 0.5 : faixaM === "50+" ? m >= 0.5 : false;
+    };
     const r = linhas.filter((l) => (!t || `${l.codigo} ${l.nome} ${l.marca ?? ""}`.toLowerCase().includes(t))
       && (!marca || (l.marca ?? "Sem marca") === marca) && (!sit || l.situacao === sit)
-      && (!soMotor || l.motor) && (!soPlanilha || l.planilha_custo != null));
+      && (!soMotor || l.motor) && (!soPlanilha || l.planilha_custo != null) && faixa(base.get(l.produto_id)!.lV));
+    const v = (l: LinhaPrec, k: "lV" | "lN" | "custoFrete" | "vip" | "normal") => base.get(l.produto_id)![k];
+    const asc = (k: "lV" | "lN" | "custoFrete" | "vip" | "normal") => (a: LinhaPrec, b: LinhaPrec) => (v(a, k) ?? Infinity) - (v(b, k) ?? Infinity);
+    const desc = (k: "lV" | "lN" | "custoFrete" | "vip" | "normal") => (a: LinhaPrec, b: LinhaPrec) => (v(b, k) ?? -Infinity) - (v(a, k) ?? -Infinity);
+    const difSug = (l: LinhaPrec) => { const c = base.get(l.produto_id)!; return c.vip && c.sugV ? (c.vip - c.sugV) / c.sugV : null; };
     const ord: Record<string, (a: LinhaPrec, b: LinhaPrec) => number> = {
       vendas: (a, b) => Number(b.vendido_90) - Number(a.vendido_90),
+      vendas_asc: (a, b) => Number(a.vendido_90) - Number(b.vendido_90),
+      lucro_vip_desc: desc("lV"), lucro_vip_asc: asc("lV"),
+      lucro_normal_desc: desc("lN"), lucro_normal_asc: asc("lN"),
+      custo_desc: desc("custoFrete"), custo_asc: asc("custoFrete"),
+      vip_desc: desc("vip"), vip_asc: asc("vip"),
+      abaixo_sugerido: (a, b) => (difSug(a) ?? Infinity) - (difSug(b) ?? Infinity),
       nome: (a, b) => a.nome.localeCompare(b.nome),
       marca: (a, b) => (a.marca ?? "").localeCompare(b.marca ?? "") || a.nome.localeCompare(b.nome),
     };
-    return r.sort(ord[ordem]);
-  }, [linhas, q, marca, sit, soMotor, soPlanilha, ordem]);
+    return r.sort(ord[ordem] ?? ord.vendas);
+  }, [linhas, base, q, marca, sit, soMotor, soPlanilha, ordem, faixaM]);
 
   const contagem = useMemo(() => linhas.reduce<Record<string, number>>((a, l) => { a[l.situacao] = (a[l.situacao] ?? 0) + 1; return a; }, {}), [linhas]);
   const alterados = Object.entries(edits).filter(([, e]) => Object.keys(e).length > 0);
@@ -149,11 +179,27 @@ export function GradePrecificacao({ linhas, premissas, acao }: {
         <label>Marca<select value={marca} onChange={(e) => setMarca(e.target.value)}>
           <option value="">Todas</option>{marcas.map((m) => <option key={m} value={m}>{m}</option>)}
         </select></label>
-        <label>Ordenar<select value={ordem} onChange={(e) => setOrdem(e.target.value)}>
-          <option value="vendas">Mais vendidos (90 dias)</option><option value="marca">Marca</option><option value="nome">Nome</option>
+        <label>Ordenar por<select value={ordem} onChange={(e) => setOrdem(e.target.value)}>
+          <optgroup label="Vendas"><option value="vendas">Mais vendidos (90 dias)</option><option value="vendas_asc">Menos vendidos</option></optgroup>
+          <optgroup label="Margem de lucro">
+            <option value="lucro_vip_desc">Maior margem VIP</option><option value="lucro_vip_asc">Menor margem VIP</option>
+            <option value="lucro_normal_desc">Maior margem Normal</option><option value="lucro_normal_asc">Menor margem Normal</option>
+            <option value="abaixo_sugerido">VIP mais abaixo do sugerido</option>
+          </optgroup>
+          <optgroup label="Valores">
+            <option value="custo_desc">Maior custo</option><option value="custo_asc">Menor custo</option>
+            <option value="vip_desc">Maior preço VIP</option><option value="vip_asc">Menor preço VIP</option>
+          </optgroup>
+          <optgroup label="Nome"><option value="marca">Marca e nome</option><option value="nome">Nome (A–Z)</option></optgroup>
         </select></label>
-        <label className="pequeno" style={{ alignSelf: "end" }}><input type="checkbox" checked={soMotor} onChange={(e) => setSoMotor(e.target.checked)} /> Só marcas do motor</label>
-        <label className="pequeno" style={{ alignSelf: "end" }}><input type="checkbox" checked={soPlanilha} onChange={(e) => setSoPlanilha(e.target.checked)} /> Custo da planilha para conferir</label>
+        <label>Margem VIP<select value={faixaM} onChange={(e) => setFaixaM(e.target.value)}>
+          <option value="">Todas</option><option value="neg">Prejuízo (negativa)</option><option value="0-20">Até 20%</option>
+          <option value="20-35">20% a 35%</option><option value="35-50">35% a 50%</option><option value="50+">Acima de 50%</option><option value="sem">Sem cálculo</option>
+        </select></label>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, alignSelf: "end" }}>
+          <label className="pequeno" style={{ display: "flex", gap: 6, alignItems: "center", flexDirection: "row" }}><input type="checkbox" style={{ width: "auto" }} checked={soMotor} onChange={(e) => setSoMotor(e.target.checked)} /> Só marcas do motor</label>
+          <label className="pequeno" style={{ display: "flex", gap: 6, alignItems: "center", flexDirection: "row" }}><input type="checkbox" style={{ width: "auto" }} checked={soPlanilha} onChange={(e) => setSoPlanilha(e.target.checked)} /> Só com custo da planilha a conferir</label>
+        </div>
         <span className="pequeno suave" style={{ alignSelf: "end" }}>{filtradas.length} produto(s)</span>
       </section>
 
@@ -172,15 +218,15 @@ export function GradePrecificacao({ linhas, premissas, acao }: {
           <thead><tr>
             <th style={{ width: 32 }}><input type="checkbox" aria-label="Selecionar todos os visíveis" checked={todosSel}
               onChange={(e) => setSel((s) => { const n = { ...s }; visiveis.forEach((l) => { n[l.produto_id] = e.target.checked; }); return n; })} /></th>
-            <th>Produto</th>
-            <th title="Custo por unidade em R$, sem frete">Custo R$</th>
-            <th title="Frete de compra por unidade em R$">Frete R$</th>
-            <th title="Custo + frete, em R$ e convertido no câmbio de custo">Custo c/ frete</th>
+            <th><Ord k="nome" atual={ordem} set={setOrdem}>Produto</Ord></th>
+            <th title="Custo por unidade em R$, sem frete">Custo</th>
+            <th title="Frete de compra por unidade em R$">Frete</th>
+            <th title="Custo + frete por unidade (R$ e Gs no câmbio de custo)"><Ord k="custo_desc" k2="custo_asc" atual={ordem} set={setOrdem}>Custo + frete</Ord></th>
             <th title="Peças por caixa (a entrega do pasero é por caixa)">Caixa</th>
-            <th>Preço Normal Gs<div className="pequeno suave">margem de lucro</div></th>
-            <th>Preço VIP Gs<div className="pequeno suave">margem de lucro</div></th>
-            <th title="Preço que o motor recomenda pela margem-alvo, nunca abaixo do mínimo">Motor sugere<div className="pequeno suave">preço e margem</div></th>
-            <th>Vendido 90d</th><th>Situação</th>
+            <th title="Preço Normal em Gs e margem de lucro"><Ord k="lucro_normal_desc" k2="lucro_normal_asc" atual={ordem} set={setOrdem}>Normal · margem</Ord></th>
+            <th title="Preço VIP em Gs e margem de lucro"><Ord k="lucro_vip_desc" k2="lucro_vip_asc" atual={ordem} set={setOrdem}>VIP · margem</Ord></th>
+            <th title="Preço que o motor recomenda pela margem-alvo, nunca abaixo do mínimo">Sugerido pelo motor</th>
+            <th><Ord k="vendas" k2="vendas_asc" atual={ordem} set={setOrdem}>Vendas 90d</Ord></th><th>Situação</th>
           </tr></thead>
           <tbody>{visiveis.map((l) => {
             const e = edits[l.produto_id] ?? {};

@@ -20,6 +20,7 @@ export const PERMISSOES: Permissao[] = [
     rotas: ["/produtos/novo", "/produtos/precos-rapido", "/produtos/kits", "/produtos/grupos", "/produtos/fotos", "/produtos/fotos-faltando", "/estoque/precos"] },
   { chave: "estoque", nome: "Estoque e inventário", rotas: ["/estoque"] },
   { chave: "estoque_importar", nome: "Importar estoque do Bling", rotas: ["/estoque/importar"], gestao: true },
+  { chave: "estoque_notas", nome: "Notas a chegar (entrada de compra)", rotas: ["/estoque/notas"], gestao: true },
   { chave: "relatorios", nome: "Relatórios", rotas: ["/relatorios"] },
   { chave: "comissoes", nome: "Comissões", rotas: ["/comissoes"] },
   { chave: "inteligencia", nome: "Inteligência comercial (rentabilidade e custos)", rotas: ["/inteligencia"], gestao: true },

@@ -72,6 +72,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
       { href: "/estoque/inventario", texto: "Inventário (contagem)" },
       { href: "/relatorios?aba=estoque", texto: "Para comprar / estoque baixo" },
       { href: "/relatorios/compra", texto: "Planejar compra por marca", dica: "Escolha a marca: estoque, venda por mês, quando acaba e quanto comprar" },
+      ...(gestao ? [{ href: "/estoque/notas", texto: "Notas a chegar", dica: "Lance a nota do fornecedor; o estoque sobe quando confirmar a chegada" }] : []),
       ...(gestao ? [{ href: "/inteligencia?aba=compras", texto: "Compras e fornecedores", dica: "Compras com frete e câmbio, e prazo de reposição" }] : []),
       { href: "/estoque/historico", texto: "Histórico do estoque", dica: "Quem mexeu no estoque, quando e em quais produtos" },
       ...(gestao ? [{ href: "/estoque/importar", texto: "Importar do Bling" }] : []),
