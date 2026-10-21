@@ -86,10 +86,8 @@ export default async function AreaInterna({ children }: { children: React.ReactN
       ] : []),
     ] },
     ...(gestao ? [{ id: "inteligencia", titulo: "Inteligência comercial", icone: "inteligencia", itens: [
-      { href: "/inteligencia?aba=marcas", texto: "Marcas do motor", dica: "Marcas que o motor usa como gatilho, papel e margem-alvo" },
-      { href: "/inteligencia?aba=sugestoes", texto: "Sugestões de preço", dica: "Preço Normal e VIP sugerido para as marcas-gatilho (simulação)" },
+      { href: "/inteligencia/precificacao", texto: "Precificação", dica: "Custo, frete, caixa e preços PY numa tabela editável, com margem e preço sugerido" },
       { href: "/inteligencia?aba=classificacao", texto: "Classificação e recomendações", dica: "Atração, rentabilidade, diferenciação e estoque parado, com o que fazer" },
-      { href: "/inteligencia?aba=rentabilidade", texto: "Rentabilidade PY", dica: "Margem e preço mínimo por produto nas tabelas do Paraguai" },
       { href: "/inteligencia", texto: "Saúde dos dados", dica: "O que falta no cadastro para calcular margem e preço mínimo" },
     ] }] : []),
     { id: "relatorios", titulo: "Relatórios", icone: "relatorios", itens: [

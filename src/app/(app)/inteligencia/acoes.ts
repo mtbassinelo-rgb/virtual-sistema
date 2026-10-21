@@ -163,34 +163,6 @@ export async function salvarMarcaInteligencia(fd: FormData) {
   } catch (e) {
     erro = mensagemErro(e);
   }
-  voltar("marcas", erro, "Marca salva no motor.");
-}
-
-/** Gera (renova) a lista de sugestões de preço das marcas-gatilho. Só registra: preço de venda não muda. */
-export async function gerarSugestoesPreco() {
-  const u = await exigirUsuario();
-  let erro: string | null = null, ok = "";
-  try {
-    if (!ehGestao(u)) throw new Error("Só gerente ou dono gera sugestões.");
-    const n = await comUsuario(u.id, async (c) => Number((await c.query("select app.gerar_sugestoes_preco_py() n")).rows[0].n));
-    ok = `${n} sugestão(ões) gerada(s). Nenhum preço foi alterado.`;
-  } catch (e) {
-    erro = mensagemErro(e);
-  }
-  voltar("sugestoes", erro, ok);
-}
-
-/** Aceita ou recusa uma sugestão (registro da decisão; o preço continua o mesmo). */
-export async function decidirSugestaoPreco(fd: FormData) {
-  const u = await exigirUsuario();
-  let erro: string | null = null;
-  try {
-    if (!ehGestao(u)) throw new Error("Só gerente ou dono decide sugestões.");
-    const status = texto(fd, "status");
-    if (!["aceita", "recusada"].includes(status)) throw new Error("Decisão inválida.");
-    await comUsuario(u.id, (c) => c.query("select app.decidir_sugestao_preco($1, $2, $3)", [texto(fd, "id"), status, texto(fd, "obs") || null]));
-  } catch (e) {
-    erro = mensagemErro(e);
-  }
-  voltar("sugestoes", erro, "Decisão registrada. O preço de venda não foi alterado.");
+  revalidatePath("/inteligencia/precificacao");
+  redirect(`/inteligencia/precificacao?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Marca salva no motor.")}`);
 }
