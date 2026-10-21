@@ -238,10 +238,17 @@ export function GradePrecificacao({ linhas, premissas, acao }: {
               <tr key={l.produto_id}>
                 <td><input type="checkbox" checked={!!sel[l.produto_id]} aria-label={`Selecionar ${l.nome}`}
                   onChange={(ev) => setSel((s) => ({ ...s, [l.produto_id]: ev.target.checked }))} /></td>
-                <td style={{ minWidth: 240 }}>
-                  <Link href={`/produtos/${l.produto_id}`}>{l.nome}</Link>
-                  <div className="pequeno suave">{l.codigo} · {l.marca ?? "Sem marca"}{l.tipo === "kit" ? " · kit" : ""}{l.motor ? " · motor" : ""}</div>
-                  {l.custo_origem && <div className="pequeno suave" title={l.custo_origem}>Custo: {l.custo_origem.length > 60 ? l.custo_origem.slice(0, 60) + "…" : l.custo_origem}</div>}
+                <td style={{ minWidth: 290 }}>
+                  <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                    {l.foto
+                      ? <img src={l.foto} alt="" loading="lazy" width={52} height={52} style={{ width: 52, height: 52, objectFit: "contain", borderRadius: 8, background: "#fff", border: "1px solid var(--linha, #e6dcec)", flex: "none" }} />
+                      : <div aria-hidden="true" title="Sem foto" style={{ width: 52, height: 52, borderRadius: 8, background: "var(--afundado, #f1ecf4)", flex: "none", display: "grid", placeItems: "center", fontSize: 11, color: "var(--suave, #6e5a7a)" }}>sem foto</div>}
+                    <div>
+                      <Link href={`/produtos/${l.produto_id}`}>{l.nome}</Link>
+                      <div className="pequeno suave">{l.codigo} · {l.marca ?? "Sem marca"}{l.tipo === "kit" ? " · kit" : ""}{l.motor ? " · motor" : ""}</div>
+                      {l.custo_origem && <div className="pequeno suave" title={l.custo_origem}>Custo: {l.custo_origem.length > 60 ? l.custo_origem.slice(0, 60) + "…" : l.custo_origem}</div>}
+                    </div>
+                  </div>
                 </td>
                 <td style={{ width: 110 }}>
                   <input className={cls("custo")} value={val("custo", brl(num(l.custo_brl)))} inputMode="decimal" placeholder="—"
