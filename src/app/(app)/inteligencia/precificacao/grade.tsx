@@ -260,31 +260,48 @@ export function GradePrecificacao({ linhas, premissas, acao }: {
       </section>
 
       {selecionados.length > 0 && (
-        <section className="painel linha" style={{ flexWrap: "wrap", gap: 8 }}>
-          <b>{selecionados.length} selecionado(s)</b>
-          <button type="button" onClick={() => usarSugestao(selecionados)}>Usar preço sugerido</button>
-          <button type="button" onClick={() => usarPlanilha(selecionados)}>Usar custo da planilha</button>
-          <button type="button" onClick={() => setSel({})}>Limpar seleção</button>
-          <span className="linha" style={{ gap: 6, alignItems: "center", flexWrap: "wrap", borderLeft: "1px solid var(--linha, #e6dcec)", paddingLeft: 10 }}>
-            <b className="pequeno">Edição em massa:</b>
-            <select value={massaCampo} onChange={(e) => { setMassaCampo(e.target.value); setMassaValor(""); }} aria-label="Campo para editar em massa" style={{ width: "auto" }}>
-              <option value="normal">Preço Normal (Gs)</option>
-              <option value="vip">Preço VIP (Gs)</option>
-              <option value="pct">Ajustar Normal e VIP em %</option>
-              <option value="custo">Custo (R$)</option>
-              <option value="frete">Frete (R$)</option>
-              <option value="caixa">Peças por caixa</option>
-              <option value="marca">Marca</option>
-            </select>
-            <input value={massaValor} onChange={(e) => setMassaValor(e.target.value)} list={massaCampo === "marca" ? "marcas-prec" : undefined}
-              inputMode={massaCampo === "marca" ? "text" : "decimal"} style={{ width: massaCampo === "marca" ? 180 : 110 }} aria-label="Valor para aplicar"
-              placeholder={massaCampo === "pct" ? "ex.: 5 ou -3" : massaCampo === "marca" ? "Marca" : massaCampo === "custo" || massaCampo === "frete" ? "ex.: 2,35" : "ex.: 15000"} />
-            <datalist id="marcas-prec">{marcasLista.map((m) => <option key={m} value={m} />)}</datalist>
-            <button type="button" className="principal" disabled={salvando} onClick={() => aplicarMassa(selecionados)}>Aplicar nos {selecionados.length}</button>
-          </span>
-          <button type="button" className="discreto" onClick={() => remover(selecionados.map((l) => l.produto_id), selecionados.map((l) => l.nome), "inativar")}>Inativar selecionados</button>
-          <button type="button" className="perigo" onClick={() => remover(selecionados.map((l) => l.produto_id), selecionados.map((l) => l.nome), "excluir")}>Excluir selecionados</button>
-          <span className="pequeno suave">Só preenche a tabela. Nada é gravado até você clicar em Salvar.</span>
+        <section className="barra-selecao" aria-label="Ações nos produtos selecionados">
+          <div className="bs-topo">
+            <span className="bs-contagem"><b>{selecionados.length}</b> {selecionados.length === 1 ? "produto selecionado" : "produtos selecionados"}</span>
+            <button type="button" className="bs-limpar" onClick={() => setSel({})}>Limpar seleção ×</button>
+          </div>
+          <div className="bs-grupos">
+            <div className="bs-grupo">
+              <span className="bs-rotulo">Preencher</span>
+              <div className="bs-linha">
+                <button type="button" onClick={() => usarSugestao(selecionados)}>Preço sugerido</button>
+                <button type="button" onClick={() => usarPlanilha(selecionados)}>Custo da planilha</button>
+              </div>
+            </div>
+            <div className="bs-grupo bs-massa">
+              <span className="bs-rotulo">Edição em massa</span>
+              <div className="bs-linha">
+                <select value={massaCampo} onChange={(e) => { setMassaCampo(e.target.value); setMassaValor(""); }} aria-label="Campo para editar em massa">
+                  <option value="normal">Preço Normal (Gs)</option>
+                  <option value="vip">Preço VIP (Gs)</option>
+                  <option value="pct">Ajustar Normal e VIP em %</option>
+                  <option value="custo">Custo (R$)</option>
+                  <option value="frete">Frete (R$)</option>
+                  <option value="caixa">Peças por caixa</option>
+                  <option value="marca">Marca</option>
+                </select>
+                <input value={massaValor} onChange={(e) => setMassaValor(e.target.value)} list={massaCampo === "marca" ? "marcas-prec" : undefined}
+                  inputMode={massaCampo === "marca" ? "text" : "decimal"} aria-label="Valor para aplicar"
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); aplicarMassa(selecionados); } }}
+                  placeholder={massaCampo === "pct" ? "ex.: 5 ou -3" : massaCampo === "marca" ? "Nome da marca" : massaCampo === "custo" || massaCampo === "frete" ? "ex.: 2,35" : "ex.: 15000"} />
+                <datalist id="marcas-prec">{marcasLista.map((m) => <option key={m} value={m} />)}</datalist>
+                <button type="button" className="principal" disabled={salvando} onClick={() => aplicarMassa(selecionados)}>Aplicar</button>
+              </div>
+            </div>
+            <div className="bs-grupo bs-remover">
+              <span className="bs-rotulo">Remover</span>
+              <div className="bs-linha">
+                <button type="button" onClick={() => remover(selecionados.map((l) => l.produto_id), selecionados.map((l) => l.nome), "inativar")}>Inativar</button>
+                <button type="button" className="bs-perigo" onClick={() => remover(selecionados.map((l) => l.produto_id), selecionados.map((l) => l.nome), "excluir")}>Excluir</button>
+              </div>
+            </div>
+          </div>
+          <p className="bs-nota">Preencher e preços só mudam a tabela: grave com <b>Salvar</b>. Marca, inativar e excluir valem na hora.</p>
         </section>
       )}
 
