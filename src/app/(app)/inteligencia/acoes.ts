@@ -144,3 +144,53 @@ export async function importarCustos(fd: FormData) {
   }
   voltar("custos", erro, ok);
 }
+
+/** Marca que o motor usa como gatilho: papel e margem-alvo (opcional). Não mexe em preço. */
+export async function salvarMarcaInteligencia(fd: FormData) {
+  const u = await exigirUsuario();
+  let erro: string | null = null;
+  try {
+    if (!ehGestao(u)) throw new Error("Só gerente ou dono escolhe as marcas do motor.");
+    const marca = texto(fd, "marca");
+    if (!marca) throw new Error("Marca não informada.");
+    const papel = texto(fd, "papel") || "acompanhar";
+    if (!["atracao", "rentabilidade", "diferenciacao", "acompanhar"].includes(papel)) throw new Error("Papel inválido.");
+    const mn = texto(fd, "margem_normal") === "" ? null : numero(fd, "margem_normal");
+    const mv = texto(fd, "margem_vip") === "" ? null : numero(fd, "margem_vip");
+    for (const m of [mn, mv]) if (m !== null && (m < 0 || m > 90)) throw new Error("Margem-alvo em % entre 0 e 90.");
+    await comUsuario(u.id, (c) => c.query("select app.definir_marca_inteligencia($1, $2, $3, $4, $5, $6)",
+      [marca, fd.get("gatilho") === "1", papel, mn, mv, texto(fd, "obs") || null]));
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  voltar("marcas", erro, "Marca salva no motor.");
+}
+
+/** Gera (renova) a lista de sugestões de preço das marcas-gatilho. Só registra: preço de venda não muda. */
+export async function gerarSugestoesPreco() {
+  const u = await exigirUsuario();
+  let erro: string | null = null, ok = "";
+  try {
+    if (!ehGestao(u)) throw new Error("Só gerente ou dono gera sugestões.");
+    const n = await comUsuario(u.id, async (c) => Number((await c.query("select app.gerar_sugestoes_preco_py() n")).rows[0].n));
+    ok = `${n} sugestão(ões) gerada(s). Nenhum preço foi alterado.`;
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  voltar("sugestoes", erro, ok);
+}
+
+/** Aceita ou recusa uma sugestão (registro da decisão; o preço continua o mesmo). */
+export async function decidirSugestaoPreco(fd: FormData) {
+  const u = await exigirUsuario();
+  let erro: string | null = null;
+  try {
+    if (!ehGestao(u)) throw new Error("Só gerente ou dono decide sugestões.");
+    const status = texto(fd, "status");
+    if (!["aceita", "recusada"].includes(status)) throw new Error("Decisão inválida.");
+    await comUsuario(u.id, (c) => c.query("select app.decidir_sugestao_preco($1, $2, $3)", [texto(fd, "id"), status, texto(fd, "obs") || null]));
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  voltar("sugestoes", erro, "Decisão registrada. O preço de venda não foi alterado.");
+}

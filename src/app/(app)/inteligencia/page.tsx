@@ -3,7 +3,7 @@ import { ehGestao, exigirUsuario } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
 import { data, dinheiro, pct } from "@/lib/formato";
 import { Avisos, Selo } from "../avisos";
-import { excluirCompra, importarCustos, registrarCompra, salvarCustoVariavel, salvarFornecedor, salvarFreteMarca } from "./acoes";
+import { decidirSugestaoPreco, excluirCompra, gerarSugestoesPreco, importarCustos, registrarCompra, salvarCustoVariavel, salvarFornecedor, salvarFreteMarca, salvarMarcaInteligencia } from "./acoes";
 import { decidirClienteLocal } from "../clientes/acoes";
 
 export const metadata = { title: "Inteligência comercial" };
@@ -20,6 +20,8 @@ const ABAS = [
   { k: "saude", t: "Saúde dos dados", d: "O que falta no cadastro para calcular custo, margem e preço mínimo de cada produto vendido ao Paraguai." },
   { k: "rentabilidade", t: "Rentabilidade PY", d: "Margem bruta, margem de contribuição e preço mínimo por produto, nas tabelas Normal e VIP do Paraguai. Só leitura: nada aqui muda preço." },
   { k: "classificacao", t: "Classificação", d: "Cada produto do Paraguai classificado em atração, rentabilidade, diferenciação ou estoque parado, com uma recomendação. Recalculado ao abrir; uma foto por dia fica guardada para comparar." },
+  { k: "marcas", t: "Marcas do motor", d: "Escolha as marcas que o motor usa como gatilho, o papel de cada uma e a margem-alvo. Só as marcas marcadas geram sugestões de preço." },
+  { k: "sugestoes", t: "Sugestões de preço", d: "Preço Normal e VIP sugeridos para os produtos das marcas-gatilho, pela margem-alvo. Simulação: aceitar ou recusar só registra a decisão, o preço de venda não muda." },
   { k: "compras", t: "Compras e fornecedores", d: "Compras com frete e câmbio, por mês, e o prazo de reposição de cada fornecedor." },
   { k: "retirada", t: "Retire em Foz", d: "Clientes locais do Paraguai que podem retirar no CD Foz e a simulação do desconto por caixa retirada. Em simulação: o cliente ainda não vê a opção." },
   { k: "custos", t: "Custos e frete", d: "Frete de compra por marca, imposto e entrega usados nos cálculos. Cada mudança fica na auditoria." },
@@ -42,6 +44,20 @@ const CATEGORIAS: Record<string, { t: string; d: string; cor: string }> = {
   parado: { t: "Estoque parado", d: "Com estoque e sem giro", cor: "aviso" },
   acompanhar: { t: "Acompanhar", d: "Margem e venda medianas", cor: "" },
   incompleto: { t: "Incompleto", d: "Faltam dados para classificar", cor: "erro" },
+};
+
+const PAPEIS: Record<string, { t: string; d: string; cor: string }> = {
+  atracao: { t: "Atração", d: "Traz o cliente: preço competitivo, margem menor", cor: "info" },
+  rentabilidade: { t: "Rentabilidade", d: "Sustenta o lucro: margem cheia", cor: "ok" },
+  diferenciacao: { t: "Diferenciação", d: "Exclusiva ou de valor: preço pelo valor", cor: "marca" },
+  acompanhar: { t: "Acompanhar", d: "Só observar", cor: "" },
+};
+const MOTIVOS: Record<string, { t: string; cor: string }> = {
+  abaixo_minimo: { t: "Abaixo do mínimo", cor: "erro" },
+  sem_preco: { t: "Sem preço", cor: "aviso" },
+  margem_abaixo_alvo: { t: "Margem abaixo do alvo", cor: "aviso" },
+  margem_acima_alvo: { t: "Margem acima do alvo", cor: "info" },
+  no_alvo: { t: "No alvo", cor: "ok" },
 };
 
 const TIPOS: Record<string, string> = { imposto: "Imposto", comissao: "Comissão", taxa_pagamento: "Taxa de pagamento", taxa_canal: "Taxa do canal", entrega: "Entrega (pasero)" };
@@ -87,7 +103,18 @@ export default async function Inteligencia({ searchParams }: {
           where c.cliente_local and c.mesclado_em is null order by c.nome`)).rows,
       sim: (await c.query("select * from app.simular_retirada_foz((date_trunc('month', current_date) - interval '5 months')::date, current_date)")).rows,
     } : null,
-    params: Object.fromEntries((await c.query("select chave, valor from app.parametros where chave in ('cambio_custo_gs','cambio_compra_gs','margem_minima_contribuicao','retirada_foz_desconto_caixa','retirada_foz_teto_mes','retirada_foz_ativa')")).rows
+    marcasMotor: aba.k === "marcas" ? (await c.query("select * from app.marcas_resumo_py()")).rows as
+      { marca: string; produtos: number; completos: number; vendido_90: string; contribuicao_media_vip: string | null; gatilho: boolean; papel: string;
+        margem_alvo_normal: string | null; margem_alvo_vip: string | null; observacao: string | null }[] : [],
+    sugestoes: aba.k === "sugestoes" ? (await c.query("select * from app.sugestoes_preco_py()")).rows as
+      { produto_id: string; codigo: string; nome: string; marca: string | null; papel: string; vendido_90: string; custo_real_gs: string; entrega_unidade_gs: string | null;
+        preco_minimo: string | null; preco_normal: string | null; normal_sugerido: string | null; dif_normal_pct: string | null; margem_normal_atual: string | null; alvo_normal: string;
+        preco_vip: string | null; vip_sugerido: string | null; dif_vip_pct: string | null; margem_vip_atual: string | null; alvo_vip: string; motivo: string }[] : [],
+    registradas: aba.k === "sugestoes" ? (await c.query(`select s.*, p.nome, p.codigo, us.nome quem from app.sugestoes_preco s join app.produtos p on p.id = s.produto_id
+      left join app.usuarios us on us.id = s.decidido_por order by (s.status = 'pendente') desc, coalesce(s.decidido_em, s.gerada_em) desc limit 300`)).rows as
+      { id: string; produto_id: string; nome: string; codigo: string; preco_normal_atual: string | null; normal_sugerido: string | null; preco_vip_atual: string | null;
+        vip_sugerido: string | null; motivo: string; status: string; gerada_em: string; decidido_em: string | null; quem: string | null }[] : [],
+    params: Object.fromEntries((await c.query("select chave, valor from app.parametros where chave in ('margem_alvo_normal','margem_alvo_vip','sugestao_tolerancia_pct','cambio_custo_gs','cambio_compra_gs','margem_minima_contribuicao','retirada_foz_desconto_caixa','retirada_foz_teto_mes','retirada_foz_ativa')")).rows
       .map((r) => [r.chave as string, Number(r.valor)])),
   }));
 
@@ -286,6 +313,123 @@ export default async function Inteligencia({ searchParams }: {
                 atração = entre os que mais vendem (ajuste em Parâmetros); rentabilidade = contribuição VIP acima da mediana. Vendas contam só pedidos enviados ou entregues.
               </p>
             </section>
+          </>
+        );
+      })()}
+
+      {aba.k === "marcas" && (() => {
+        const M = d.marcasMotor;
+        const ativas = M.filter((m) => m.gatilho);
+        return (
+          <>
+            <section className="painel pequeno suave" style={{ gap: 4 }}>
+              <div><b>{ativas.length}</b> marca(s) no motor, de {M.length}. Margem-alvo padrão: Normal <b>{d.params.margem_alvo_normal ?? 35}%</b> · VIP <b>{d.params.margem_alvo_vip ?? 25}%</b> (margem de contribuição, já descontados imposto e entrega).
+                Deixe a margem da marca vazia para usar o padrão. <Link href="/parametros">Padrões em Parâmetros</Link>.</div>
+              <div>Papéis: {Object.values(PAPEIS).map((p) => <span key={p.t} style={{ marginRight: 10 }}><Selo cor={p.cor}>{p.t}</Selo> {p.d}</span>)}</div>
+            </section>
+            <section className="painel">
+              <div className="linha entre"><h2>Marcas</h2>{ativas.length > 0 && <Link className="botao" href="/inteligencia?aba=sugestoes">Ver sugestões de preço</Link>}</div>
+              <div className="tabela"><table>
+                <thead><tr><th>Marca</th><th>Produtos ativos</th><th>Com cálculo completo</th><th>Vendido 90 dias</th><th>Contribuição VIP média</th><th>No motor · papel · margem-alvo Normal / VIP (%)</th></tr></thead>
+                <tbody>{M.length === 0 ? <tr><td colSpan={6} className="vazio">Nenhuma marca.</td></tr> : M.map((m) => {
+                  const cv = n(m.contribuicao_media_vip);
+                  return (
+                    <tr key={m.marca}>
+                      <td><b>{m.marca}</b>{m.gatilho && <> <Selo cor={PAPEIS[m.papel]?.cor}>{PAPEIS[m.papel]?.t}</Selo></>}
+                        {m.observacao && <div className="pequeno suave">{m.observacao}</div>}</td>
+                      <td className="num">{m.produtos}</td>
+                      <td className="num">{m.completos}{m.completos < m.produtos && <div className="pequeno suave">{m.produtos - m.completos} sem dados</div>}</td>
+                      <td className="num">{Number(m.vendido_90).toLocaleString("pt-BR")}</td>
+                      <td className="num">{cv === null ? "—" : <Selo cor={cv < 0 ? "erro" : cv < 0.15 ? "aviso" : "ok"}>{pct(cv)}</Selo>}</td>
+                      <td style={{ minWidth: 420 }}>
+                        {gerir ? (
+                          <form action={salvarMarcaInteligencia} className="linha" style={{ flexWrap: "wrap", gap: 6 }}>
+                            <input type="hidden" name="marca" value={m.marca} />
+                            <label className="pequeno"><input type="checkbox" name="gatilho" value="1" defaultChecked={m.gatilho} /> usar</label>
+                            <select name="papel" defaultValue={m.papel} aria-label={`Papel de ${m.marca}`}>
+                              {Object.entries(PAPEIS).map(([k, p]) => <option key={k} value={k}>{p.t}</option>)}
+                            </select>
+                            <input name="margem_normal" inputMode="decimal" style={{ width: 60 }} placeholder={String(d.params.margem_alvo_normal ?? 35)}
+                              defaultValue={m.margem_alvo_normal === null ? "" : Number(m.margem_alvo_normal).toLocaleString("pt-BR")} aria-label={`Margem-alvo Normal de ${m.marca}`} />
+                            <input name="margem_vip" inputMode="decimal" style={{ width: 60 }} placeholder={String(d.params.margem_alvo_vip ?? 25)}
+                              defaultValue={m.margem_alvo_vip === null ? "" : Number(m.margem_alvo_vip).toLocaleString("pt-BR")} aria-label={`Margem-alvo VIP de ${m.marca}`} />
+                            <input name="obs" style={{ width: 140 }} placeholder="Observação" defaultValue={m.observacao ?? ""} aria-label={`Observação de ${m.marca}`} />
+                            <button>Salvar</button>
+                          </form>
+                        ) : m.gatilho ? `${PAPEIS[m.papel]?.t} · ${m.margem_alvo_normal ?? "padrão"} / ${m.margem_alvo_vip ?? "padrão"}` : "—"}
+                      </td>
+                    </tr>);
+                })}</tbody>
+              </table></div>
+            </section>
+          </>
+        );
+      })()}
+
+      {aba.k === "sugestoes" && (() => {
+        const S = d.sugestoes;
+        const fora = S.filter((s) => s.motivo !== "no_alvo");
+        const pend = d.registradas.filter((r) => r.status === "pendente");
+        const dif = (v: string | null) => (v === null ? "—" : `${Number(v) > 0 ? "+" : ""}${pct(v)}`);
+        return (
+          <>
+            <section className="painel pequeno suave" style={{ gap: 4 }}>
+              <div><b>Simulação.</b> Nenhum preço de venda é alterado por esta tela. Preço sugerido = (custo real + entrega por unidade) ÷ (1 − imposto − margem-alvo), arredondado para cima e nunca abaixo do preço mínimo.
+                Diferença = quanto o preço atual está acima (+) ou abaixo (−) do sugerido; só entra na lista quem passa de {d.params.sugestao_tolerancia_pct ?? 3}%.</div>
+              {S.length === 0 && <div>Nenhuma marca marcada no motor, ou os produtos das marcas marcadas ainda não têm custo, frete e caixa. <Link href="/inteligencia?aba=marcas">Escolher marcas</Link>.</div>}
+            </section>
+            {S.length > 0 && (
+              <section className="painel">
+                <div className="linha entre">
+                  <h2>{fora.length} produto(s) fora do alvo · {S.length - fora.length} no alvo</h2>
+                  {gerir && <form action={gerarSugestoesPreco}><button className="principal">Registrar sugestões para decidir</button></form>}
+                </div>
+                <div className="tabela"><table>
+                  <thead><tr><th>Produto</th><th>Custo real + entrega</th><th>Preço mínimo</th><th>Normal atual</th><th>Normal sugerido</th><th>Dif.</th>
+                    <th>VIP atual</th><th>VIP sugerido</th><th>Dif.</th><th>Contribuição VIP atual / alvo</th><th>Vendido 90 dias</th><th>Situação</th></tr></thead>
+                  <tbody>{S.slice(0, 400).map((s) => (
+                    <tr key={s.produto_id}>
+                      <td><Link href={`/produtos/${s.produto_id}`}>{s.nome}</Link>
+                        <div className="pequeno suave">{s.codigo} · {s.marca ?? "Sem marca"} · {PAPEIS[s.papel]?.t}</div></td>
+                      <td className="num">{gs(Number(s.custo_real_gs) + Number(s.entrega_unidade_gs ?? 0))}</td>
+                      <td className="num">{gs(s.preco_minimo)}</td>
+                      <td className="num">{gs(s.preco_normal)}</td>
+                      <td className="num"><b>{gs(s.normal_sugerido)}</b></td>
+                      <td className="num">{dif(s.dif_normal_pct)}</td>
+                      <td className="num">{gs(s.preco_vip)}</td>
+                      <td className="num"><b>{gs(s.vip_sugerido)}</b></td>
+                      <td className="num">{dif(s.dif_vip_pct)}</td>
+                      <td className="num">{pct(s.margem_vip_atual)} / {pct(s.alvo_vip)}</td>
+                      <td className="num">{Number(s.vendido_90).toLocaleString("pt-BR")}</td>
+                      <td><Selo cor={MOTIVOS[s.motivo]?.cor}>{MOTIVOS[s.motivo]?.t ?? s.motivo}</Selo></td>
+                    </tr>))}</tbody>
+                </table></div>
+                {S.length > 400 && <p className="pequeno suave">Mostrando os 400 primeiros.</p>}
+              </section>
+            )}
+            {d.registradas.length > 0 && (
+              <section className="painel">
+                <h2>Sugestões registradas ({pend.length} pendente(s))</h2>
+                <p className="pequeno suave" style={{ margin: 0 }}>Aceitar marca que a sugestão foi aprovada para aplicar depois; o preço continua o mesmo até ser alterado na tela de preços.</p>
+                <div className="tabela"><table>
+                  <thead><tr><th>Produto</th><th>Normal atual → sugerido</th><th>VIP atual → sugerido</th><th>Motivo</th><th>Situação</th><th></th></tr></thead>
+                  <tbody>{d.registradas.map((r) => (
+                    <tr key={r.id}>
+                      <td><Link href={`/produtos/${r.produto_id}`}>{r.nome}</Link><div className="pequeno suave">{r.codigo} · gerada {data(r.gerada_em)}</div></td>
+                      <td className="num">{gs(r.preco_normal_atual)} → <b>{gs(r.normal_sugerido)}</b></td>
+                      <td className="num">{gs(r.preco_vip_atual)} → <b>{gs(r.vip_sugerido)}</b></td>
+                      <td><Selo cor={MOTIVOS[r.motivo]?.cor}>{MOTIVOS[r.motivo]?.t ?? r.motivo}</Selo></td>
+                      <td>{r.status === "pendente" ? <Selo cor="aviso">Pendente</Selo> : <><Selo cor={r.status === "aceita" ? "ok" : ""}>{r.status === "aceita" ? "Aceita" : "Recusada"}</Selo>
+                        <div className="pequeno suave">{r.quem} · {data(r.decidido_em)}</div></>}</td>
+                      <td>{gerir && r.status === "pendente" && (
+                        <div className="linha" style={{ gap: 4 }}>
+                          <form action={decidirSugestaoPreco}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="status" value="aceita" /><button>Aceitar</button></form>
+                          <form action={decidirSugestaoPreco}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="status" value="recusada" /><button>Recusar</button></form>
+                        </div>)}</td>
+                    </tr>))}</tbody>
+                </table></div>
+              </section>
+            )}
           </>
         );
       })()}
