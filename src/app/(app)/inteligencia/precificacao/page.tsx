@@ -15,7 +15,10 @@ export default async function Precificacao({ searchParams }: { searchParams: Pro
   if (!ehGestao(u)) return <div className="painel">Só gerente ou dono vê a precificação.</div>;
   const f = await searchParams;
   const d = await comUsuario(u.id, async (c) => {
-    const linhas = (await c.query("select * from app.precificacao_py()")).rows as LinhaPrec[];
+    // Produto vendido só em kit (shampoo, condicionador e máscara fora do site) não aparece solto: o preço é o do kit
+    const linhas = (await c.query(`select * from app.precificacao_py() x
+      where not exists (select 1 from app.kit_componentes k join app.produtos c on c.id = k.componente_id join app.produtos kt on kt.id = k.kit_id
+                         where k.componente_id = x.produto_id and not c.mostrar_no_site and kt.ativo)`)).rows as LinhaPrec[];
     const params = Object.fromEntries((await c.query(`select chave, valor from app.parametros
       where chave in ('cambio_custo_gs','margem_minima_contribuicao','arredondamento_gs','margem_alvo_normal','margem_alvo_vip','frete_padrao_brl')`)).rows.map((r) => [r.chave as string, Number(r.valor)]));
     const custos = (await c.query("select * from app.custos_variaveis_vigentes('PY')")).rows as { tipo: string; base: string; percentual: string | null; valor: string | null; moeda: string | null }[];
