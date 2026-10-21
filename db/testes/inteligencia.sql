@@ -205,6 +205,18 @@ select teste.ok((select pedidos = 1 and caixas = 2 and pasero_economizado = 1400
   'Relatório: 1 retirada, 2 caixas, pasero economizado 14.000 Gs e o saldo');
 reset role;
 
+\echo '== Pedido do site nunca trava: produto sem preço entra com valor 0 =='
+insert into app.produtos (id, codigo, nome, marca, unidades_caixa) values ('00000000-0000-0000-0000-00000000f1a9', 'INT-SEMPRECO', 'Produto Sem Preço Teste', 'MARCA INT', 12);
+insert into app.portal_sessoes (token_hash, cliente_id, expira_em) values ('teste-sem-preco', '00000000-0000-0000-0000-0000000000c1', now() + interval '1 day');
+set role vc_app;
+select teste.como('');
+select app.portal_criar_pedido('teste-sem-preco', '[{"produto_id":"00000000-0000-0000-0000-00000000f1a9","quantidade":12}]'::jsonb) as ped_sp \gset
+reset role;
+select teste.ok((select count(*) = 1 and bool_and(preco_unitario = 0 and descricao ilike '%SEM PREÇO%') from app.pedido_itens where pedido_id = :'ped_sp'),
+  'Produto sem preço entra no pedido com valor 0 e marcado para a vendedora');
+select teste.ok(not exists (select 1 from app.vitrine_com_preco() x where x = '00000000-0000-0000-0000-00000000f1a9'), 'Produto sem preço fica fora da vitrine');
+delete from app.portal_sessoes where token_hash = 'teste-sem-preco';
+
 \echo '== Compra por unidade: vendedora pede, gerente aprova; VIP só caixa =='
 select categoria_preco as cat_c1 from app.clientes where id = '00000000-0000-0000-0000-0000000000c1' \gset
 update app.clientes set categoria_preco = 'normal', compra_unidade = false where id = '00000000-0000-0000-0000-0000000000c1';

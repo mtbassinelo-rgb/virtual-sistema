@@ -59,7 +59,11 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
 
   const grupos = new Map<string, { grupo: string; variante: string | null }>(
     ((await pool.query("select * from app.grupos_publicos()")).rows as { produto_id: string; grupo: string; variante: string | null }[]).map((g) => [g.produto_id, g]));
-  let todos: Produto[] = publicos.filter((p) => !interno(p.nome)).map((p) => ({
+  // Produto sem preço fica oculto no site (o cliente logado: sem preço na tabela dele; visitante: sem preço normal em R$ nem em Gs).
+  // A equipe arruma em Produtos → "Sem preço (fora do site)".
+  const comPreco = cliente && token ? null : new Set(((await pool.query("select app.vitrine_com_preco() as id")).rows as { id: string }[]).map((r) => r.id));
+  const temPreco = (id: string) => (comPreco ? comPreco.has(id) : precos.has(id));
+  let todos: Produto[] = publicos.filter((p) => !interno(p.nome) && temPreco(p.produto_id)).map((p) => ({
     ...p, grupo: grupos.get(p.produto_id)?.grupo ?? null, variante: grupos.get(p.produto_id)?.variante ?? null, linha: linhaDe(p.nome, p.marca, p.tipo), marcaNome: marcaDe(p.nome, p.marca), p: precos.get(p.produto_id), x: extras.get(p.produto_id),
   }));
   const contagem = new Map<string, number>();

@@ -13,7 +13,7 @@ const TAMANHOS = [50, 100, 200, 500];
 
 const MOSTRAR: [string, string][] = [
   ["", "Ativos"], ["abaixo-minimo", "Abaixo do estoque mínimo"], ["sem-estoque", "Sem estoque"], ["com-estoque", "Com estoque"],
-  ["sem-minimo", "Sem estoque mínimo"], ["sem-preco", "Sem preço"], ["sem-preco-gs", "Sem preço em Gs"], ["sem-preco-br", "Sem preço em R$"],
+  ["sem-minimo", "Sem estoque mínimo"], ["fora-do-site", "Sem preço (fora do site)"], ["sem-preco", "Sem preço"], ["sem-preco-gs", "Sem preço em Gs"], ["sem-preco-br", "Sem preço em R$"],
   ["em-promocao", "Em promoção"], ["sem-foto", "Sem foto"], ["sem-caixa", "Sem peças por caixa"], ["inativos", "Inativos"], ["todos", "Todos"],
 ];
 const ORDEM: Record<string, [string, string]> = {
@@ -48,6 +48,7 @@ export default async function Produtos({ searchParams }: { searchParams: Promise
     "com-estoque": "s.saldo > 0",
     "sem-minimo": "p.estoque_minimo is null and p.tipo <> 'kit'",
     "sem-preco": "x.py_normal is null and x.py_vip is null and x.br_normal is null and x.br_vip is null",
+    "fora-do-site": "p.mostrar_no_site and (x.py_normal is null or x.br_normal is null)",
     "sem-preco-gs": "x.py_normal is null",
     "sem-preco-br": "x.br_normal is null",
     "sem-foto": "p.foto is null and p.mostrar_no_site",

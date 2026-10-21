@@ -26,10 +26,11 @@ export default async function AreaInterna({ children }: { children: React.ReactN
            ${gestao ? `(select count(*) from app.procuras where visto_em is null)::int` : "0"} as procuras,
            ${gestao ? `(select count(*) from app.fotos_catalogo where status = 'pendente')::int` : "0"} as fotos,
            (select count(*) from app.produtos p where p.ativo and not exists (select 1 from app.precos z where z.produto_id = p.id))::int as sem_preco,
+           (select count(*) from app.produtos p where p.ativo and p.mostrar_no_site and (not exists (select 1 from app.precos z where z.produto_id = p.id and z.tabela = 'br_normal') or not exists (select 1 from app.precos z where z.produto_id = p.id and z.tabela = 'py_normal')))::int as fora_site,
            (select count(*) from app.carrinhos_parados() where avisado_em is null)::int as carrinhos,
            (select count(*) from app.procuras_chegaram())::int as chegaram,
            (select count(*) from app.pedidos where desconto_qtd_status = 'pendente' and status_comercial <> 'cancelado')::int as descontos
-  `)).rows[0] as { pedidos_abertos: number; contas_vencidas: number; procuras: number; fotos: number; sem_preco: number; carrinhos: number; chegaram: number; descontos: number }).catch(() => ({ pedidos_abertos: 0, contas_vencidas: 0, procuras: 0, fotos: 0, sem_preco: 0, carrinhos: 0, chegaram: 0, descontos: 0 }));
+  `)).rows[0] as { pedidos_abertos: number; contas_vencidas: number; procuras: number; fotos: number; sem_preco: number; fora_site: number; carrinhos: number; chegaram: number; descontos: number }).catch(() => ({ pedidos_abertos: 0, contas_vencidas: 0, procuras: 0, fotos: 0, sem_preco: 0, fora_site: 0, carrinhos: 0, chegaram: 0, descontos: 0 }));
 
   // Menu: Dashboard → operação do dia (vendas, clientes) → cadastro (produtos, estoque) → loja e marketing → análise → financeiro → configurações
   const todos: GrupoMenu[] = [
@@ -59,6 +60,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
       ...(gestao ? [
         { href: "/produtos/novo", texto: "Novo produto" },
         { href: "/produtos/precos-rapido", texto: "Editar preços rápido", contador: n.sem_preco, dica: "Produtos ativos sem nenhum preço" },
+        { href: "/produtos?filtro=fora-do-site", texto: "Sem preço (fora do site)", contador: n.fora_site, dica: "Sem preço Normal em R$ ou em Gs: ficam ocultos no site para quem não tem o preço. Arrume e eles voltam a aparecer" },
         { href: "/estoque/precos", texto: "Preços por planilha" },
         { href: "/produtos/kits", texto: "Kits capilares (montar)" },
         { href: "/produtos/grupos", texto: "Fragrâncias agrupadas", dica: "Mesmo produto em várias fragrâncias vira um cartão só no site" },
