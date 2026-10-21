@@ -12,6 +12,7 @@ const GRUPOS: { titulo: string; chaves: string[] }[] = [
   { titulo: "Vendas e lucro", chaves: ["cambio_custo_gs", "pedido_exige_estoque", "link_pedido_validade_dias", "arredondamento_gs"] },
   { titulo: "Envios ao Paraguai", chaves: ["passeiro_custo_volume"] },
   { titulo: "Inteligência comercial", chaves: ["cambio_compra_gs", "margem_minima_contribuicao", "classif_atracao_pct", "classif_margem_baixa"] },
+  { titulo: "Recompra", chaves: ["recompra_intervalo_padrao", "recompra_tolerancia_pct", "recompra_inativo_dias", "recompra_novo_dias"] },
   { titulo: "Retire em Foz", chaves: ["retirada_foz_ativa", "retirada_foz_desconto_caixa", "retirada_foz_teto_mes"] },
   { titulo: "Promoções", chaves: ["promo_desconto_maximo", "promo_sugerida_desconto"] },
   { titulo: "Estoque", chaves: ["giro_janela_dias", "giro_parado_cobertura", "giro_baixo_cobertura", "giro_ultimas_unidades"] },

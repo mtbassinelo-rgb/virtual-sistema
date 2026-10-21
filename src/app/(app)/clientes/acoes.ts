@@ -244,3 +244,20 @@ export async function recusarSugestaoCredito(fd: FormData) {
   revalidatePath(`/clientes/${id}`);
   redirect(`/clientes/${id}?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Sugestão de crédito recusada.")}`);
 }
+
+/** Recompra: registra que a vendedora chamou o cliente (vira um atendimento por WhatsApp). */
+export async function registrarContatoRecompra(fd: FormData) {
+  const u = await exigirUsuario();
+  const id = texto(fd, "cliente_id");
+  let erro: string | null = null;
+  try {
+    await comUsuario(u.id, (c) => c.query(
+      `insert into app.atendimentos (cliente_id, tipo, resultado, nota, usuario_id) values ($1, 'whatsapp', 'Recompra', nullif($2, ''), app.uid())`,
+      [id, texto(fd, "nota")]));
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  const volta = texto(fd, "volta") || "/clientes/recompra";
+  revalidatePath("/clientes/recompra");
+  redirect(`${volta}${volta.includes("?") ? "&" : "?"}${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Contato registrado.")}`);
+}

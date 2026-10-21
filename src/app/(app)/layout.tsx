@@ -46,6 +46,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
       ...(gestao ? [{ href: "/pedidos?desconto=pendente", texto: "Descontos a liberar", contador: n.descontos, dica: "Pedidos do site que atingiram o desconto por quantidade: o gerente libera ou não" }] : []),
     ] },
     { id: "clientes", titulo: "Clientes", icone: "clientes", itens: [
+      { href: "/clientes/recompra", texto: "Recompra (quem chamar)", dica: "Clientes que passaram do ritmo normal de compra, com WhatsApp pronto" },
       { href: "/clientes", texto: "Clientes" },
       { href: "/clientes/carrinhos", texto: "Carrinhos parados", contador: n.carrinhos, dica: "Clientes que montaram carrinho e não enviaram" },
       { href: "/procuras", texto: gestao ? "Procurados sem estoque" : "Cliente pediu e não temos", contador: gestao ? n.procuras + n.chegaram : n.chegaram,
