@@ -229,6 +229,18 @@ select app.ativar_cliente('00000000-0000-0000-0000-0000000000c1', true);
 select teste.ok((select ativo and inativado_em is null from app.clientes where id = '00000000-0000-0000-0000-0000000000c1'), 'Gerente reativa');
 reset role;
 
+\echo '== Marca do motor: vale o preço do motor, promoção não baixa =='
+create temp table mi_antes as select * from app.marcas_inteligencia where marca = 'MARCA INT';
+delete from app.marcas_inteligencia where marca = 'MARCA INT';
+insert into app.promocoes (produto_id, pais, desconto_pct, inicio, fim, status) values (:'PI1', 'PY', 10, current_date - 1, current_date + 5, 'aprovada');
+select teste.ok((select preco < preco_tabela from app.preco_final('00000000-0000-0000-0000-0000000000c1', :'PI1')), 'Fora do motor: a promoção baixa o preço');
+insert into app.marcas_inteligencia (marca, gatilho) values ('MARCA INT', true);
+select teste.ok((select preco = preco_tabela and promocao_id is null from app.preco_final('00000000-0000-0000-0000-0000000000c1', :'PI1')), 'Marca do motor: fica só o preço do motor');
+select teste.ok(not exists (select 1 from app.vitrine_extras() where produto_id = :'PI1' and promo_pct is not null), 'Site não mostra promoção de produto do motor');
+delete from app.marcas_inteligencia where marca = 'MARCA INT';
+insert into app.marcas_inteligencia select * from mi_antes;
+delete from app.promocoes where produto_id = :'PI1' and desconto_pct = 10 and status = 'aprovada' and inicio = current_date - 1;
+
 \echo '== Compra por unidade: vendedora pede, gerente aprova; VIP só caixa =='
 select categoria_preco as cat_c1 from app.clientes where id = '00000000-0000-0000-0000-0000000000c1' \gset
 update app.clientes set categoria_preco = 'normal', compra_unidade = false where id = '00000000-0000-0000-0000-0000000000c1';
