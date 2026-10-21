@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { produtosLotePrecificacao } from "./acoes";
 
 export type LinhaPrec = {
   produto_id: string; codigo: string; nome: string; marca: string | null; foto: string | null; tipo: string; caixa: number | null;
@@ -162,6 +163,21 @@ export function GradePrecificacao({ linhas, premissas, acao }: {
     });
   }
 
+  // Inativar / excluir direto daqui (um produto ou os selecionados)
+  function remover(ids: string[], nomes: string[], op: "inativar" | "excluir") {
+    if (!ids.length) return;
+    const quem = ids.length === 1 ? `"${nomes[0]}"` : `${ids.length} produtos`;
+    const pergunta = op === "inativar"
+      ? `Inativar ${quem}?\n\nSai do site e das listas. Volta em Produtos → filtro Inativos.`
+      : `Excluir ${quem}?\n\nQuem já teve pedido ou estoque fica só inativo (o histórico é mantido). Quem nunca teve é apagado e não dá para desfazer.`;
+    if (!window.confirm(pergunta)) return;
+    iniciar(async () => {
+      const r = await produtosLotePrecificacao(ids, op);
+      setMsg(r);
+      if (r.ok) { setSel({}); router.refresh(); }
+    });
+  }
+
   const visiveis = filtradas.slice(0, limite);
   const todosSel = visiveis.length > 0 && visiveis.every((l) => sel[l.produto_id]);
 
@@ -209,6 +225,8 @@ export function GradePrecificacao({ linhas, premissas, acao }: {
           <button type="button" onClick={() => usarSugestao(selecionados)}>Usar preço sugerido</button>
           <button type="button" onClick={() => usarPlanilha(selecionados)}>Usar custo da planilha</button>
           <button type="button" onClick={() => setSel({})}>Limpar seleção</button>
+          <button type="button" className="discreto" onClick={() => remover(selecionados.map((l) => l.produto_id), selecionados.map((l) => l.nome), "inativar")}>Inativar selecionados</button>
+          <button type="button" className="perigo" onClick={() => remover(selecionados.map((l) => l.produto_id), selecionados.map((l) => l.nome), "excluir")}>Excluir selecionados</button>
           <span className="pequeno suave">Só preenche a tabela. Nada é gravado até você clicar em Salvar.</span>
         </section>
       )}
@@ -246,6 +264,10 @@ export function GradePrecificacao({ linhas, premissas, acao }: {
                     <div>
                       <Link href={`/produtos/${l.produto_id}`}>{l.nome}</Link>
                       <div className="pequeno suave">{l.codigo} · {l.marca ?? "Sem marca"}{l.tipo === "kit" ? " · kit" : ""}{l.motor ? " · motor" : ""}</div>
+                      <div className="pequeno" style={{ display: "flex", gap: 10, marginTop: 2 }}>
+                        <button type="button" className="link-acao" disabled={salvando} onClick={() => remover([l.produto_id], [l.nome], "inativar")}>Inativar</button>
+                        <button type="button" className="link-acao perigo-texto" disabled={salvando} onClick={() => remover([l.produto_id], [l.nome], "excluir")}>Excluir</button>
+                      </div>
                       {l.custo_origem && <div className="pequeno suave" title={l.custo_origem}>Custo: {l.custo_origem.length > 60 ? l.custo_origem.slice(0, 60) + "…" : l.custo_origem}</div>}
                     </div>
                   </div>

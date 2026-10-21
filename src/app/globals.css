@@ -323,3 +323,8 @@ button.discreto:hover { color: var(--erro); border-color: transparent; }
 .filtro-tabela input[type="search"] { flex: 1 1 220px; max-width: 360px; padding: 6px 10px; }
 .filtro-tabela select { width: auto; max-width: 220px; padding: 6px 8px; font-size: .85rem; }
 .filtro-tabela button { padding: 5px 10px; }
+
+/* Ações em texto dentro de tabelas (ex.: Inativar / Excluir na precificação) */
+.link-acao { background: none; border: 0; padding: 0; font: inherit; font-size: .8rem; color: var(--marca, #822aa1); text-decoration: underline; cursor: pointer; min-height: 0; }
+.link-acao:disabled { opacity: .5; cursor: default; }
+.link-acao.perigo-texto { color: var(--erro, #b0303a); }

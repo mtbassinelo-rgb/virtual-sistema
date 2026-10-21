@@ -1,6 +1,9 @@
 "use server";
 
+import { rm } from "node:fs/promises";
+import path from "node:path";
 import { revalidatePath } from "next/cache";
+import { pastaFotos } from "@/lib/arquivos";
 import { exigirUsuario, ehGestao } from "@/lib/auth";
 import { comUsuario, mensagemErro } from "@/lib/db";
 
@@ -38,6 +41,27 @@ export async function salvarPrecificacao(fd: FormData): Promise<{ ok?: string; e
     revalidatePath("/produtos");
     const partes = [r.custos && `${r.custos} custo(s)`, r.fretes && `${r.fretes} frete(s)`, r.nc && `${r.nc} caixa(s)`, r.np && `${r.np} preço(s)`].filter(Boolean);
     return { ok: partes.length ? `Salvo: ${partes.join(", ")}.` : "Nada mudou." };
+  } catch (e) {
+    return { erro: mensagemErro(e) };
+  }
+}
+
+/** Inativar ou excluir produtos direto da precificação. Excluir: quem já teve pedido ou estoque fica só inativo (histórico mantido). */
+export async function produtosLotePrecificacao(ids: string[], op: "inativar" | "excluir"): Promise<{ ok?: string; erro?: string }> {
+  const u = await exigirUsuario();
+  try {
+    if (!ehGestao(u)) throw new Error("Só gerente ou dono inativa ou exclui produtos.");
+    const lista = ids.filter((x) => /^[0-9a-f-]{36}$/i.test(x)).slice(0, 500);
+    if (!lista.length) throw new Error("Nenhum produto escolhido.");
+    if (op !== "inativar" && op !== "excluir") throw new Error("Operação inválida.");
+    const r = await comUsuario(u.id, async (c) => (await c.query("select app.produtos_em_lote($1::uuid[], $2) as r", [lista, op])).rows[0].r as
+      { excluidos?: number; inativados_por_historico?: number; fotos?: string[] } | number);
+    if (op === "excluir" && r && typeof r === "object")
+      for (const f of r.fotos ?? []) await rm(path.join(pastaFotos(), path.basename(f)), { force: true });
+    revalidatePath("/inteligencia/precificacao"); revalidatePath("/produtos"); revalidatePath("/loja");
+    if (op === "inativar") return { ok: `${lista.length} produto(s) inativado(s). Para voltar: Produtos → filtro Inativos.` };
+    const o = r as { excluidos?: number; inativados_por_historico?: number };
+    return { ok: `${o.excluidos ?? 0} excluído(s)${o.inativados_por_historico ? `; ${o.inativados_por_historico} já tinham pedido ou estoque e ficaram só inativos` : ""}.` };
   } catch (e) {
     return { erro: mensagemErro(e) };
   }
