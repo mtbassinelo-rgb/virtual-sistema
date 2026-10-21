@@ -1,8 +1,9 @@
+import Link from "next/link";
 import { ehGestao, exigirUsuario } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
 import { dataHora, linkWhatsApp, telefone } from "@/lib/formato";
 import { Avisos, Selo } from "../avisos";
-import { alternarBanner, apagarBanner, atenderCadastro, criarBanner, ordemBanner } from "./acoes";
+import { alternarBanner, apagarBanner, aprovarCadastro, atenderCadastro, criarBanner, ordemBanner } from "./acoes";
 
 export const metadata = { title: "Site" };
 
@@ -16,8 +17,11 @@ export default async function Site({ searchParams }: { searchParams: Promise<{ o
   const d = await comUsuario(u.id, async (c) => ({
     banners: (await c.query("select * from app.banners order by ativo desc, ordem, criado_em desc")).rows,
     cadastros: (await c.query(
-      `select s.*, us.nome as atendente from app.cadastros_site s left join app.usuarios us on us.id = s.atendido_por
-        order by (s.atendido_em is null) desc, s.criado_em desc limit 100`)).rows,
+      `select s.*, us.nome as atendente, cl.nome as cliente_nome, vv.nome as vendedora_nome from app.cadastros_site s
+         left join app.usuarios us on us.id = s.atendido_por left join app.clientes cl on cl.id = s.cliente_id
+         left join app.vendedoras vv on vv.id = s.vendedora_id
+        order by (s.cliente_id is null and s.atendido_em is null) desc, (s.cliente_id is null) desc, s.criado_em desc limit 150`)).rows,
+    vendedoras: (await c.query("select id, nome from app.vendedoras where ativo order by nome")).rows as { id: string; nome: string }[],
   }));
 
   return (
@@ -45,14 +49,31 @@ export default async function Site({ searchParams }: { searchParams: Promise<{ o
                   <td>{s.contato ?? "—"}<div className="pequeno">{zap && <a href={zap} target="_blank" rel="noopener noreferrer">{telefone(s.whatsapp)}</a>}</div>
                     {s.email && <div className="pequeno"><a href={`mailto:${s.email}`}>{s.email}</a></div>}</td>
                   <td className="pequeno">{s.mensagem ?? ""}</td>
-                  <td>{s.atendido_em ? <span className="pequeno suave">Atendido por {s.atendente ?? "—"}</span> : (
-                    <form action={atenderCadastro}><input type="hidden" name="id" value={s.id} /><button>Atendido</button></form>)}</td>
+                  <td style={{ minWidth: 230 }}>
+                    {s.cliente_id ? (
+                      <><Link href={`/clientes/${s.cliente_id}`}>Ver cliente: {s.cliente_nome}</Link>
+                        <div className="pequeno suave">Aprovado por {s.atendente ?? "—"}{s.vendedora_nome ? ` · vendedora ${s.vendedora_nome}` : ""}</div></>
+                    ) : (
+                      <>
+                        {s.atendido_em && <div className="pequeno"><Selo cor="aviso">Marcado atendido, mas sem cliente</Selo></div>}
+                        <form action={aprovarCadastro} className="linha" style={{ gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+                          <input type="hidden" name="id" value={s.id} />
+                          <select name="vendedora_id" defaultValue={s.vendedora_id ?? ""} aria-label="Vendedora do cliente" required>
+                            <option value="" disabled>Vendedora…</option>
+                            {d.vendedoras.map((v) => <option key={v.id} value={v.id}>{v.nome}</option>)}
+                          </select>
+                          <button className="principal">Aprovar e criar cliente</button>
+                        </form>
+                        {!s.atendido_em && <form action={atenderCadastro} style={{ marginTop: 4 }}><input type="hidden" name="id" value={s.id} /><button className="discreto">Só marcar atendido (não vira cliente)</button></form>}
+                      </>
+                    )}
+                  </td>
                 </tr>
               );
             })}</tbody>
           </table></div>
         )}
-        <p className="pequeno suave">Para virar cliente com preços: cadastre em Clientes e mande o link de acesso pelo WhatsApp.</p>
+        <p className="pequeno suave"><b>Aprovar e criar cliente</b> cadastra o cliente com os dados do site (nome, WhatsApp, cidade, documento, país pelo idioma) e abre a ficha dele para criar o acesso à loja. Se já existe cliente com o mesmo WhatsApp ou documento, liga ao cadastro que já existe.</p>
       </section>
 
       <section className="painel">

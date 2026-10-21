@@ -241,6 +241,22 @@ delete from app.marcas_inteligencia where marca = 'MARCA INT';
 insert into app.marcas_inteligencia select * from mi_antes;
 delete from app.promocoes where produto_id = :'PI1' and desconto_pct = 10 and status = 'aprovada' and inicio = current_date - 1;
 
+\echo '== Quero ser cliente: aprovar cria o cliente =='
+insert into app.cadastros_site (id, nome, contato, whatsapp, cidade, tipo, documento, idioma)
+values ('00000000-0000-0000-0000-00000000ca01', 'Salão Gabriel Teste', 'Gabriel', '595981000111', 'Hernandarias', 'salao', '4.555.666', 'es'),
+       ('00000000-0000-0000-0000-00000000ca02', 'Gabriel de novo', null, '595981000111', null, null, null, 'es');
+set role vc_app;
+select teste.como(:'GERENTE');
+select app.aprovar_cadastro_site('00000000-0000-0000-0000-00000000ca01', '00000000-0000-0000-0000-0000000000a1') as cli_site \gset
+reset role;
+select teste.ok((select nome = 'Salão Gabriel Teste' and pais = 'PY' and documento_login = '4555666' and vendedora_id = '00000000-0000-0000-0000-0000000000a1'
+                   from app.clientes where id = :'cli_site'), 'Aprovar cria o cliente com os dados do site (Paraguai pelo idioma)');
+select teste.ok((select cliente_id = :'cli_site' and atendido_em is not null from app.cadastros_site where id = '00000000-0000-0000-0000-00000000ca01'), 'Cadastro fica ligado ao cliente');
+set role vc_app;
+select teste.como(:'GERENTE');
+select teste.ok(app.aprovar_cadastro_site('00000000-0000-0000-0000-00000000ca02', '00000000-0000-0000-0000-0000000000a1') = :'cli_site', 'Mesmo WhatsApp: liga ao cliente que já existe, não duplica');
+reset role;
+
 \echo '== Compra por unidade: vendedora pede, gerente aprova; VIP só caixa =='
 select categoria_preco as cat_c1 from app.clientes where id = '00000000-0000-0000-0000-0000000000c1' \gset
 update app.clientes set categoria_preco = 'normal', compra_unidade = false where id = '00000000-0000-0000-0000-0000000000c1';

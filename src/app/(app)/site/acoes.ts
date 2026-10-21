@@ -85,3 +85,18 @@ export async function atenderCadastro(fd: FormData) {
   revalidatePath("/");
   revalidatePath("/site");
 }
+
+/** "Quero ser cliente": aprova e cria o cliente (ou liga a um cliente que já existe com o mesmo WhatsApp/documento). */
+export async function aprovarCadastro(fd: FormData) {
+  const u = await exigirUsuario();
+  let erro: string | null = null, cli = "";
+  try {
+    cli = await comUsuario(u.id, async (c) => String((await c.query("select app.aprovar_cadastro_site($1, $2) id",
+      [texto(fd, "id"), texto(fd, "vendedora_id") || null])).rows[0].id));
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  revalidatePath("/"); revalidatePath("/site"); revalidatePath("/clientes");
+  if (erro) redirect(`/site?erro=${encodeURIComponent(erro)}#cadastros`);
+  redirect(`/clientes/${cli}?ok=${encodeURIComponent("Cliente criado a partir do cadastro do site. Confira os dados e crie o acesso dele à loja.")}`);
+}
