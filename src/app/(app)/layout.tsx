@@ -83,6 +83,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
       { href: "/inteligencia?aba=rentabilidade", texto: "Rentabilidade PY", dica: "Margem e preço mínimo por produto nas tabelas do Paraguai" },
       { href: "/inteligencia?aba=classificacao", texto: "Classificação", dica: "Atração, rentabilidade, diferenciação e estoque parado, com recomendação" },
       { href: "/inteligencia?aba=compras", texto: "Compras e fornecedores", dica: "Compras com frete e câmbio, e prazo de reposição" },
+      { href: "/inteligencia?aba=retirada", texto: "Retire em Foz", dica: "Clientes locais e simulação do desconto por caixa retirada" },
       { href: "/inteligencia?aba=custos", texto: "Custos e frete", dica: "Frete por marca, imposto e entrega usados nos cálculos" },
     ] }] : []),
     gestao

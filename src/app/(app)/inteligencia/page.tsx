@@ -4,6 +4,7 @@ import { comUsuario } from "@/lib/db";
 import { data, dinheiro, pct } from "@/lib/formato";
 import { Avisos, Selo } from "../avisos";
 import { excluirCompra, registrarCompra, salvarCustoVariavel, salvarFornecedor, salvarFreteMarca } from "./acoes";
+import { decidirClienteLocal } from "../clientes/acoes";
 
 export const metadata = { title: "Inteligência comercial" };
 
@@ -20,6 +21,7 @@ const ABAS = [
   { k: "rentabilidade", t: "Rentabilidade PY", d: "Margem bruta, margem de contribuição e preço mínimo por produto, nas tabelas Normal e VIP do Paraguai. Só leitura: nada aqui muda preço." },
   { k: "classificacao", t: "Classificação", d: "Cada produto do Paraguai classificado em atração, rentabilidade, diferenciação ou estoque parado, com uma recomendação. Recalculado ao abrir; uma foto por dia fica guardada para comparar." },
   { k: "compras", t: "Compras e fornecedores", d: "Compras com frete e câmbio, por mês, e o prazo de reposição de cada fornecedor." },
+  { k: "retirada", t: "Retire em Foz", d: "Clientes locais do Paraguai que podem retirar no CD Foz e a simulação do desconto por caixa retirada. Em simulação: o cliente ainda não vê a opção." },
   { k: "custos", t: "Custos e frete", d: "Frete de compra por marca, imposto e entrega usados nos cálculos. Cada mudança fica na auditoria." },
 ];
 
@@ -77,7 +79,15 @@ export default async function Inteligencia({ searchParams }: {
     compras: aba.k === "compras" ? (await c.query(`select c.*, f.nome fornecedor from app.compras c join app.fornecedores f on f.id = c.fornecedor_id
         order by c.data desc, c.criado_em desc limit 60`)).rows : [],
     meses: aba.k === "compras" ? (await c.query("select * from app.v_compras_mensal order by mes desc limit 12")).rows : [],
-    params: Object.fromEntries((await c.query("select chave, valor from app.parametros where chave in ('cambio_custo_gs','cambio_compra_gs','margem_minima_contribuicao')")).rows
+    retirada: aba.k === "retirada" ? {
+      pendentes: (await c.query(`select c.id, c.nome, v.nome vendedora, u2.nome sugerido_por, c.cliente_local_sugerido_em em
+          from app.clientes c join app.vendedoras v on v.id = c.vendedora_id left join app.usuarios u2 on u2.id = c.cliente_local_sugerido_por
+          where c.cliente_local_sugerido_em is not null and not c.cliente_local and c.mesclado_em is null order by c.cliente_local_sugerido_em`)).rows,
+      locais: (await c.query(`select c.id, c.nome, v.nome vendedora from app.clientes c join app.vendedoras v on v.id = c.vendedora_id
+          where c.cliente_local and c.mesclado_em is null order by c.nome`)).rows,
+      sim: (await c.query("select * from app.simular_retirada_foz((date_trunc('month', current_date) - interval '5 months')::date, current_date)")).rows,
+    } : null,
+    params: Object.fromEntries((await c.query("select chave, valor from app.parametros where chave in ('cambio_custo_gs','cambio_compra_gs','margem_minima_contribuicao','retirada_foz_desconto_caixa','retirada_foz_teto_mes','retirada_foz_ativa')")).rows
       .map((r) => [r.chave as string, Number(r.valor)])),
   }));
 
@@ -361,6 +371,68 @@ export default async function Inteligencia({ searchParams }: {
                 <label>Pedido mínimo (R$)<input name="pedido_minimo" inputMode="decimal" style={{ width: 110 }} /></label>
                 <button className="principal">Adicionar</button>
               </form>
+            )}
+          </section>
+        </>
+      )}
+
+
+      {aba.k === "retirada" && d.retirada && (
+        <>
+          <section className="indicadores">
+            <div className="indicador"><span className="rotulo">Situação</span><span className="valor">{d.params.retirada_foz_ativa === 1 ? "Ativo na loja" : "Simulação"}</span>
+              <span className="pequeno suave">A opção no pedido da loja entra na próxima etapa</span></div>
+            <div className="indicador"><span className="rotulo">Desconto por caixa retirada</span><span className="valor">{gs(d.params.retirada_foz_desconto_caixa)}</span>
+              <span className="pequeno suave">Pasero cobra {entregaCaixa ? gs(entregaCaixa.valor) : "—"} por caixa</span></div>
+            <div className="indicador"><span className="rotulo">Teto por mês</span><span className="valor">{d.params.retirada_foz_teto_mes ? gs(d.params.retirada_foz_teto_mes) : "Sem teto"}</span></div>
+            <div className="indicador"><span className="rotulo">Clientes locais</span><span className="valor">{d.retirada.locais.length}</span>
+              <span className="pequeno suave">{d.retirada.pendentes.length} sugestão(ões) esperando</span></div>
+          </section>
+
+          <section className="painel">
+            <h2>Simulação nos pedidos dos clientes locais</h2>
+            <p className="pequeno suave" style={{ margin: 0 }}>Quanto o desconto teria custado se esses clientes tivessem retirado em Foz. Como a empresa não paga o pasero na retirada,
+              o desconto troca um custo por outro e não reduz a margem. Itens abaixo do mínimo = preço menos o desconto por unidade fica abaixo do preço mínimo sem entrega.</p>
+            {d.retirada.sim.length === 0 ? <div className="vazio">Nenhum pedido de cliente local nos últimos 6 meses. Marque os clientes locais para ver a simulação.</div> : (
+              <div className="tabela"><table style={{ minWidth: 0 }}>
+                <thead><tr><th>Mês</th><th>Clientes</th><th>Pedidos</th><th>Vendido</th><th>Caixas</th><th>Desconto</th><th>% das vendas</th><th>Itens abaixo do mínimo</th></tr></thead>
+                <tbody>{d.retirada.sim.map((m) => (
+                  <tr key={m.mes}><td>{m.mes}</td><td className="num">{m.clientes}</td><td className="num">{m.pedidos}</td><td className="num">{gs(m.vendido)}</td>
+                    <td className="num">{Number(m.caixas ?? 0).toLocaleString("pt-BR")}{m.itens_sem_caixa > 0 && <div className="pequeno suave">{m.itens_sem_caixa} item(ns) sem caixa</div>}</td>
+                    <td className="num">{gs(m.desconto)}</td><td className="num">{pct(m.desconto_pct)}</td>
+                    <td className="num">{m.itens_abaixo_minimo > 0 ? <Selo cor="erro">{m.itens_abaixo_minimo}</Selo> : 0}</td></tr>
+                ))}</tbody>
+              </table></div>
+            )}
+          </section>
+
+          <section className="painel">
+            <h2>Sugestões das vendedoras</h2>
+            {d.retirada.pendentes.length === 0 ? <div className="vazio">Nenhuma sugestão esperando.</div> : (
+              <div className="tabela"><table style={{ minWidth: 0 }}>
+                <thead><tr><th>Cliente</th><th>Vendedora</th><th>Sugerido por</th><th></th></tr></thead>
+                <tbody>{d.retirada.pendentes.map((x) => (
+                  <tr key={x.id}><td><Link href={`/clientes/${x.id}`}>{x.nome}</Link></td><td>{x.vendedora}</td><td>{x.sugerido_por ?? "—"}<div className="pequeno suave">{data(x.em)}</div></td>
+                    <td>{gerir && <div className="linha">
+                      <form action={decidirClienteLocal}><input type="hidden" name="cliente_id" value={x.id} /><input type="hidden" name="local" value="1" /><input type="hidden" name="volta" value="inteligencia" /><button>Aprovar</button></form>
+                      <form action={decidirClienteLocal}><input type="hidden" name="cliente_id" value={x.id} /><input type="hidden" name="local" value="0" /><input type="hidden" name="volta" value="inteligencia" /><button className="discreto">Recusar</button></form>
+                    </div>}</td></tr>
+                ))}</tbody>
+              </table></div>
+            )}
+          </section>
+
+          <section className="painel">
+            <h2>Clientes locais</h2>
+            <p className="pequeno suave" style={{ margin: 0 }}>Para incluir, abra o cadastro do cliente (só clientes do Paraguai). A vendedora sugere e o gerente aprova.</p>
+            {d.retirada.locais.length === 0 ? <div className="vazio">Nenhum cliente local ainda.</div> : (
+              <div className="tabela"><table style={{ minWidth: 0 }}>
+                <thead><tr><th>Cliente</th><th>Vendedora</th><th></th></tr></thead>
+                <tbody>{d.retirada.locais.map((x) => (
+                  <tr key={x.id}><td><Link href={`/clientes/${x.id}`}>{x.nome}</Link></td><td>{x.vendedora}</td>
+                    <td>{gerir && <form action={decidirClienteLocal}><input type="hidden" name="cliente_id" value={x.id} /><input type="hidden" name="local" value="0" /><input type="hidden" name="volta" value="inteligencia" /><button className="discreto">Deixar de ser local</button></form>}</td></tr>
+                ))}</tbody>
+              </table></div>
             )}
           </section>
         </>

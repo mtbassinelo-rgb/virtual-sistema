@@ -129,4 +129,38 @@ select teste.ok(app.registrar_classificacao_py() = 0, 'Foto do dia é gravada um
 select teste.ok((select categoria from app.produto_classificacao where data = current_date and produto_id = :'KIT') = 'diferenciacao', 'Foto guarda a categoria');
 reset role;
 
+\echo '== Retire em Foz: cliente local e simulação =='
+set role vc_app;
+select teste.como(:'KEILA');
+select teste.ok(app.sugerir_cliente_local('00000000-0000-0000-0000-0000000000c1') = 'sugerido', 'Vendedora sugere cliente local');
+select teste.ok((select not cliente_local and cliente_local_sugerido_por is not null from app.clientes where id = '00000000-0000-0000-0000-0000000000c1'),
+  'Sugestão não marca o cliente: espera o gerente');
+select teste.falha($$select app.sugerir_cliente_local('00000000-0000-0000-0000-0000000000c2')$$, 'permissão', 'Vendedora não sugere cliente de outra vendedora');
+select teste.falha($$select app.decidir_cliente_local('00000000-0000-0000-0000-0000000000c1', true)$$, 'gerente ou dono', 'Vendedora não aprova cliente local');
+select teste.falha($$update app.clientes set cliente_local = true where id = '00000000-0000-0000-0000-0000000000c1'$$, null, 'Vendedora não marca cliente local direto');
+select teste.como(:'GERENTE');
+select app.decidir_cliente_local('00000000-0000-0000-0000-0000000000c1', true);
+select teste.ok((select cliente_local and cliente_local_sugerido_por is null from app.clientes where id = '00000000-0000-0000-0000-0000000000c1'), 'Gerente aprova: cliente local');
+select teste.falha($$select app.decidir_cliente_local('00000000-0000-0000-0000-0000000000c3', true)$$, 'Paraguai', 'Cliente do Brasil não vira cliente local');
+reset role;
+insert into app.pedidos (id, origem, cliente_id, vendedora_id, data_pedido, moeda, valor_total)
+values ('00000000-0000-0000-0000-00000000f201', 'planilha', '00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000a1', current_date, 'GS', 168000);
+insert into app.pedido_itens (pedido_id, produto_id, descricao, quantidade, preco_unitario)
+values ('00000000-0000-0000-0000-00000000f201', :'PI1', 'Sebo de Carneiro Teste', 24, 7000);
+update app.pedidos set status_comercial = 'em_separacao' where id = '00000000-0000-0000-0000-00000000f201';
+set role vc_app;
+select teste.como(:'KEILA');
+select teste.falha($$select * from app.simular_retirada_foz(current_date - 30, current_date)$$, 'gestão', 'Vendedora não vê a simulação');
+select teste.como(:'GERENTE');
+select teste.ok((select caixas >= 2 and desconto >= 14000 from app.simular_retirada_foz(current_date - 30, current_date) where mes = to_char(current_date, 'YYYY-MM')),
+  'Simulação: 24 unidades em caixas de 12 = 2 caixas × 7.000 Gs de desconto');
+reset role;
+update app.parametros set valor = 5000 where chave = 'retirada_foz_teto_mes';
+set role vc_app;
+select teste.como(:'GERENTE');
+select teste.ok((select desconto from app.simular_retirada_foz(current_date - 30, current_date) where mes = to_char(current_date, 'YYYY-MM')) = 5000,
+  'Teto mensal limita o desconto simulado');
+reset role;
+update app.parametros set valor = 0 where chave = 'retirada_foz_teto_mes';
+
 \echo '== Testes da inteligência comercial passaram =='

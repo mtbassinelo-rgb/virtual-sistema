@@ -7,7 +7,7 @@ import {
   type Moeda,
 } from "@/lib/formato";
 import { Avisos, Barra, Selo } from "../../avisos";
-import { atendimentoCliente, bloquearCliente, compraUnidadeCliente, definirCredito, depositoCliente, recusarSugestaoCredito, salvarCliente, sugerirCredito } from "../acoes";
+import { atendimentoCliente, bloquearCliente, compraUnidadeCliente, decidirClienteLocal, definirCredito, depositoCliente, recusarSugestaoCredito, salvarCliente, sugerirClienteLocal, sugerirCredito } from "../acoes";
 import { AcessoCliente } from "./acesso-cliente";
 
 export const metadata = { title: "Cliente" };
@@ -181,6 +181,24 @@ export default async function Cliente({ params, searchParams }: {
                 : <>Compra no site: <b>só caixa fechada</b>. Pode liberar unidade (sortido) para cliente do Brasil.</>}</span>
               <button className={cli.compra_unidade ? "discreto" : ""}>{cli.compra_unidade ? "Voltar a só caixa" : "Liberar compra por unidade"}</button>
             </form>
+          )}
+          {!ro && cli.pais === "PY" && (
+            <div className="linha" style={{ alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <span className="pequeno">{cli.cliente_local
+                ? <>✓ <b>Cliente local</b>: pode retirar no CD Foz (Retire em Foz).</>
+                : cli.cliente_local_sugerido_em ? <>Sugerido como <b>cliente local</b>: aguardando o gerente.</>
+                : <>Retire em Foz: <b>não é cliente local</b>.</>}</span>
+              {ehGestao(u) ? (
+                cli.cliente_local
+                  ? <form action={decidirClienteLocal}><input type="hidden" name="cliente_id" value={cli.id} /><input type="hidden" name="local" value="0" /><button className="discreto">Deixar de ser local</button></form>
+                  : <>
+                      <form action={decidirClienteLocal}><input type="hidden" name="cliente_id" value={cli.id} /><input type="hidden" name="local" value="1" /><button>{cli.cliente_local_sugerido_em ? "Aprovar cliente local" : "Marcar como local"}</button></form>
+                      {cli.cliente_local_sugerido_em && <form action={decidirClienteLocal}><input type="hidden" name="cliente_id" value={cli.id} /><input type="hidden" name="local" value="0" /><button className="discreto">Recusar</button></form>}
+                    </>
+              ) : !cli.cliente_local && !cli.cliente_local_sugerido_em && (
+                <form action={sugerirClienteLocal}><input type="hidden" name="cliente_id" value={cli.id} /><button>Sugerir como cliente local</button></form>
+              )}
+            </div>
           )}
           {ehGestao(u) && (
             <form action={depositoCliente} className="campos">

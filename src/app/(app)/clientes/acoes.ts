@@ -133,6 +133,38 @@ export async function compraUnidadeCliente(fd: FormData) {
   redirect(`/clientes/${id}?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent(liberar ? "Cliente liberado para comprar por unidade no site." : "Cliente volta a comprar só caixa fechada.")}`);
 }
 
+/** Retire em Foz: a vendedora sugere o cliente como local (da região); gerente ou dono marca direto. */
+export async function sugerirClienteLocal(fd: FormData) {
+  const u = await exigirUsuario();
+  const id = texto(fd, "cliente_id");
+  let erro: string | null = null, r = "";
+  try {
+    r = await comUsuario(u.id, async (c) => String((await c.query("select app.sugerir_cliente_local($1) r", [id])).rows[0].r));
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  revalidatePath(`/clientes/${id}`);
+  redirect(`/clientes/${id}?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent(r === "sugerido" ? "Sugestão enviada ao gerente." : "Cliente marcado como local: pode retirar em Foz.")}`);
+}
+
+/** Gestão aprova ou recusa a sugestão de cliente local, ou desmarca. */
+export async function decidirClienteLocal(fd: FormData) {
+  const u = await exigirUsuario();
+  const id = texto(fd, "cliente_id");
+  const local = texto(fd, "local") === "1";
+  let erro: string | null = null;
+  try {
+    await comUsuario(u.id, (c) => c.query("select app.decidir_cliente_local($1, $2)", [id, local]));
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  const volta = texto(fd, "volta");
+  revalidatePath(`/clientes/${id}`);
+  revalidatePath("/inteligencia");
+  const destino = volta === "inteligencia" ? "/inteligencia?aba=retirada&" : `/clientes/${id}?`;
+  redirect(`${destino}${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent(local ? "Cliente marcado como local." : "Cliente não é mais local.")}`);
+}
+
 export type RespostaAcesso = { erro?: string; login?: string; senha?: string; mensagem?: string; whatsapp?: string | null };
 
 /** Cria (ou refaz) o acesso do cliente: documento + a senha que a vendedora digitar (ou 6 números sorteados se deixar em branco).
