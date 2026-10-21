@@ -4,6 +4,7 @@ import { comUsuario } from "@/lib/db";
 import { dinheiro, data, type Moeda } from "@/lib/formato";
 import { Avisos, Selo } from "../avisos";
 import { criarCliente, decidirCompraUnidade, trocarVendedoraCliente } from "./acoes";
+import { aprovarCadastro } from "../site/acoes";
 
 export const metadata = { title: "Clientes" };
 
@@ -30,6 +31,10 @@ export default async function Clientes({ searchParams }: { searchParams: Promise
         where ${cond.join(" and ")}
         order by x.total desc nulls last, c.nome limit 500`, par)).rows,
     vendedoras: (await c.query("select id, nome from app.vendedoras where ativo order by nome")).rows,
+    // cadastros do site ("Quero ser cliente") esperando virar cliente
+    leads: (await c.query(`select s.id, s.nome, s.contato, s.whatsapp, s.cidade, s.documento, s.criado_em, s.vendedora_id
+        from app.cadastros_site s where s.cliente_id is null and s.atendido_em is null order by s.criado_em desc limit 50`).catch(() => ({ rows: [] }))).rows as
+      { id: string; nome: string; contato: string | null; whatsapp: string; cidade: string | null; documento: string | null; criado_em: string; vendedora_id: string | null }[],
     aguardando: Number((await c.query(`select count(*) n from app.clientes where mesclado_em is null and compra_unidade_sugerido_em is not null
                                          and not compra_unidade and categoria_preco = 'normal'`)).rows[0].n),
   }));
@@ -43,6 +48,32 @@ export default async function Clientes({ searchParams }: { searchParams: Promise
         <div><h1>Clientes</h1><div className="suave pequeno">{d.clientes.length} cliente(s)</div></div>
       </section>
       <Avisos erro={f.erro} ok={f.ok} />
+      {d.leads.length > 0 && (
+        <section className="painel">
+          <h2 style={{ margin: 0 }}>Novos cadastros pelo site ({d.leads.length})</h2>
+          <p className="pequeno suave" style={{ margin: 0 }}>Pessoas que pediram para ser cliente no site. Escolha a vendedora e aprove: o cliente é criado e entra na lista abaixo.</p>
+          <div className="tabela"><table style={{ minWidth: 0 }}>
+            <thead><tr><th>Empresa</th><th>Contato</th><th>Cidade</th><th>Documento</th><th>Vendedora</th></tr></thead>
+            <tbody>{d.leads.map((l) => (
+              <tr key={l.id}>
+                <td><b>{l.nome}</b><div className="pequeno suave">{data(l.criado_em)}</div></td>
+                <td>{l.contato ?? "—"}<div className="pequeno">+{l.whatsapp}</div></td>
+                <td>{l.cidade ?? "—"}</td><td>{l.documento ?? "—"}</td>
+                <td>
+                  <form action={aprovarCadastro} className="linha" style={{ gap: 6, flexWrap: "wrap" }}>
+                    <input type="hidden" name="id" value={l.id} />
+                    <select name="vendedora_id" defaultValue={l.vendedora_id ?? ""} required aria-label={`Vendedora de ${l.nome}`}>
+                      <option value="" disabled>Vendedora…</option>
+                      {d.vendedoras.map((v) => <option key={v.id} value={v.id}>{v.nome}</option>)}
+                    </select>
+                    <button className="principal">Aprovar e criar cliente</button>
+                  </form>
+                </td>
+              </tr>
+            ))}</tbody>
+          </table></div>
+        </section>
+      )}
       {ehGestao(u) && d.aguardando > 0 && f.compra !== "aguardando" && (
         <div className="painel linha entre" style={{ alignItems: "center" }}>
           <span><b>{d.aguardando}</b> cliente(s) aguardando sua aprovação para comprar por unidade.</span>
