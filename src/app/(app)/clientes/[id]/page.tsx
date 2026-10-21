@@ -71,21 +71,18 @@ export default async function Cliente({ params, searchParams }: {
             {cli.perfil_comercial && <span>{cli.perfil_comercial}</span>}
           </div>
           {gestao && (
-            <details style={{ marginTop: 6 }}>
-              <summary className="pequeno">Trocar vendedora</summary>
-              <form action={trocarVendedoraCliente} className="linha" style={{ gap: 10, alignItems: "center", flexWrap: "wrap", marginTop: 6 }}>
-                <input type="hidden" name="cliente_id" value={cli.id} />
-                <select name="vendedora_id" defaultValue={cli.vendedora_id} required>
-                  {d.vendedoras.map((v) => <option key={v.id} value={v.id}>{v.nome}</option>)}
-                </select>
-                <label className="pequeno" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <input type="checkbox" name="pedidos_abertos" value="1" defaultChecked style={{ width: "auto" }} />
-                  Passar junto os pedidos em andamento
-                </label>
-                <button className="principal">Trocar</button>
-              </form>
-              <div className="pequeno suave">Pedidos enviados, entregues ou cancelados ficam com quem vendeu. A troca fica no histórico do cliente.</div>
-            </details>
+            <form action={trocarVendedoraCliente} className="painel linha" style={{ gap: 10, alignItems: "center", flexWrap: "wrap", marginTop: 10, padding: "10px 14px" }}>
+              <input type="hidden" name="cliente_id" value={cli.id} />
+              <b>Trocar vendedora:</b>
+              <select name="vendedora_id" defaultValue={cli.vendedora_id} required aria-label="Nova vendedora">
+                {d.vendedoras.map((v) => <option key={v.id} value={v.id}>{v.nome}</option>)}
+              </select>
+              <label className="pequeno" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <input type="checkbox" name="pedidos_abertos" value="1" defaultChecked style={{ width: "auto" }} />
+                levar os pedidos em andamento
+              </label>
+              <button className="principal">Trocar</button>
+            </form>
           )}
         </div>
         <div className="linha">

@@ -59,7 +59,9 @@ export async function trocarVendedoraCliente(fd: FormData) {
   }
   revalidatePath(`/clientes/${id}`);
   revalidatePath("/clientes");
-  redirect(`/clientes/${id}?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Vendedora do cliente trocada." + (n ? ` ${n} pedido(s) em andamento passaram para ela.` : ""))}`);
+  const volta = texto(fd, "volta");
+  const destino = volta.startsWith("/clientes?") ? volta + "&" : `/clientes/${id}?`;
+  redirect(`${destino}${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Vendedora do cliente trocada." + (n ? ` ${n} pedido(s) em andamento passaram para ela.` : ""))}`);
 }
 
 export async function salvarCliente(fd: FormData) {

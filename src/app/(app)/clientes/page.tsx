@@ -3,7 +3,7 @@ import { exigirUsuario, ehGestao, podeEscrever } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
 import { dinheiro, data, type Moeda } from "@/lib/formato";
 import { Avisos, Selo } from "../avisos";
-import { criarCliente, decidirCompraUnidade } from "./acoes";
+import { criarCliente, decidirCompraUnidade, trocarVendedoraCliente } from "./acoes";
 
 export const metadata = { title: "Clientes" };
 
@@ -20,7 +20,7 @@ export default async function Clientes({ searchParams }: { searchParams: Promise
 
   const d = await comUsuario(u.id, async (c) => ({
     clientes: (await c.query(
-      `select c.id, c.nome, c.cidade, c.pais, c.categoria_preco, c.moeda, v.nome as vendedora, c.compra_unidade, c.compra_unidade_sugerido_em,
+      `select c.id, c.nome, c.cidade, c.pais, c.categoria_preco, c.moeda, c.vendedora_id, v.nome as vendedora, c.compra_unidade, c.compra_unidade_sugerido_em,
               x.pedidos, x.total, x.ultima, x.saldo
          from app.clientes c join app.vendedoras v on v.id = c.vendedora_id
          left join lateral (
@@ -33,6 +33,9 @@ export default async function Clientes({ searchParams }: { searchParams: Promise
                                          and not compra_unidade and categoria_preco = 'normal'`)).rows[0].n),
   }));
 
+  // volta para a mesma lista (com os filtros) depois de trocar a vendedora
+  const voltaLista = "/clientes?" + new URLSearchParams(Object.entries({ q: f.q, vendedora: f.vendedora, compra: f.compra })
+    .filter((x): x is [string, string] => Boolean(x[1]))).toString();
   return (
     <>
       <section className="linha entre">
@@ -68,7 +71,7 @@ export default async function Clientes({ searchParams }: { searchParams: Promise
 
       {d.clientes.length === 0 ? <div className="painel vazio">Nenhum cliente encontrado.</div> : (
         <div className="tabela"><table>
-          <thead><tr><th>Cliente</th><th>Preço</th><th>Compra no site</th>{ehGestao(u) && <th>Vendedora</th>}<th>Pedidos</th><th>Total</th><th>Saldo</th><th>Última compra</th></tr></thead>
+          <thead><tr><th>Cliente</th><th>Preço</th><th>Compra no site</th>{ehGestao(u) && <th>Vendedora (trocar)</th>}<th>Pedidos</th><th>Total</th><th>Saldo</th><th>Última compra</th></tr></thead>
           <tbody>{d.clientes.map((c) => (
             <tr key={c.id}>
               <td><Link href={`/clientes/${c.id}`}>{c.nome}</Link>{c.cidade && <div className="pequeno suave">{c.cidade}</div>}</td>
@@ -84,7 +87,19 @@ export default async function Clientes({ searchParams }: { searchParams: Promise
                       </>}
                     </div>}
               </td>
-              {ehGestao(u) && <td>{c.vendedora}</td>}
+              {ehGestao(u) && (
+                <td>
+                  <form action={trocarVendedoraCliente} className="linha" style={{ gap: 6, alignItems: "center", flexWrap: "nowrap" }}>
+                    <input type="hidden" name="cliente_id" value={c.id} />
+                    <input type="hidden" name="pedidos_abertos" value="1" />
+                    <input type="hidden" name="volta" value={voltaLista} />
+                    <select name="vendedora_id" defaultValue={c.vendedora_id} aria-label={`Vendedora de ${c.nome}`}>
+                      {d.vendedoras.map((v) => <option key={v.id} value={v.id}>{v.nome}</option>)}
+                    </select>
+                    <button title="Trocar a vendedora deste cliente">Trocar</button>
+                  </form>
+                </td>
+              )}
               <td className="num">{c.pedidos ?? 0}</td>
               <td className="num">{dinheiro(c.total ?? 0, c.moeda as Moeda)}</td>
               <td className="num">{dinheiro(c.saldo ?? 0, c.moeda as Moeda)}</td>
