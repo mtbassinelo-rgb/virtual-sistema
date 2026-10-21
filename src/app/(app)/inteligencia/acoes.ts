@@ -95,3 +95,52 @@ export async function excluirCompra(fd: FormData) {
   }
   voltar("compras", erro, "Compra excluída.");
 }
+
+/**
+ * Importa custos reais por unidade (R$) de um CSV com ";" — o casamento produto × planilha Clientes VIP.
+ * Aceita as colunas: codigo; custo_brl (ou custo); custo_frete_brl ou frete_brl (ou frete); normal_sugerido_gs (ou normal);
+ * vip_sugerido_gs (ou vip); confianca (opcional). Preço de venda só entra onde está em branco; produto nunca é ativado.
+ */
+export async function importarCustos(fd: FormData) {
+  const u = await exigirUsuario();
+  let erro: string | null = null, ok = "";
+  try {
+    if (!ehGestao(u)) throw new Error("Só gerente ou dono importa custos.");
+    const arq = fd.get("arquivo");
+    const texto_ = arq instanceof File && arq.size > 0 ? await arq.text() : texto(fd, "conteudo");
+    if (!texto_.trim()) throw new Error("Escolha o arquivo CSV.");
+    if (texto_.length > 2_000_000) throw new Error("Arquivo grande demais.");
+    const linhas = texto_.replace(/^﻿/, "").split(/\r?\n/).filter((l) => l.trim());
+    const cab = linhas[0].split(";").map((c) => c.trim().toLowerCase());
+    const idx = (...nomes: string[]) => nomes.map((n) => cab.indexOf(n)).find((i) => i >= 0) ?? -1;
+    const iCod = idx("codigo", "código"), iCusto = idx("custo_brl", "custo"), iFrete = idx("frete_brl", "frete"),
+      iCustoFrete = idx("custo_frete_brl"), iNormal = idx("normal_sugerido_gs", "normal"), iVip = idx("vip_sugerido_gs", "vip"), iConf = idx("confianca");
+    if (iCod < 0 || iCusto < 0) throw new Error("O arquivo precisa das colunas codigo e custo_brl (ou custo).");
+    const aceitar = new Set(fd.getAll("confianca").map(String));
+    const preencher = fd.get("preencher_precos") === "1";
+    const num = (s: string | undefined) => {
+      const t = (s ?? "").trim().replace(/\s/g, "");
+      if (!t) return null;
+      const n = Number(t.includes(",") ? t.replace(/\./g, "").replace(",", ".") : t);
+      return Number.isFinite(n) ? n : null;
+    };
+    const dados: { codigo: string; custo: number | null; frete: number | null; normal: number | null; vip: number | null }[] = [];
+    let ignoradas = 0;
+    for (const l of linhas.slice(1)) {
+      const c = l.split(";");
+      const conf = iConf >= 0 ? (c[iConf] ?? "").trim() : "alta";
+      const custo = num(c[iCusto]);
+      if (!c[iCod]?.trim() || custo === null || (iConf >= 0 && !aceitar.has(conf))) { ignoradas++; continue; }
+      const frete = iFrete >= 0 ? num(c[iFrete]) : iCustoFrete >= 0 && num(c[iCustoFrete]) !== null ? Math.round((num(c[iCustoFrete])! - custo) * 10000) / 10000 : null;
+      dados.push({ codigo: c[iCod].trim(), custo, frete, normal: preencher && iNormal >= 0 ? num(c[iNormal]) : null, vip: preencher && iVip >= 0 ? num(c[iVip]) : null });
+    }
+    if (!dados.length) throw new Error("Nenhuma linha para importar com as confianças escolhidas.");
+    const r = await comUsuario(u.id, async (c) => (await c.query("select app.importar_custos($1::jsonb) r", [JSON.stringify(dados)])).rows[0].r as
+      { custos: number; fretes: number; precos_preenchidos: number; nao_encontrados: string[] });
+    ok = `Importado: ${r.custos} custo(s) e ${r.fretes} frete(s) atualizados; ${r.precos_preenchidos} preço(s) em branco preenchidos; ${ignoradas} linha(s) ignoradas` +
+      (r.nao_encontrados.length ? `; ${r.nao_encontrados.length} código(s) não encontrados (${r.nao_encontrados.slice(0, 5).join(", ")}${r.nao_encontrados.length > 5 ? "…" : ""})` : "") + ".";
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  voltar("custos", erro, ok);
+}

@@ -3,7 +3,7 @@ import { ehGestao, exigirUsuario } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
 import { data, dinheiro, pct } from "@/lib/formato";
 import { Avisos, Selo } from "../avisos";
-import { excluirCompra, registrarCompra, salvarCustoVariavel, salvarFornecedor, salvarFreteMarca } from "./acoes";
+import { excluirCompra, importarCustos, registrarCompra, salvarCustoVariavel, salvarFornecedor, salvarFreteMarca } from "./acoes";
 import { decidirClienteLocal } from "../clientes/acoes";
 
 export const metadata = { title: "Inteligência comercial" };
@@ -440,6 +440,24 @@ export default async function Inteligencia({ searchParams }: {
 
       {aba.k === "custos" && (
         <>
+          <section className="painel">
+            <h2>Custo real por produto (planilha)</h2>
+            <p className="pequeno suave" style={{ margin: 0 }}>Envie o CSV do casamento com a planilha Clientes VIP (separado por ponto e vírgula). O custo por unidade em R$ e o frete passam a valer
+              em todo o sistema e não são apagados pela importação do Bling. Preço de venda só é preenchido onde está em branco; nenhum produto é ativado.</p>
+            {gerir ? (
+              <form action={importarCustos} className="linha" style={{ flexWrap: "wrap", alignItems: "end", gap: 12 }}>
+                <label>Arquivo CSV<input type="file" name="arquivo" accept=".csv,text/csv" required /></label>
+                <fieldset className="linha" style={{ gap: 10, border: 0, padding: 0 }}>
+                  <legend className="pequeno">Importar casamentos com confiança</legend>
+                  <label className="pequeno"><input type="checkbox" name="confianca" value="alta" defaultChecked /> alta</label>
+                  <label className="pequeno"><input type="checkbox" name="confianca" value="media" defaultChecked /> média</label>
+                  <label className="pequeno"><input type="checkbox" name="confianca" value="baixa" /> baixa</label>
+                </fieldset>
+                <label className="pequeno"><input type="checkbox" name="preencher_precos" value="1" defaultChecked /> Preencher preços PY que estão em branco</label>
+                <button className="principal">Importar custos</button>
+              </form>
+            ) : <p className="pequeno suave">Só gerente ou dono importa custos.</p>}
+          </section>
           <section className="painel">
             <h2>Imposto, entrega e outros custos do Paraguai</h2>
             <div className="tabela"><table style={{ minWidth: 0 }}>
