@@ -17,7 +17,7 @@ export default async function Precificacao({ searchParams }: { searchParams: Pro
   const d = await comUsuario(u.id, async (c) => {
     const linhas = (await c.query("select * from app.precificacao_py()")).rows as LinhaPrec[];
     const params = Object.fromEntries((await c.query(`select chave, valor from app.parametros
-      where chave in ('cambio_custo_gs','margem_minima_contribuicao','arredondamento_gs','margem_alvo_normal','margem_alvo_vip')`)).rows.map((r) => [r.chave as string, Number(r.valor)]));
+      where chave in ('cambio_custo_gs','margem_minima_contribuicao','arredondamento_gs','margem_alvo_normal','margem_alvo_vip','frete_padrao_brl')`)).rows.map((r) => [r.chave as string, Number(r.valor)]));
     const custos = (await c.query("select * from app.custos_variaveis_vigentes('PY')")).rows as { tipo: string; base: string; percentual: string | null; valor: string | null; moeda: string | null }[];
     const marcas = (await c.query(`select coalesce(nullif(trim(p.marca), ''), 'Sem marca') marca, count(*)::int n,
         coalesce(mi.gatilho, false) gatilho, coalesce(mi.papel, 'acompanhar') papel, mi.margem_alvo_normal, mi.margem_alvo_vip
@@ -43,14 +43,32 @@ export default async function Precificacao({ searchParams }: { searchParams: Pro
       </section>
       <Avisos ok={f.ok} erro={f.erro} />
 
-      <section className="painel pequeno suave" style={{ gap: 4 }}>
-        <div>
-          Câmbio de custo <b>{premissas.cambio.toLocaleString("pt-BR")} Gs/R$</b> · imposto <b>{imposto.toLocaleString("pt-BR")}%</b> · entrega <b>Gs {entregaCaixa.toLocaleString("es-PY")}</b> por caixa ·
-          margem-alvo padrão <b>Normal {an}% · VIP {av}%</b> · margem mínima <b>{premissas.margemMin}%</b> · <Link href="/parametros">mudar em Parâmetros</Link>
-        </div>
-        <div>Margem = (preço − imposto − custo total) ÷ preço. Preço sugerido = custo total ÷ (1 − imposto − margem-alvo), arredondado para cima em Gs {premissas.arred} e nunca abaixo do mínimo.
-          Custos vieram da planilha PRODUCTOS VC (aba Clientes VIP e abas de cada fornecedor); a origem aparece embaixo do nome.</div>
-      </section>
+      {(() => {
+        // Exemplo fixo para explicar a conta: custo R$ 2,34 + frete, caixa de 12, VIP Gs 6.500
+        const fr = d.params.frete_padrao_brl ?? 0.35, cf = 2.34 + fr, real = cf * premissas.cambio, ent = premissas.entregaCaixa / 12, imp = imposto / 100;
+        const ar = (v: number) => Math.ceil(v / premissas.arred) * premissas.arred;
+        const sv = ar((real + ent) / (1 - imp - av / 100)), sn = ar((real + ent) / (1 - imp - an / 100));
+        const p = (v: number) => `${(v * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
+        const g = (v: number) => Math.round(v).toLocaleString("es-PY");
+        return (
+          <section className="painel" style={{ gap: 6 }}>
+            <h2 style={{ margin: 0 }}>Como o motor calcula</h2>
+            <div className="tabela"><table style={{ minWidth: 0 }}>
+              <thead><tr><th>Passo</th><th>Conta</th><th>Exemplo (custo R$ 2,34, caixa de 12)</th></tr></thead>
+              <tbody>
+                <tr><td>1. Custo com frete</td><td>custo + frete por produto (padrão R$ {fr.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}; Maycrene R$ 0,80; kit = frete × nº de produtos)</td><td>R$ {cf.toFixed(2).replace(".", ",")}</td></tr>
+                <tr><td>2. Em guaranis</td><td>× câmbio de custo {premissas.cambio.toLocaleString("pt-BR")}</td><td>Gs {g(real)}</td></tr>
+                <tr><td>3. Margem de lucro</td><td>(preço − custo com frete) ÷ preço — igual à planilha Clientes VIP</td><td>VIP Gs 6.500 → {p((6500 - real) / 6500)}</td></tr>
+                <tr><td>4. Margem líquida</td><td>tira imposto {imposto.toLocaleString("pt-BR")}% e entrega Gs {g(premissas.entregaCaixa)} ÷ peças da caixa</td><td>{p((6500 * (1 - imp) - real - ent) / 6500)}</td></tr>
+                <tr><td>5. Preço mínimo</td><td>abaixo dele a venda dá prejuízo (margem líquida {premissas.margemMin}%)</td><td>Gs {g(ar((real + ent) / (1 - imp - premissas.margemMin / 100)))}</td></tr>
+                <tr><td>6. Motor sugere</td><td>preço para ter margem líquida de {an}% no Normal e {av}% no VIP, arredondado em Gs {premissas.arred}</td>
+                  <td>Normal Gs {g(sn)} (lucro {p((sn - real) / sn)}) · VIP Gs {g(sv)} (lucro {p((sv - real) / sv)})</td></tr>
+              </tbody>
+            </table></div>
+            <div className="pequeno suave">Na tabela, cada preço mostra a <b>margem de lucro</b> em negrito e a líquida ao lado. Câmbio, frete padrão e margens-alvo: <Link href="/parametros">Parâmetros</Link>; margem por marca: quadro “Marcas do motor”.</div>
+          </section>
+        );
+      })()}
 
       <details className="painel">
         <summary><b>Marcas do motor</b> <span className="pequeno suave">({noMotor.length} marcada(s){noMotor.length ? ": " + noMotor.map((m) => m.marca).join(", ") : ""}) · margem-alvo própria por marca</span></summary>

@@ -22,3 +22,15 @@ select teste.ok((select (app.importar_custos('[{"codigo":"CUS-B","custo":4.5,"or
 select teste.ok((select planilha_custo is null and custo_origem = 'Editado na precificação' from app.precificacao_py() where codigo = 'CUS-B'),
   'Depois de usar o custo da planilha a dica some e a origem fica registrada');
 \echo '== Testes de precificação passaram =='
+
+\echo '== Frete padrão e kits =='
+reset role;
+insert into app.produtos (id, codigo, nome, marca) values
+  ('00000000-0000-0000-0000-00000000c601', 'FRE-1', 'Creme Maycrene', 'MAYCRENE'),
+  ('00000000-0000-0000-0000-00000000c602', 'FRE-2', 'Kit Maycrene Biotina (Shampoo + Condicionador + Máscara)', 'MAYCRENE'),
+  ('00000000-0000-0000-0000-00000000c603', 'FRE-3', 'KIT CAPILAR 2 ITENS ARRUDA', 'MARCA SEM FRETE');
+insert into app.frete_marca (marca, frete_unidade_brl) values ('MAYCRENE', 0.80) on conflict (marca) do update set frete_unidade_brl = 0.80;
+select teste.ok(app.frete_produto('00000000-0000-0000-0000-00000000c601') = 0.80, 'Maycrene: R$ 0,80 por produto');
+select teste.ok(app.frete_produto('00000000-0000-0000-0000-00000000c602') = 2.40, 'Kit Maycrene de 3 produtos: 3 × 0,80');
+select teste.ok(app.frete_produto('00000000-0000-0000-0000-00000000c603') = 0.70, 'Kit de 2 itens sem frete da marca: 2 × padrão 0,35');
+\echo '== Testes de frete passaram =='

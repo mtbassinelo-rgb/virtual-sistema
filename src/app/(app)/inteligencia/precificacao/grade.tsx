@@ -50,8 +50,11 @@ function calcular(l: LinhaPrec, e: Edit, p: Premissas) {
   const minimo = base != null && 1 - imp - p.margemMin / 100 > 0 ? arred(base / (1 - imp - p.margemMin / 100)) : null;
   const sug = (alvo: number) => (base != null && 1 - imp - alvo > 0 ? Math.max(minimo ?? 0, arred(base / (1 - imp - alvo))) : null);
   const contrib = (pr: number | null) => (pr && base != null ? (pr * (1 - imp) - base) / pr : null);
-  return { custo, frete, caixa, normal, vip, real, base, minimo, sugN: sug(Number(l.alvo_normal)), sugV: sug(Number(l.alvo_vip)),
-    mN: contrib(normal), mV: contrib(vip), semFrete: frete == null };
+  const lucro = (pr: number | null) => (pr && real != null ? (pr - real) / pr : null);
+  const sugN = sug(Number(l.alvo_normal)), sugV = sug(Number(l.alvo_vip));
+  return { custo, frete, caixa, normal, vip, real, base, minimo, sugN, sugV, custoFrete: custo != null ? custo + (frete ?? 0) : null,
+    mN: contrib(normal), mV: contrib(vip), lN: lucro(normal), lV: lucro(vip), lSN: lucro(sugN), lSV: lucro(sugV), mSN: contrib(sugN), mSV: contrib(sugV),
+    semFrete: frete == null };
 }
 
 export function GradePrecificacao({ linhas, premissas, acao }: {
@@ -172,10 +175,11 @@ export function GradePrecificacao({ linhas, premissas, acao }: {
             <th>Produto</th>
             <th title="Custo por unidade em R$, sem frete">Custo R$</th>
             <th title="Frete de compra por unidade em R$">Frete R$</th>
+            <th title="Custo + frete, em R$ e convertido no câmbio de custo">Custo c/ frete</th>
             <th title="Peças por caixa (a entrega do pasero é por caixa)">Caixa</th>
-            <th title="(Custo + frete) × câmbio + entrega por unidade">Custo total Gs</th>
-            <th>Normal Gs</th><th>VIP Gs</th>
-            <th title="Pela margem-alvo, nunca abaixo do preço mínimo">Sugerido Normal / VIP</th>
+            <th>Preço Normal Gs<div className="pequeno suave">margem de lucro</div></th>
+            <th>Preço VIP Gs<div className="pequeno suave">margem de lucro</div></th>
+            <th title="Preço que o motor recomenda pela margem-alvo, nunca abaixo do mínimo">Motor sugere<div className="pequeno suave">preço e margem</div></th>
             <th>Vendido 90d</th><th>Situação</th>
           </tr></thead>
           <tbody>{visiveis.map((l) => {
@@ -204,26 +208,27 @@ export function GradePrecificacao({ linhas, premissas, acao }: {
                   <input className={cls("frete")} value={val("frete", brl(num(l.frete_brl)))} inputMode="decimal" placeholder="—"
                     onChange={(ev) => editar(l.produto_id, "frete", ev.target.value)} aria-label={`Frete de ${l.nome}`} />
                 </td>
+                <td className="num" style={{ whiteSpace: "nowrap" }}>{c.custoFrete == null ? "—" : <><b>R$ {brl(c.custoFrete)}</b><div className="pequeno suave">Gs {gsTxt(c.real)}</div></>}</td>
                 <td style={{ width: 70 }}>
                   <input className={cls("caixa")} value={val("caixa", l.caixa ? String(l.caixa) : "")} inputMode="numeric" placeholder="—"
                     onChange={(ev) => editar(l.produto_id, "caixa", ev.target.value)} aria-label={`Peças por caixa de ${l.nome}`} />
                 </td>
-                <td className="num">{gsTxt(c.base)}<div className="pequeno suave">mín. {gsTxt(c.minimo)}</div></td>
                 <td style={{ width: 120 }}>
                   <input className={cls("normal")} value={val("normal", l.preco_normal ? String(Math.round(Number(l.preco_normal))) : "")} inputMode="numeric" placeholder="—"
                     onChange={(ev) => editar(l.produto_id, "normal", ev.target.value)} aria-label={`Preço Normal de ${l.nome}`} />
-                  <div className="pequeno" style={{ color: corM(c.mN) }}>margem {pctTxt(c.mN)}</div>
+                  <div className="pequeno" style={{ color: corM(c.mN) }}><b>{pctTxt(c.lN)}</b> <span className="suave">líq. {pctTxt(c.mN)}</span></div>
                 </td>
                 <td style={{ width: 120 }}>
                   <input className={cls("vip")} value={val("vip", l.preco_vip ? String(Math.round(Number(l.preco_vip))) : "")} inputMode="numeric" placeholder="—"
                     onChange={(ev) => editar(l.produto_id, "vip", ev.target.value)} aria-label={`Preço VIP de ${l.nome}`} />
-                  <div className="pequeno" style={{ color: corM(c.mV) }}>margem {pctTxt(c.mV)}</div>
+                  <div className="pequeno" style={{ color: corM(c.mV) }}><b>{pctTxt(c.lV)}</b> <span className="suave">líq. {pctTxt(c.mV)}</span></div>
                 </td>
                 <td className="num" style={{ whiteSpace: "nowrap" }}>
                   {c.sugN == null ? <span className="pequeno suave">{c.custo == null ? "falta custo" : !c.caixa ? "falta caixa" : "—"}</span> : <>
-                    {gsTxt(c.sugN)} / {gsTxt(c.sugV)}
+                    <div>Normal <b>{gsTxt(c.sugN)}</b> <span className="pequeno">{pctTxt(c.lSN)}</span></div>
+                    <div>VIP <b>{gsTxt(c.sugV)}</b> <span className="pequeno">{pctTxt(c.lSV)}</span></div>
                     <div><button type="button" className="pequeno" style={{ padding: "1px 6px" }} onClick={() => usarSugestao([l])}>Usar</button>
-                      <span className="pequeno suave"> alvo {pctTxt(Number(l.alvo_normal))}/{pctTxt(Number(l.alvo_vip))}</span></div>
+                      <span className="pequeno suave"> mín. {gsTxt(c.minimo)}</span></div>
                   </>}
                 </td>
                 <td className="num">{Number(l.vendido_90).toLocaleString("pt-BR")}</td>
