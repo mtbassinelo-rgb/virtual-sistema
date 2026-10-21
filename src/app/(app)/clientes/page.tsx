@@ -3,21 +3,24 @@ import { exigirUsuario, ehGestao, podeEscrever } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
 import { dinheiro, data, type Moeda } from "@/lib/formato";
 import { Avisos, Selo } from "../avisos";
-import { criarCliente } from "./acoes";
+import { criarCliente, decidirCompraUnidade } from "./acoes";
 
 export const metadata = { title: "Clientes" };
 
-export default async function Clientes({ searchParams }: { searchParams: Promise<{ q?: string; vendedora?: string; erro?: string }> }) {
+export default async function Clientes({ searchParams }: { searchParams: Promise<{ q?: string; vendedora?: string; compra?: string; erro?: string; ok?: string }> }) {
   const u = await exigirUsuario();
   const f = await searchParams;
   const par: unknown[] = [];
   const cond = ["c.mesclado_em is null"];
   if (f.q) { par.push(`%${f.q}%`); cond.push(`(c.nome ilike $${par.length} or c.whatsapp ilike $${par.length} or c.telefone ilike $${par.length})`); }
   if (f.vendedora) { par.push(f.vendedora); cond.push(`c.vendedora_id = $${par.length}::uuid`); }
+  if (f.compra === "aguardando") cond.push("c.compra_unidade_sugerido_em is not null and not c.compra_unidade and c.categoria_preco = 'normal'");
+  if (f.compra === "unidade") cond.push("c.compra_unidade and c.categoria_preco = 'normal'");
+  if (f.compra === "caixa") cond.push("not (c.compra_unidade and c.categoria_preco = 'normal')");
 
   const d = await comUsuario(u.id, async (c) => ({
     clientes: (await c.query(
-      `select c.id, c.nome, c.cidade, c.pais, c.categoria_preco, c.moeda, v.nome as vendedora,
+      `select c.id, c.nome, c.cidade, c.pais, c.categoria_preco, c.moeda, v.nome as vendedora, c.compra_unidade, c.compra_unidade_sugerido_em,
               x.pedidos, x.total, x.ultima, x.saldo
          from app.clientes c join app.vendedoras v on v.id = c.vendedora_id
          left join lateral (
@@ -26,6 +29,8 @@ export default async function Clientes({ searchParams }: { searchParams: Promise
         where ${cond.join(" and ")}
         order by x.total desc nulls last, c.nome limit 500`, par)).rows,
     vendedoras: (await c.query("select id, nome from app.vendedoras where ativo order by nome")).rows,
+    aguardando: Number((await c.query(`select count(*) n from app.clientes where mesclado_em is null and compra_unidade_sugerido_em is not null
+                                         and not compra_unidade and categoria_preco = 'normal'`)).rows[0].n),
   }));
 
   return (
@@ -33,7 +38,13 @@ export default async function Clientes({ searchParams }: { searchParams: Promise
       <section className="linha entre">
         <div><h1>Clientes</h1><div className="suave pequeno">{d.clientes.length} cliente(s)</div></div>
       </section>
-      <Avisos erro={f.erro} />
+      <Avisos erro={f.erro} ok={f.ok} />
+      {ehGestao(u) && d.aguardando > 0 && f.compra !== "aguardando" && (
+        <div className="painel linha entre" style={{ alignItems: "center" }}>
+          <span><b>{d.aguardando}</b> cliente(s) aguardando sua aprovação para comprar por unidade.</span>
+          <Link className="botao" href="/clientes?compra=aguardando">Ver e aprovar</Link>
+        </div>
+      )}
       <form className="painel campos" method="get">
         <label>Nome ou telefone<input name="q" defaultValue={f.q} /></label>
         {ehGestao(u) && (
@@ -44,16 +55,35 @@ export default async function Clientes({ searchParams }: { searchParams: Promise
             </select>
           </label>
         )}
+        <label>Compra no site
+          <select name="compra" defaultValue={f.compra ?? ""}>
+            <option value="">Todos</option>
+            <option value="aguardando">Aguardando aprovação (unidade)</option>
+            <option value="unidade">Unidade liberada</option>
+            <option value="caixa">Só caixa fechada</option>
+          </select>
+        </label>
         <button className="principal">Buscar</button>
       </form>
 
       {d.clientes.length === 0 ? <div className="painel vazio">Nenhum cliente encontrado.</div> : (
         <div className="tabela"><table>
-          <thead><tr><th>Cliente</th><th>Preço</th>{ehGestao(u) && <th>Vendedora</th>}<th>Pedidos</th><th>Total</th><th>Saldo</th><th>Última compra</th></tr></thead>
+          <thead><tr><th>Cliente</th><th>Preço</th><th>Compra no site</th>{ehGestao(u) && <th>Vendedora</th>}<th>Pedidos</th><th>Total</th><th>Saldo</th><th>Última compra</th></tr></thead>
           <tbody>{d.clientes.map((c) => (
             <tr key={c.id}>
               <td><Link href={`/clientes/${c.id}`}>{c.nome}</Link>{c.cidade && <div className="pequeno suave">{c.cidade}</div>}</td>
               <td><Selo cor={c.categoria_preco === "vip" ? "marca" : ""}>{c.pais} · {c.categoria_preco === "vip" ? "VIP" : "Normal"}</Selo></td>
+              <td>
+                {c.categoria_preco === "vip" || (!c.compra_unidade && !c.compra_unidade_sugerido_em) ? <span className="pequeno suave">Só caixa</span>
+                  : c.compra_unidade ? <Selo cor="ok">Unidade liberada</Selo>
+                  : <div className="linha" style={{ gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                      <Selo cor="aviso">Aguardando gerente</Selo>
+                      {ehGestao(u) && <>
+                        <form action={decidirCompraUnidade}><input type="hidden" name="cliente_id" value={c.id} /><input type="hidden" name="liberar" value="1" /><input type="hidden" name="volta" value="lista" /><button className="principal">Aprovar</button></form>
+                        <form action={decidirCompraUnidade}><input type="hidden" name="cliente_id" value={c.id} /><input type="hidden" name="liberar" value="0" /><input type="hidden" name="volta" value="lista" /><button className="discreto">Recusar</button></form>
+                      </>}
+                    </div>}
+              </td>
               {ehGestao(u) && <td>{c.vendedora}</td>}
               <td className="num">{c.pedidos ?? 0}</td>
               <td className="num">{dinheiro(c.total ?? 0, c.moeda as Moeda)}</td>
@@ -94,6 +124,10 @@ export default async function Clientes({ searchParams }: { searchParams: Promise
                 </select>
               </label>
             )}
+            <label className="largo" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <input type="checkbox" name="pedir_unidade" value="1" style={{ width: "auto" }} />
+              {ehGestao(u) ? "Liberar compra por unidade no site (só preço Normal)" : "Pedir ao gerente compra por unidade no site (só preço Normal; VIP é só caixa fechada)"}
+            </label>
             <label className="largo">Observações<textarea name="observacoes" /></label>
             <button className="principal">Cadastrar</button>
           </form>

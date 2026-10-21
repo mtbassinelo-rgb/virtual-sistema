@@ -7,7 +7,7 @@ import {
   type Moeda,
 } from "@/lib/formato";
 import { Avisos, Barra, Selo } from "../../avisos";
-import { atendimentoCliente, bloquearCliente, compraUnidadeCliente, decidirClienteLocal, definirCredito, depositoCliente, recusarSugestaoCredito, salvarCliente, sugerirClienteLocal, sugerirCredito } from "../acoes";
+import { atendimentoCliente, pedirCompraUnidade, bloquearCliente, decidirCompraUnidade, decidirClienteLocal, definirCredito, depositoCliente, recusarSugestaoCredito, salvarCliente, sugerirClienteLocal, sugerirCredito } from "../acoes";
 import { AcessoCliente } from "./acesso-cliente";
 
 export const metadata = { title: "Cliente" };
@@ -172,16 +172,24 @@ export default async function Cliente({ params, searchParams }: {
               {cli.portal_ativo && d.temAcesso && <form action={bloquearCliente}><input type="hidden" name="cliente_id" value={cli.id} /><button className="perigo">Bloquear acesso</button></form>}
             </div>
           )}
-          {!ro && cli.pais === "BR" && (
-            <form action={compraUnidadeCliente} className="linha" style={{ alignItems: "center", gap: 10 }}>
-              <input type="hidden" name="cliente_id" value={cli.id} />
-              <input type="hidden" name="liberar" value={cli.compra_unidade ? "0" : "1"} />
-              <span className="pequeno">{cli.compra_unidade
-                ? <>✓ <b>Compra por unidade liberada</b>: no site ele escolhe caixa fechada ou unidade.</>
-                : <>Compra no site: <b>só caixa fechada</b>. Pode liberar unidade (sortido) para cliente do Brasil.</>}</span>
-              <button className={cli.compra_unidade ? "discreto" : ""}>{cli.compra_unidade ? "Voltar a só caixa" : "Liberar compra por unidade"}</button>
-            </form>
-          )}
+          {/* Compra por unidade no site: vendedora pede, gerente aprova. Só preço Normal (BR e PY); VIP é sempre caixa fechada. */}
+          <div className="linha" style={{ alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <span className="pequeno">{cli.categoria_preco === "vip"
+              ? <>Compra no site: <b>só caixa fechada</b> (cliente VIP).</>
+              : cli.compra_unidade ? <>✓ <b>Compra por unidade liberada</b>: no site ele escolhe caixa fechada ou unidade.</>
+              : cli.compra_unidade_sugerido_em ? <>Compra por unidade: <b>aguardando o gerente aprovar</b> (pedido em {data(cli.compra_unidade_sugerido_em)}).</>
+              : <>Compra no site: <b>só caixa fechada</b>.</>}</span>
+            {!ro && cli.categoria_preco !== "vip" && (gestao ? (
+              cli.compra_unidade
+                ? <form action={decidirCompraUnidade}><input type="hidden" name="cliente_id" value={cli.id} /><input type="hidden" name="liberar" value="0" /><button className="discreto">Voltar a só caixa</button></form>
+                : <>
+                    <form action={decidirCompraUnidade}><input type="hidden" name="cliente_id" value={cli.id} /><input type="hidden" name="liberar" value="1" /><button className="principal">{cli.compra_unidade_sugerido_em ? "Aprovar compra por unidade" : "Liberar compra por unidade"}</button></form>
+                    {cli.compra_unidade_sugerido_em && <form action={decidirCompraUnidade}><input type="hidden" name="cliente_id" value={cli.id} /><input type="hidden" name="liberar" value="0" /><button className="discreto">Recusar</button></form>}
+                  </>
+            ) : !cli.compra_unidade && !cli.compra_unidade_sugerido_em && (
+              <form action={pedirCompraUnidade}><input type="hidden" name="cliente_id" value={cli.id} /><button>Pedir compra por unidade ao gerente</button></form>
+            ))}
+          </div>
           {!ro && cli.pais === "PY" && (
             <div className="linha" style={{ alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <span className="pequeno">{cli.cliente_local

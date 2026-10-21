@@ -31,9 +31,18 @@ export async function criarCliente(fd: FormData) {
   } catch (e) {
     erro = mensagemErro(e);
   }
+  let extra = "";
+  if (!erro && texto(fd, "pedir_unidade") === "1" && (texto(fd, "categoria_preco") || "normal") === "normal") {
+    try {
+      const r = await comUsuario(u.id, async (c) => String((await c.query("select app.sugerir_compra_unidade($1) r", [id])).rows[0].r));
+      extra = r === "sugerido" ? " Compra por unidade enviada para o gerente aprovar." : " Compra por unidade liberada.";
+    } catch (e) {
+      extra = " Não foi possível pedir a compra por unidade: " + mensagemErro(e);
+    }
+  }
   if (erro) redirect(`/clientes?erro=${encodeURIComponent(erro)}`);
   revalidatePath("/clientes");
-  redirect(`/clientes/${id}?ok=${encodeURIComponent("Cliente cadastrado.")}`);
+  redirect(`/clientes/${id}?ok=${encodeURIComponent("Cliente cadastrado." + extra)}`);
 }
 
 export async function salvarCliente(fd: FormData) {
@@ -117,20 +126,36 @@ export async function depositoCliente(fd: FormData) {
   redirect(`/clientes/${id}?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Depósito do cliente atualizado.")}`);
 }
 
-/** Libera (ou não) o cliente para comprar por unidade no site, sem ser só caixa fechada. */
-export async function compraUnidadeCliente(fd: FormData) {
+/** Compra por unidade no site: a vendedora pede ao gerente; gerente ou dono libera direto. Só cliente de preço Normal (BR ou PY). */
+export async function pedirCompraUnidade(fd: FormData) {
+  const u = await exigirUsuario();
+  const id = texto(fd, "cliente_id");
+  let erro: string | null = null, r = "";
+  try {
+    r = await comUsuario(u.id, async (c) => String((await c.query("select app.sugerir_compra_unidade($1) r", [id])).rows[0].r));
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  revalidatePath(`/clientes/${id}`);
+  revalidatePath("/clientes");
+  redirect(`/clientes/${id}?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent(r === "sugerido" ? "Pedido enviado ao gerente: ele aprova a compra por unidade." : "Cliente liberado para comprar por unidade no site.")}`);
+}
+
+/** Gestão aprova ou recusa o pedido da vendedora, ou volta o cliente para só caixa fechada. */
+export async function decidirCompraUnidade(fd: FormData) {
   const u = await exigirUsuario();
   const id = texto(fd, "cliente_id");
   const liberar = texto(fd, "liberar") === "1";
   let erro: string | null = null;
   try {
-    const r = await comUsuario(u.id, (c) => c.query("update app.clientes set compra_unidade = $2 where id = $1 and (pais = 'BR' or not $2)", [id, liberar]));
-    if (!r.rowCount) throw new Error("Compra por unidade é só para clientes do Brasil (em reais). Cliente do Paraguai compra sempre caixa fechada.");
+    await comUsuario(u.id, (c) => c.query("select app.decidir_compra_unidade($1, $2)", [id, liberar]));
   } catch (e) {
     erro = mensagemErro(e);
   }
   revalidatePath(`/clientes/${id}`);
-  redirect(`/clientes/${id}?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent(liberar ? "Cliente liberado para comprar por unidade no site." : "Cliente volta a comprar só caixa fechada.")}`);
+  revalidatePath("/clientes");
+  const destino = texto(fd, "volta") === "lista" ? "/clientes?compra=aguardando&" : `/clientes/${id}?`;
+  redirect(`${destino}${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent(liberar ? "Compra por unidade liberada." : "Cliente compra só caixa fechada.")}`);
 }
 
 /** Retire em Foz: a vendedora sugere o cliente como local (da região); gerente ou dono marca direto. */

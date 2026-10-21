@@ -163,4 +163,22 @@ select teste.ok((select desconto from app.simular_retirada_foz(current_date - 30
 reset role;
 update app.parametros set valor = 0 where chave = 'retirada_foz_teto_mes';
 
+\echo '== Compra por unidade: vendedora pede, gerente aprova; VIP só caixa =='
+select categoria_preco as cat_c1 from app.clientes where id = '00000000-0000-0000-0000-0000000000c1' \gset
+update app.clientes set categoria_preco = 'normal', compra_unidade = false where id = '00000000-0000-0000-0000-0000000000c1';
+set role vc_app;
+select teste.como(:'KEILA');
+select teste.ok(app.sugerir_compra_unidade('00000000-0000-0000-0000-0000000000c1') = 'sugerido', 'Vendedora pede compra por unidade');
+select teste.ok((select not compra_unidade and compra_unidade_sugerido_em is not null from app.clientes where id = '00000000-0000-0000-0000-0000000000c1'), 'Pedido espera o gerente');
+select teste.falha($$select app.decidir_compra_unidade('00000000-0000-0000-0000-0000000000c1', true)$$, 'gerente ou dono', 'Vendedora não aprova');
+select teste.falha($$update app.clientes set compra_unidade = true where id = '00000000-0000-0000-0000-0000000000c1'$$, 'gerente ou dono', 'Vendedora não libera direto');
+select teste.como(:'GERENTE');
+select app.decidir_compra_unidade('00000000-0000-0000-0000-0000000000c1', true);
+select teste.ok((select compra_unidade and compra_unidade_sugerido_em is null from app.clientes where id = '00000000-0000-0000-0000-0000000000c1'), 'Gerente aprova a compra por unidade');
+update app.clientes set categoria_preco = 'vip' where id = '00000000-0000-0000-0000-0000000000c1';
+select teste.ok((select not compra_unidade from app.clientes where id = '00000000-0000-0000-0000-0000000000c1'), 'Cliente que vira VIP volta a só caixa');
+select teste.falha($$select app.decidir_compra_unidade('00000000-0000-0000-0000-0000000000c1', true)$$, 'VIP', 'VIP não é liberado para unidade');
+reset role;
+update app.clientes set categoria_preco = :'cat_c1' where id = '00000000-0000-0000-0000-0000000000c1';
+
 \echo '== Testes da inteligência comercial passaram =='
