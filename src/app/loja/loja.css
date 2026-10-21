@@ -577,3 +577,14 @@
   .filtros .sublinhas { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--linha-l); }
   .filtros .sublinhas a { font-size: .86rem; padding: 6px 10px 6px 18px; }
 }
+
+/* Retire em Foz no fechamento do pedido */
+.g-entrega { border: 0; padding: 0; margin: 4px 0 6px; display: grid; gap: 6px; }
+.g-entrega legend { font-weight: 700; font-size: .9rem; margin-bottom: 4px; }
+.g-entrega label { display: flex; gap: 8px; align-items: flex-start; border: 1.5px solid var(--linha-l); border-radius: 12px; padding: 9px 11px; cursor: pointer; background: var(--papel); }
+.g-entrega label.marcada { border-color: var(--roxo); background: var(--roxo-suave); }
+.g-entrega label.destaque b { color: var(--roxo); }
+.g-entrega input { margin-top: 3px; accent-color: var(--roxo); }
+.g-entrega small { display: block; color: var(--apagado); font-size: .78rem; }
+.g-economia { font-style: normal; font-weight: 800; font-size: .8rem; background: var(--verde); color: var(--verde-tinta); border-radius: 999px; padding: 1px 8px; margin-left: 4px; white-space: nowrap; }
+.g-total-ret b { color: var(--roxo); }

@@ -3,7 +3,7 @@ import { ehGestao, exigirUsuario } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
 import { data, dinheiro, pct } from "@/lib/formato";
 import { Avisos, Selo } from "../avisos";
-import { excluirCompra, importarCustos, registrarCompra, salvarCustoVariavel, salvarFornecedor, salvarFreteMarca } from "./acoes";
+import { excluirCompra, importarCustos, ligarRetirada, registrarCompra, salvarCustoVariavel, salvarFornecedor, salvarFreteMarca, salvarRetiradaMarcas } from "./acoes";
 import { decidirClienteLocal } from "../clientes/acoes";
 
 export const metadata = { title: "Inteligência comercial" };
@@ -21,7 +21,7 @@ const ABAS = [
   { k: "rentabilidade", t: "Rentabilidade PY", d: "Margem bruta, margem de contribuição e preço mínimo por produto, nas tabelas Normal e VIP do Paraguai. Só leitura: nada aqui muda preço." },
   { k: "classificacao", t: "Classificação", d: "Cada produto do Paraguai classificado em atração, rentabilidade, diferenciação ou estoque parado, com uma recomendação. Recalculado ao abrir; uma foto por dia fica guardada para comparar." },
   { k: "compras", t: "Compras e fornecedores", d: "Compras com frete e câmbio, por mês, e o prazo de reposição de cada fornecedor." },
-  { k: "retirada", t: "Retire em Foz", d: "Clientes locais do Paraguai que podem retirar no CD Foz e a simulação do desconto por caixa retirada. Em simulação: o cliente ainda não vê a opção." },
+  { k: "retirada", t: "Retire em Foz", d: "Clientes locais do Paraguai que podem retirar no CD Foz e a simulação do desconto por caixa retirada. O cliente local escolhe Entrega ou Retirar em Foz ao fechar o pedido; aqui você escolhe as marcas com desconto." },
   { k: "custos", t: "Custos e frete", d: "Frete de compra por marca, imposto e entrega usados nos cálculos. Cada mudança fica na auditoria." },
 ];
 
@@ -91,6 +91,11 @@ export default async function Inteligencia({ searchParams }: {
       locais: (await c.query(`select c.id, c.nome, v.nome vendedora from app.clientes c join app.vendedoras v on v.id = c.vendedora_id
           where c.cliente_local and c.mesclado_em is null order by c.nome`)).rows,
       sim: (await c.query("select * from app.simular_retirada_foz((date_trunc('month', current_date) - interval '5 months')::date, current_date)")).rows,
+      marcas: (await c.query(`select m.marca, coalesce(r.aplica, true) aplica, m.produtos
+          from (select marca, count(*)::int produtos from app.produtos where ativo and marca is not null group by marca) m
+          left join app.retirada_foz_marcas r on r.marca = m.marca order by m.marca`)).rows as { marca: string; aplica: boolean; produtos: number }[],
+      pedidos: (await c.query(`select count(*)::int n, coalesce(sum(retirada_foz_desconto), 0) desconto from app.pedidos
+          where retirada_foz and date_trunc('month', data_pedido) = date_trunc('month', current_date)`)).rows[0] as { n: number; desconto: string },
     } : null,
     params: Object.fromEntries((await c.query("select chave, valor from app.parametros where chave in ('margem_alvo_normal','margem_alvo_vip','sugestao_tolerancia_pct','cambio_custo_gs','cambio_compra_gs','margem_minima_contribuicao','retirada_foz_desconto_caixa','retirada_foz_teto_mes','retirada_foz_ativa')")).rows
       .map((r) => [r.chave as string, Number(r.valor)])),
@@ -407,13 +412,38 @@ export default async function Inteligencia({ searchParams }: {
       {aba.k === "retirada" && d.retirada && (
         <>
           <section className="indicadores">
-            <div className="indicador"><span className="rotulo">Situação</span><span className="valor">{d.params.retirada_foz_ativa === 1 ? "Ativo na loja" : "Simulação"}</span>
-              <span className="pequeno suave">A opção no pedido da loja entra na próxima etapa</span></div>
+            <div className="indicador"><span className="rotulo">Situação</span><span className="valor">{d.params.retirada_foz_ativa === 1 ? "Ativo na loja" : "Desligado"}</span>
+              <span className="pequeno suave">{d.params.retirada_foz_ativa === 1 ? "O cliente local escolhe Entrega ou Retirar em Foz ao fechar o pedido" : "O cliente não vê a opção"}</span>
+              {gerir && <form action={ligarRetirada} style={{ marginTop: 6 }}><input type="hidden" name="ligar" value={d.params.retirada_foz_ativa === 1 ? "0" : "1"} />
+                <button className={d.params.retirada_foz_ativa === 1 ? "discreto" : "principal"}>{d.params.retirada_foz_ativa === 1 ? "Desligar na loja" : "Ligar na loja"}</button></form>}</div>
+            <div className="indicador"><span className="rotulo">Retiradas este mês</span><span className="valor">{d.retirada.pedidos.n}</span>
+              <span className="pequeno suave">{gs(d.retirada.pedidos.desconto)} de desconto dado</span></div>
             <div className="indicador"><span className="rotulo">Desconto por caixa retirada</span><span className="valor">{gs(d.params.retirada_foz_desconto_caixa)}</span>
               <span className="pequeno suave">Pasero cobra {entregaCaixa ? gs(entregaCaixa.valor) : "—"} por caixa</span></div>
             <div className="indicador"><span className="rotulo">Teto por mês</span><span className="valor">{d.params.retirada_foz_teto_mes ? gs(d.params.retirada_foz_teto_mes) : "Sem teto"}</span></div>
             <div className="indicador"><span className="rotulo">Clientes locais</span><span className="valor">{d.retirada.locais.length}</span>
               <span className="pequeno suave">{d.retirada.pendentes.length} sugestão(ões) esperando</span></div>
+          </section>
+
+          <section className="painel">
+            <h2>Marcas com desconto de retirada</h2>
+            <p className="pequeno suave" style={{ margin: 0 }}>Marcadas = o cliente local que retira em Foz ganha o desconto por caixa nessa marca. Desmarque as marcas em que o preço
+              já é igual para todos e não deve ter desconto (ex.: deixar Soul com desconto e tirar Rhenuks). Marca nova entra marcada.</p>
+            {gerir ? (
+              <form action={salvarRetiradaMarcas}>
+                <div className="linha" style={{ flexWrap: "wrap", gap: "6px 18px", margin: "10px 0" }}>
+                  {d.retirada.marcas.map((m) => (
+                    <label key={m.marca} className="pequeno" style={{ flexDirection: "row", gap: 6, alignItems: "center", minWidth: 220 }}>
+                      <input type="hidden" name="marca" value={m.marca} /><input type="hidden" name="antes" value={`${m.marca}|${m.aplica ? 1 : 0}`} />
+                      <input type="checkbox" name="aplica" value={m.marca} defaultChecked={m.aplica} /> {m.marca} <span className="suave">({m.produtos})</span>
+                    </label>
+                  ))}
+                </div>
+                <button className="principal">Salvar marcas</button>
+              </form>
+            ) : (
+              <p className="pequeno">Sem desconto: {d.retirada.marcas.filter((m) => !m.aplica).map((m) => m.marca).join(", ") || "nenhuma (todas com desconto)"}</p>
+            )}
           </section>
 
           <section className="painel">

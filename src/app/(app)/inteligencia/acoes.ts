@@ -169,3 +169,40 @@ export async function salvarMarcaInteligencia(fd: FormData) {
   revalidatePath("/inteligencia/precificacao");
   redirect(`/inteligencia/precificacao?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Marca salva no motor.")}`);
 }
+
+/** Retire em Foz: em quais marcas o desconto por caixa vale (ex.: Soul sim, Rhenuks não). */
+export async function salvarRetiradaMarcas(fd: FormData) {
+  const u = await exigirUsuario();
+  let erro: string | null = null, n = 0;
+  try {
+    if (!ehGestao(u)) throw new Error("Só gerente ou dono escolhe as marcas.");
+    const marcas = fd.getAll("marca").map(String).filter(Boolean);
+    const comDesconto = new Set(fd.getAll("aplica").map(String));
+    const antes = new Map(fd.getAll("antes").map(String).map((x) => [x.split("|")[0], x.split("|")[1] === "1"] as const));
+    await comUsuario(u.id, async (c) => {
+      for (const m of marcas) {
+        const aplica = comDesconto.has(m);
+        if (antes.get(m) === aplica) continue;
+        await c.query("select app.definir_retirada_foz_marca($1, $2)", [m, aplica]);
+        n++;
+      }
+    });
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  voltar("retirada", erro, n ? `${n} marca(s) atualizada(s).` : "Nada mudou nas marcas.");
+}
+
+/** Liga ou desliga a opção Retire em Foz na loja (o cliente local escolhe ao fechar o pedido). */
+export async function ligarRetirada(fd: FormData) {
+  const u = await exigirUsuario();
+  let erro: string | null = null;
+  const ligar = texto(fd, "ligar") === "1";
+  try {
+    if (!ehGestao(u)) throw new Error("Só gerente ou dono liga ou desliga.");
+    await comUsuario(u.id, (c) => c.query("update app.parametros set valor = $1 where chave = 'retirada_foz_ativa'", [ligar ? 1 : 0]));
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  voltar("retirada", erro, ligar ? "Retire em Foz ligado: os clientes locais já veem a opção ao fechar o pedido." : "Retire em Foz desligado na loja.");
+}

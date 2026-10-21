@@ -163,6 +163,34 @@ select teste.ok((select desconto from app.simular_retirada_foz(current_date - 30
 reset role;
 update app.parametros set valor = 0 where chave = 'retirada_foz_teto_mes';
 
+\echo '== Retire em Foz no fechamento do pedido =='
+insert into app.portal_sessoes (token_hash, cliente_id, expira_em) values ('teste-retirada', '00000000-0000-0000-0000-0000000000c1', now() + interval '1 day'),
+  ('teste-retirada-br', '00000000-0000-0000-0000-0000000000c3', now() + interval '1 day');
+insert into app.pedidos (id, origem, cliente_id, vendedora_id, data_pedido, moeda, valor_total)
+values ('00000000-0000-0000-0000-00000000f202', 'portal', '00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000a1', current_date, 'GS', 168000);
+insert into app.pedido_itens (pedido_id, produto_id, descricao, quantidade, preco_unitario)
+values ('00000000-0000-0000-0000-00000000f202', :'PI1', 'Sebo de Carneiro Teste', 24, 7000);
+set role vc_app;
+select teste.como('');
+select teste.ok(app.portal_retirada_foz('teste-retirada') = 7000, 'Cliente local vê a opção Retirar em Foz com 7.000 Gs por caixa');
+select teste.ok(app.portal_retirada_foz('teste-retirada-br') is null, 'Cliente que não é local não vê a opção');
+select teste.ok(app.portal_aplicar_retirada_foz('teste-retirada', '00000000-0000-0000-0000-00000000f202') between 13950 and 14000, 'Retirando: 2 caixas × 7.000 Gs de desconto (preço por unidade em Gs inteiros)');
+select teste.ok(app.portal_aplicar_retirada_foz('teste-retirada', '00000000-0000-0000-0000-00000000f202') = 0, 'Desconto não é aplicado duas vezes');
+reset role;
+select teste.ok((select retirada_foz and valor_total + retirada_foz_desconto = 168000 and retirada_foz_desconto > 13900 and local_retirada = 'CD Foz do Iguaçu'
+                   from app.pedidos where id = '00000000-0000-0000-0000-00000000f202'), 'Pedido fica marcado para retirar em Foz, com o total já descontado');
+delete from app.portal_sessoes where token_hash in ('teste-retirada', 'teste-retirada-br');
+set role vc_app;
+select teste.como(:'KEILA');
+select teste.falha($$select app.definir_retirada_foz_marca('MARCA INT', false)$$, 'gerente ou dono', 'Vendedora não escolhe as marcas do Retire em Foz');
+select teste.como(:'GERENTE');
+select app.definir_retirada_foz_marca('MARCA INT', false);
+select teste.ok(not app.retirada_foz_marca('MARCA INT') and app.retirada_foz_marca('OUTRA') and 'MARCA INT' = any(app.retirada_foz_marcas_fora()),
+  'Gerente tira a marca do desconto; marcas fora da lista continuam com desconto');
+select teste.ok((select coalesce(sum(caixas), 0) = 0 from app.simular_retirada_foz(current_date - 30, current_date)), 'Simulação ignora a marca sem desconto');
+select app.definir_retirada_foz_marca('MARCA INT', true);
+reset role;
+
 \echo '== Compra por unidade: vendedora pede, gerente aprova; VIP só caixa =='
 select categoria_preco as cat_c1 from app.clientes where id = '00000000-0000-0000-0000-0000000000c1' \gset
 update app.clientes set categoria_preco = 'normal', compra_unidade = false where id = '00000000-0000-0000-0000-0000000000c1';

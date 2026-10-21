@@ -108,9 +108,12 @@ export async function enviarCarrinho(_: RespostaCarrinho, fd: FormData): Promise
         [sha256(t!), JSON.stringify(itens.map(({ produto_id, quantidade, encomenda }) => ({ produto_id, quantidade, encomenda: !!encomenda }))), obs])).rows[0].id;
       // desconto por quantidade (levando N caixas da marca) e registro para o funil de vendas
       await pool.query("select app.portal_aplicar_desconto_quantidade($1, $2)", [sha256(t!), ped]).catch(() => undefined);
+      // Retire em Foz: o cliente local escolheu retirar no CD Foz → desconto por caixa
+      const retirar = texto(fd, "entrega") === "retirar";
+      const descRet = retirar ? Number((await pool.query("select app.portal_aplicar_retirada_foz($1, $2) as d", [sha256(t!), ped]).catch(() => ({ rows: [{ d: 0 }] }))).rows[0]?.d ?? 0) : 0;
       await pool.query("select app.registrar_evento_site('pedido', null, $1, null, null, null, null)", [sha256(t!)]).catch(() => undefined);
       await avisarEquipe(`Pedido novo pela área do cliente: ${cliente.nome}`,
-        `Cliente: ${cliente.nome}\nVendedora: ${cliente.vendedora}\n\n${await listaTexto(itens)}${obs ? "\n\nObs.: " + obs : ""}`).catch(() => undefined);
+        `Cliente: ${cliente.nome}\nVendedora: ${cliente.vendedora}${retirar ? `\nRETIRA EM FOZ (desconto Gs ${Math.round(descRet).toLocaleString("es-PY")})` : ""}\n\n${await listaTexto(itens)}${obs ? "\n\nObs.: " + obs : ""}`).catch(() => undefined);
       return { url: "/loja/pedidos?novo=1&ok=" + encodeURIComponent("Pedido enviado! A vendedora confere e avisa o total para pagamento.") };
     } catch (e) {
       const msg = `Olá, ${cliente.vendedora}! Sou ${cliente.nome}. Quero fazer este pedido:\n${await listaTexto(itens)}${obs ? "\nObs.: " + obs : ""}`;
@@ -148,10 +151,28 @@ export async function enviarCarrinho(_: RespostaCarrinho, fd: FormData): Promise
   }
 }
 
+export type RetiradaFoz = { desconto: number; fora: string[]; t: { titulo: string; entrega: string; entregaNota: string; retirar: string; economia: string; nota: string; total: string } };
+
+/** Retire em Foz: só para o cliente local (Paraguai) com a opção ligada. null = a opção não aparece. */
+export async function retiradaDoCliente(): Promise<RetiradaFoz | null> {
+  const tk = await tokenCliente();
+  if (!tk) return null;
+  const r = (await pool.query("select app.portal_retirada_foz($1) as d, app.retirada_foz_marcas_fora() as fora", [sha256(tk)]).catch(() => ({ rows: [] }))).rows[0];
+  if (!r?.d) return null;
+  const es = (await idiomaAtual()) === "es";
+  return {
+    desconto: Number(r.d), fora: (r.fora ?? []) as string[],
+    t: es ? { titulo: "¿Cómo quiere recibir?", entrega: "Envío (pasero)", entregaNota: "Llevamos hasta usted", retirar: "Retirar en Foz", economia: "ahorre 9999",
+              nota: "Retire en el CD de Foz do Iguaçu y gane descuento por caja. Su vendedora le avisa cuándo está listo.", total: "Total con descuento" }
+       : { titulo: "Como quer receber?", entrega: "Entrega (pasero)", entregaNota: "Levamos até você", retirar: "Retirar em Foz", economia: "economize 9999",
+              nota: "Retire no CD de Foz do Iguaçu e ganhe desconto por caixa. A vendedora avisa quando estiver pronto.", total: "Total com desconto" },
+  };
+}
+
 /** Cliente logado agora (o carrinho confere ao abrir, para não pedir nome/WhatsApp de quem já entrou). */
-export async function clienteDoCarrinho(): Promise<{ nome: string; vendedora: string; moeda: "GS" | "BRL" } | null> {
+export async function clienteDoCarrinho(): Promise<{ nome: string; vendedora: string; moeda: "GS" | "BRL"; retirada: RetiradaFoz | null } | null> {
   const c = await clienteAtual();
-  return c ? { nome: c.nome, vendedora: c.vendedora, moeda: c.moeda as "GS" | "BRL" } : null;
+  return c ? { nome: c.nome, vendedora: c.vendedora, moeda: c.moeda as "GS" | "BRL", retirada: await retiradaDoCliente() } : null;
 }
 
 export type RespostaProcura = { ok?: string; erro?: string };

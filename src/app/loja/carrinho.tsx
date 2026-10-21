@@ -1,12 +1,12 @@
 "use client";
 
 import { createContext, useActionState, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { clienteDoCarrinho, enviarCarrinho, guardarCarrinho, itensParaRepetir, sugestoesCompreJunto, type RespostaCarrinho, type Sugestao } from "./acoes";
+import { clienteDoCarrinho, enviarCarrinho, guardarCarrinho, itensParaRepetir, sugestoesCompreJunto, type RespostaCarrinho, type RetiradaFoz, type Sugestao } from "./acoes";
 import type { TextosCarrinho } from "@/lib/idioma";
 
 /** qtd = caixas fechadas quando o produto tem "caixa" (peças por caixa); senão, unidades. preco = por unidade. */
 export type ItemCarrinho = { id: string; produto?: string; marcaDb?: string | null; nome: string; marca: string | null; preco: number | null; qtd: number; limite?: number | null; caixa?: number | null; encomenda?: boolean };
-export type ClienteCarrinho = { nome: string; vendedora: string; moeda: "GS" | "BRL" } | null;
+export type ClienteCarrinho = { nome: string; vendedora: string; moeda: "GS" | "BRL"; retirada?: RetiradaFoz | null } | null;
 export type DescontoQtd = { marca: string | null; min_qtd: number; desconto_pct: number; pais: "BR" | "PY" | null };
 
 /** Id anônimo do navegador (só para contar visitas e carrinhos no funil de vendas). */
@@ -159,6 +159,12 @@ function Gaveta({ cliente: clienteInicial }: { cliente: ClienteCarrinho }) {
   const total = cliente ? itens.reduce((s, i) => s + (i.preco ?? 0) * un(i), 0) : 0;
   const semPreco = cliente ? itens.filter((i) => i.preco == null).length : 0;
   const payload = JSON.stringify(itens.map((i) => ({ produto_id: produtoDe(i), quantidade: un(i), caixas: i.caixa ? i.qtd : null, encomenda: !!i.encomenda })));
+  // Retire em Foz: desconto por caixa (só marcas com desconto); o servidor recalcula ao enviar
+  const ret = cliente?.retirada ?? null;
+  const [entrega, setEntrega] = useState<"entrega" | "retirar">("entrega");
+  const fora = new Set((ret?.fora ?? []).map(chaveMarca));
+  const caixasRet = ret ? itens.reduce((s, i) => s + (i.caixa && !fora.has(chaveMarca(i.marcaDb ?? i.marca)) ? i.qtd : 0), 0) : 0;
+  const economia = ret ? caixasRet * ret.desconto : 0;
   const progresso = progressoDescontos(itens, descontos, cliente?.moeda === "BRL" ? "BR" : cliente?.moeda === "GS" ? "PY" : null);
 
   return (
@@ -207,7 +213,24 @@ function Gaveta({ cliente: clienteInicial }: { cliente: ClienteCarrinho }) {
               <input type="hidden" name="itens" value={payload} />
               {cliente ? (
                 <>
+                  {ret && economia > 0 && (
+                    <fieldset className="g-entrega">
+                      <legend>{ret.t.titulo}</legend>
+                      <label className={entrega === "retirar" ? "marcada destaque" : "destaque"}>
+                        <input type="radio" name="entrega" value="retirar" checked={entrega === "retirar"} onChange={() => setEntrega("retirar")} />
+                        <span><b>{ret.t.retirar}</b> <em className="g-economia">{ret.t.economia.replace("9999", fmt(economia, cliente.moeda))}</em></span>
+                      </label>
+                      <label className={entrega === "entrega" ? "marcada" : ""}>
+                        <input type="radio" name="entrega" value="entrega" checked={entrega === "entrega"} onChange={() => setEntrega("entrega")} />
+                        <span><b>{ret.t.entrega}</b> <small>{ret.t.entregaNota}</small></span>
+                      </label>
+                      <p className="g-nota">{ret.t.nota}</p>
+                    </fieldset>
+                  )}
                   <div className="g-total"><span>{t.total}</span><b>{fmt(total, cliente.moeda)}</b></div>
+                  {ret && entrega === "retirar" && economia > 0 && (
+                    <div className="g-total g-total-ret"><span>{ret.t.total}</span><b>{fmt(Math.max(total - economia, 0), cliente.moeda)}</b></div>
+                  )}
                   {semPreco > 0 && <p className="g-nota">{t.semPrecoTabela.replace("9999", String(semPreco))}</p>}
                   <label>{t.observacao}<input name="observacao" placeholder={t.obsExemplo} maxLength={500} /></label>
                   <p className="g-nota">{t.confere || t.confereGenerico}</p>
