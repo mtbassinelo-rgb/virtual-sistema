@@ -191,6 +191,20 @@ select teste.ok((select coalesce(sum(caixas), 0) = 0 from app.simular_retirada_f
 select app.definir_retirada_foz_marca('MARCA INT', true);
 reset role;
 
+\echo '== Retire em Foz: candidatos a cliente local e relatório =='
+update app.clientes set pais = 'PY', cidade = 'Ciudad del Este', cliente_local = false where id = '00000000-0000-0000-0000-0000000000c2';
+set role vc_app;
+select teste.como(:'KEILA');
+select teste.falha($$select * from app.candidatos_cliente_local()$$, 'gestão', 'Vendedora não vê os candidatos');
+select teste.falha($$select * from app.relatorio_retirada_foz(current_date - 30, current_date)$$, 'gestão', 'Vendedora não vê o relatório');
+select teste.como(:'GERENTE');
+select teste.ok((select cidade_regiao from app.candidatos_cliente_local() where cliente_id = '00000000-0000-0000-0000-0000000000c2'), 'Cliente de Ciudad del Este aparece como candidato a local');
+select teste.ok(not exists (select 1 from app.candidatos_cliente_local() where cliente_id = '00000000-0000-0000-0000-0000000000c1'), 'Quem já é local não aparece');
+select teste.ok((select pedidos = 1 and caixas = 2 and pasero_economizado = 14000 and saldo = pasero_economizado - desconto
+                   from app.relatorio_retirada_foz(current_date - 30, current_date) where mes = to_char(current_date, 'YYYY-MM')),
+  'Relatório: 1 retirada, 2 caixas, pasero economizado 14.000 Gs e o saldo');
+reset role;
+
 \echo '== Compra por unidade: vendedora pede, gerente aprova; VIP só caixa =='
 select categoria_preco as cat_c1 from app.clientes where id = '00000000-0000-0000-0000-0000000000c1' \gset
 update app.clientes set categoria_preco = 'normal', compra_unidade = false where id = '00000000-0000-0000-0000-0000000000c1';

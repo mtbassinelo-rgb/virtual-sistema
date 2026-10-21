@@ -94,6 +94,10 @@ export default async function Inteligencia({ searchParams }: {
       marcas: (await c.query(`select m.marca, coalesce(r.aplica, true) aplica, m.produtos
           from (select marca, count(*)::int produtos from app.produtos where ativo and marca is not null group by marca) m
           left join app.retirada_foz_marcas r on r.marca = m.marca order by m.marca`)).rows as { marca: string; aplica: boolean; produtos: number }[],
+      relatorio: (await c.query("select * from app.relatorio_retirada_foz((date_trunc('month', current_date) - interval '11 months')::date, current_date)")).rows as
+        { mes: string; pedidos: number; clientes: number; vendido: string; caixas: string; desconto: string; pasero_economizado: string; saldo: string }[],
+      candidatos: (await c.query("select * from app.candidatos_cliente_local()")).rows as
+        { cliente_id: string; nome: string; cidade: string | null; vendedora: string; cidade_regiao: boolean; retiradas: number; pedidos_90: number; caixas_90: string; vendido_90: string; sugerido: boolean }[],
       pedidos: (await c.query(`select count(*)::int n, coalesce(sum(retirada_foz_desconto), 0) desconto from app.pedidos
           where retirada_foz and date_trunc('month', data_pedido) = date_trunc('month', current_date)`)).rows[0] as { n: number; desconto: string },
     } : null,
@@ -443,6 +447,39 @@ export default async function Inteligencia({ searchParams }: {
               </form>
             ) : (
               <p className="pequeno">Sem desconto: {d.retirada.marcas.filter((m) => !m.aplica).map((m) => m.marca).join(", ") || "nenhuma (todas com desconto)"}</p>
+            )}
+          </section>
+
+          <section className="painel">
+            <h2>Relatório das retiradas</h2>
+            <p className="pequeno suave" style={{ margin: 0 }}>Pedidos em que o cliente escolheu Retirar em Foz. <b>Pasero economizado</b> = caixas retiradas × o custo do pasero por caixa;
+              <b> saldo</b> = pasero economizado − desconto dado. Saldo positivo: o incentivo se paga.</p>
+            {d.retirada.relatorio.length === 0 ? <div className="vazio">Nenhuma retirada ainda. Elas aparecem aqui quando os clientes locais escolherem Retirar em Foz.</div> : (
+              <div className="tabela"><table style={{ minWidth: 0 }}>
+                <thead><tr><th>Mês</th><th>Pedidos</th><th>Clientes</th><th>Vendido</th><th>Caixas</th><th>Desconto dado</th><th>Pasero economizado</th><th>Saldo</th></tr></thead>
+                <tbody>{d.retirada.relatorio.map((m) => (
+                  <tr key={m.mes}><td>{m.mes}</td><td className="num">{m.pedidos}</td><td className="num">{m.clientes}</td><td className="num">{gs(m.vendido)}</td>
+                    <td className="num">{Number(m.caixas).toLocaleString("pt-BR")}</td><td className="num">{gs(m.desconto)}</td><td className="num">{gs(m.pasero_economizado)}</td>
+                    <td className="num">{Number(m.saldo) >= 0 ? <Selo cor="ok">{gs(m.saldo)}</Selo> : <Selo cor="erro">{gs(m.saldo)}</Selo>}</td></tr>
+                ))}</tbody>
+              </table></div>
+            )}
+          </section>
+
+          <section className="painel">
+            <h2>Possíveis clientes locais ({d.retirada.candidatos.length})</h2>
+            <p className="pequeno suave" style={{ margin: 0 }}>Clientes do Paraguai que ainda não são locais e parecem ser da região: cidade perto de Foz (Ciudad del Este, Hernandarias,
+              Presidente Franco, Minga Guazú…) e/ou já retiraram pedido antes. Ordenados por quanto compram (últimos 90 dias). Confira e marque.</p>
+            {d.retirada.candidatos.length === 0 ? <div className="vazio">Nenhum candidato: preencha a cidade dos clientes do Paraguai para o sistema sugerir.</div> : (
+              <div className="tabela"><table style={{ minWidth: 0 }}>
+                <thead><tr><th>Cliente</th><th>Cidade</th><th>Vendedora</th><th>Por quê</th><th>Pedidos 90d</th><th>Caixas 90d</th><th>Comprou 90d</th><th></th></tr></thead>
+                <tbody>{d.retirada.candidatos.map((x) => (
+                  <tr key={x.cliente_id}><td><Link href={`/clientes/${x.cliente_id}`}>{x.nome}</Link></td><td>{x.cidade ?? "—"}</td><td>{x.vendedora}</td>
+                    <td>{x.cidade_regiao && <Selo cor="info">mora na região</Selo>} {x.retiradas > 0 && <Selo cor="ok">já retirou {x.retiradas}×</Selo>} {x.sugerido && <Selo cor="aviso">vendedora sugeriu</Selo>}</td>
+                    <td className="num">{x.pedidos_90}</td><td className="num">{Number(x.caixas_90).toLocaleString("pt-BR")}</td><td className="num">{gs(x.vendido_90)}</td>
+                    <td>{gerir && <form action={decidirClienteLocal}><input type="hidden" name="cliente_id" value={x.cliente_id} /><input type="hidden" name="local" value="1" /><input type="hidden" name="volta" value="inteligencia" /><button>Marcar como local</button></form>}</td></tr>
+                ))}</tbody>
+              </table></div>
             )}
           </section>
 
