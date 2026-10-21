@@ -141,7 +141,7 @@ export function VendaBalcao({ caixa, produtos, clientes, moedaPadrao }: { caixa:
         )}
       </div>
       {itens.length > 0 && (
-        <div className="tabela"><table>
+        <div className="tabela"><table data-sem-filtro>
           <thead><tr><th>Produto</th><th className="num">Qtd (un.)</th><th className="num">Preço un.</th><th className="num">Total</th><th></th></tr></thead>
           <tbody>{itens.map((i, k) => (
             <tr key={i.produto.id}>

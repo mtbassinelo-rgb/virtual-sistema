@@ -76,12 +76,15 @@ export async function registrarCompra(fd: FormData) {
     if (!fornecedor) throw new Error("Escolha o fornecedor.");
     const valor = numero(fd, "valor");
     if (valor === null || valor <= 0) throw new Error("Informe o valor dos produtos em R$.");
-    await comUsuario(u.id, (c) => c.query("select app.registrar_compra($1, $2, $3, $4, $5, $6)",
-      [fornecedor, texto(fd, "data") || null, valor, numero(fd, "frete") ?? 0, numero(fd, "cambio"), texto(fd, "obs") || null]));
+    const unidades = texto(fd, "unidades") === "" ? null : numero(fd, "unidades");
+    if (unidades !== null && (!Number.isInteger(unidades) || unidades < 1)) throw new Error("Quantidade de produtos da nota: número inteiro.");
+    await comUsuario(u.id, (c) => c.query("select app.registrar_compra($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+      [fornecedor, texto(fd, "data") || null, valor, numero(fd, "frete") ?? 0, numero(fd, "cambio"), texto(fd, "obs") || null,
+       texto(fd, "marca") || null, unidades, texto(fd, "nfe") || null]));
   } catch (e) {
     erro = mensagemErro(e);
   }
-  voltar("compras", erro, "Compra registrada.");
+  voltar("compras", erro, "Compra registrada. Se informou marca e quantidade, o frete por produto da marca foi recalculado.");
 }
 
 export async function excluirCompra(fd: FormData) {

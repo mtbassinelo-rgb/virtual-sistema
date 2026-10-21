@@ -34,3 +34,17 @@ select teste.ok(app.frete_produto('00000000-0000-0000-0000-00000000c601') = 0.80
 select teste.ok(app.frete_produto('00000000-0000-0000-0000-00000000c602') = 2.40, 'Kit Maycrene de 3 produtos: 3 × 0,80');
 select teste.ok(app.frete_produto('00000000-0000-0000-0000-00000000c603') = 0.70, 'Kit de 2 itens sem frete da marca: 2 × padrão 0,35');
 \echo '== Testes de frete passaram =='
+
+\echo '== Frete pelas notas fiscais =='
+reset role;
+insert into app.fornecedores (id, nome) values ('00000000-0000-0000-0000-00000000f701', 'Fornecedor Notas');
+insert into app.produtos (id, codigo, nome, marca) values ('00000000-0000-0000-0000-00000000c701', 'NOT-1', 'Produto Marca Nota', 'MARCA NOTA');
+set role vc_app;
+select teste.como(:'GERENTE');
+select teste.falha($$select app.registrar_compra('00000000-0000-0000-0000-00000000f701', current_date, 100, 30, null, null, null, 100, null)$$, 'informe a marca', 'Quantidade sem marca é recusada');
+select app.registrar_compra('00000000-0000-0000-0000-00000000f701', current_date - 5, 1000, 30, 1300, null, 'MARCA NOTA', 100, '123');
+select teste.ok(app.frete_produto('00000000-0000-0000-0000-00000000c701') = 0.30, 'Uma nota: frete por produto = frete ÷ produtos');
+select app.registrar_compra('00000000-0000-0000-0000-00000000f701', current_date - 1, 1000, 50, 1300, null, 'MARCA NOTA', 100, '124');
+select teste.ok(app.frete_produto('00000000-0000-0000-0000-00000000c701') = 0.40, 'Duas notas: média ponderada (80 ÷ 200)');
+select teste.ok((select notas = 2 and frete_unidade = 0.40 from app.frete_medio_notas() where marca = 'MARCA NOTA'), 'Resumo de frete por marca');
+\echo '== Testes de frete por nota passaram =='

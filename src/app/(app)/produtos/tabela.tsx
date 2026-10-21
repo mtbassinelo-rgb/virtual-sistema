@@ -76,7 +76,7 @@ export function TabelaProdutos({ linhas, gestao, acao }: {
   return (
     <>
       {gestao && <form id="edicao" ref={form} hidden onSubmit={(e) => { e.preventDefault(); salvar(); }} />}
-      <div className="tabela tabela-produtos"><table>
+      <div className="tabela tabela-produtos"><table data-sem-filtro>
         <thead><tr>
           {gestao && <th style={{ width: 32 }}><MarcarTodos form="lote" /></th>}
           {gestao && <th title="A = ativo no site · D = desativado (clique para trocar) · E = excluir">Site</th>}

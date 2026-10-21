@@ -27,7 +27,7 @@ export function GradePrecos({ linhas, acao, volta }: { linhas: LinhaPreco[]; aca
         if (el.dataset.original !== undefined && !mudados[el.name]) el.disabled = true;
     }}>
       <input type="hidden" name="volta" value={volta} />
-      <div className="tabela precos-grade"><table>
+      <div className="tabela precos-grade"><table data-sem-filtro>
         <thead><tr><th></th><th>Produto</th><th title="Peças por caixa fechada">Caixa</th>{TABELAS.map((t) => <th key={t.k}>{t.t}</th>)}</tr></thead>
         <tbody>{linhas.map((l) => (
           <tr key={l.id}>

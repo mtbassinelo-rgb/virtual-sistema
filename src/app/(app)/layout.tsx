@@ -5,6 +5,7 @@ import { ehGestao, exigirUsuario, sair } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
 import { PERFIS } from "@/lib/formato";
 import { MenuLateral, type GrupoMenu } from "./menu-lateral";
+import { FiltrosAutomaticos } from "./filtros-automaticos";
 import { unidadeSistema } from "@/lib/unidade-sistema";
 import { permissaoDoLink, pode } from "@/lib/permissoes";
 
@@ -154,6 +155,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
           </div>
         </header>
         <main className="conteudo">{children}</main>
+        <Suspense fallback={null}><FiltrosAutomaticos /></Suspense>
       </div>
     </div>
   );

@@ -317,3 +317,9 @@ button.discreto:hover { color: var(--erro); border-color: transparent; }
 .saude-plano { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 20px; }
 .saude-plano h3 { margin: 0 0 4px; font-size: .95rem; }
 .saude-plano ul { margin: 0; padding-left: 18px; font-size: .88rem; display: flex; flex-direction: column; gap: 4px; }
+
+/* Filtro automático das tabelas */
+.filtro-tabela { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 8px; }
+.filtro-tabela input[type="search"] { flex: 1 1 220px; max-width: 360px; padding: 6px 10px; }
+.filtro-tabela select { width: auto; max-width: 220px; padding: 6px 8px; font-size: .85rem; }
+.filtro-tabela button { padding: 5px 10px; }

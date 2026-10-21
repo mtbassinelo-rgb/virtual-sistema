@@ -56,7 +56,7 @@ export default async function Precificacao({ searchParams }: { searchParams: Pro
             <div className="tabela"><table style={{ minWidth: 0 }}>
               <thead><tr><th>Passo</th><th>Conta</th><th>Exemplo (custo R$ 2,34, caixa de 12)</th></tr></thead>
               <tbody>
-                <tr><td>1. Custo com frete</td><td>custo + frete por produto (padrão R$ {fr.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}; Maycrene R$ 0,80; kit = frete × nº de produtos)</td><td>R$ {cf.toFixed(2).replace(".", ",")}</td></tr>
+                <tr><td>1. Custo com frete</td><td>custo + frete por produto: média das notas fiscais da marca (Compras); sem notas, padrão R$ {fr.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} e Maycrene R$ 0,80; kit = frete × nº de produtos</td><td>R$ {cf.toFixed(2).replace(".", ",")}</td></tr>
                 <tr><td>2. Em guaranis</td><td>× câmbio de custo {premissas.cambio.toLocaleString("pt-BR")}</td><td>Gs {g(real)}</td></tr>
                 <tr><td>3. Margem de lucro</td><td>(preço − custo com frete) ÷ preço — igual à planilha Clientes VIP</td><td>VIP Gs 6.500 → {p((6500 - real) / 6500)}</td></tr>
                 <tr><td>4. Margem líquida</td><td>tira imposto {imposto.toLocaleString("pt-BR")}% e entrega Gs {g(premissas.entregaCaixa)} ÷ peças da caixa</td><td>{p((6500 * (1 - imp) - real - ent) / 6500)}</td></tr>

@@ -168,7 +168,7 @@ export function GradePrecificacao({ linhas, premissas, acao }: {
       )}
 
       <section className="painel" style={{ padding: 0 }}>
-        <div className="tabela precos-grade"><table>
+        <div className="tabela precos-grade"><table data-sem-filtro>
           <thead><tr>
             <th style={{ width: 32 }}><input type="checkbox" aria-label="Selecionar todos os visíveis" checked={todosSel}
               onChange={(e) => setSel((s) => { const n = { ...s }; visiveis.forEach((l) => { n[l.produto_id] = e.target.checked; }); return n; })} /></th>

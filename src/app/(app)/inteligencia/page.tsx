@@ -79,6 +79,11 @@ export default async function Inteligencia({ searchParams }: {
     compras: aba.k === "compras" ? (await c.query(`select c.*, f.nome fornecedor from app.compras c join app.fornecedores f on f.id = c.fornecedor_id
         order by c.data desc, c.criado_em desc limit 60`)).rows : [],
     meses: aba.k === "compras" ? (await c.query("select * from app.v_compras_mensal order by mes desc limit 12")).rows : [],
+    fretesNotas: aba.k === "compras" ? (await c.query(`select coalesce(n.marca, fm.marca) marca, n.notas, n.unidades, n.frete_total, n.frete_unidade, n.ultima,
+        fm.frete_unidade_brl em_uso, fm.observacao
+      from app.frete_medio_notas() n full join app.frete_marca fm on fm.marca = n.marca order by n.notas desc nulls last, 1`)).rows as
+      { marca: string; notas: number | null; unidades: string | null; frete_total: string | null; frete_unidade: string | null; ultima: string | null; em_uso: string | null; observacao: string | null }[] : [],
+    marcasCadastro: aba.k === "compras" ? (await c.query("select distinct marca from app.produtos where marca is not null and ativo order by marca")).rows.map((r) => r.marca as string) : [],
     retirada: aba.k === "retirada" ? {
       pendentes: (await c.query(`select c.id, c.nome, v.nome vendedora, u2.nome sugerido_por, c.cliente_local_sugerido_em em
           from app.clientes c join app.vendedoras v on v.id = c.vendedora_id left join app.usuarios u2 on u2.id = c.cliente_local_sugerido_por
@@ -319,21 +324,42 @@ export default async function Inteligencia({ searchParams }: {
                 <label>Produtos (R$)<input name="valor" inputMode="decimal" required style={{ width: 120 }} /></label>
                 <label>Frete (R$)<input name="frete" inputMode="decimal" style={{ width: 100 }} /></label>
                 <label>Câmbio (Gs por R$)<input name="cambio" inputMode="decimal" style={{ width: 100 }} /></label>
+                <label>Marca da nota<select name="marca" defaultValue="">
+                  <option value="">—</option>{d.marcasCadastro.map((m) => <option key={m} value={m}>{m}</option>)}
+                </select></label>
+                <label title="Total de produtos (unidades) na nota">Qtd. de produtos<input name="unidades" inputMode="numeric" style={{ width: 90 }} /></label>
+                <label>Nº NF-e<input name="nfe" style={{ width: 110 }} /></label>
                 <label>Observação<input name="obs" style={{ width: 200 }} /></label>
                 <button className="principal">Registrar</button>
               </form>
-              <p className="pequeno suave" style={{ margin: 0 }}>Registrar a compra não mexe no estoque: o estoque continua vindo do Bling e dos lançamentos de estoque.</p>
+              <p className="pequeno suave" style={{ margin: 0 }}>Com a marca e a quantidade de produtos da nota, o frete por produto da marca passa a ser a média das últimas notas (frete ÷ produtos) e entra na precificação na hora.
+                Registrar a compra não mexe no estoque.</p>
             </section>
           )}
+
+          <section className="painel">
+            <h2>Frete por produto, por marca</h2>
+            <p className="pequeno suave" style={{ margin: 0 }}>“Em uso” é o que a precificação usa. Marcas sem nota ficam com o valor informado (padrão R$ 0,35; Maycrene R$ 0,80). Kits: frete × produtos do kit.</p>
+            <div className="tabela"><table style={{ minWidth: 0 }}>
+              <thead><tr><th>Marca</th><th>Notas</th><th>Produtos nas notas</th><th>Frete das notas</th><th>Média por produto</th><th>Em uso</th><th>Origem</th></tr></thead>
+              <tbody>{d.fretesNotas.map((r) => (
+                <tr key={r.marca}><td>{r.marca}</td><td className="num">{r.notas ?? "—"}</td><td className="num">{r.unidades ? Number(r.unidades).toLocaleString("pt-BR") : "—"}</td>
+                  <td className="num">{r.frete_total ? dinheiro(r.frete_total, "BRL") : "—"}</td><td className="num">{r.frete_unidade ? dinheiro(r.frete_unidade, "BRL") : "—"}</td>
+                  <td className="num"><b>{r.em_uso ? dinheiro(r.em_uso, "BRL") : "padrão"}</b></td><td className="pequeno suave">{r.observacao}</td></tr>))}</tbody>
+            </table></div>
+          </section>
 
           <section className="painel">
             <h2>Últimas compras</h2>
             {d.compras.length === 0 ? <div className="vazio">Nenhuma compra registrada.</div> : (
               <div className="tabela"><table>
-                <thead><tr><th>Data</th><th>Fornecedor</th><th>Produtos</th><th>Frete</th><th>Total</th><th>Câmbio</th><th>Total em Gs</th><th></th></tr></thead>
+                <thead><tr><th>Data</th><th>Fornecedor</th><th>Marca</th><th>NF-e</th><th>Produtos</th><th>Frete</th><th>Frete/produto</th><th>Total</th><th>Câmbio</th><th>Total em Gs</th><th></th></tr></thead>
                 <tbody>{d.compras.map((x) => (
                   <tr key={x.id}><td>{data(x.data)}</td><td>{x.fornecedor}{x.observacao && <div className="pequeno suave">{x.observacao}</div>}</td>
-                    <td className="num">{dinheiro(x.valor_produtos, "BRL")}</td><td className="num">{dinheiro(x.frete, "BRL")}</td><td className="num">{dinheiro(x.total, "BRL")}</td>
+                    <td>{x.marca ?? "—"}</td><td>{x.nfe ?? "—"}</td>
+                    <td className="num">{dinheiro(x.valor_produtos, "BRL")}</td><td className="num">{dinheiro(x.frete, "BRL")}</td>
+                    <td className="num">{x.unidades ? <>{dinheiro(Number(x.frete) / Number(x.unidades), "BRL")}<div className="pequeno suave">{Number(x.unidades).toLocaleString("pt-BR")} produtos</div></> : "—"}</td>
+                    <td className="num">{dinheiro(x.total, "BRL")}</td>
                     <td className="num">{x.cambio ? Number(x.cambio).toLocaleString("pt-BR") : "—"}</td>
                     <td className="num">{x.cambio ? gs(Number(x.total) * Number(x.cambio)) : "—"}</td>
                     <td>{gerir && <form action={excluirCompra}><input type="hidden" name="id" value={x.id} /><button className="pequeno">Excluir</button></form>}</td></tr>
