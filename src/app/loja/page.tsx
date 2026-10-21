@@ -2,7 +2,7 @@ import Link from "next/link";
 import { pool } from "@/lib/db";
 import { clienteAtual, sha256, tokenCliente } from "@/lib/portal";
 import { dinheiro, data, type Moeda } from "@/lib/formato";
-import { LINHAS, SUBLINHAS, corRotulo, interno, linhaDe, linhasExtras, marcaDe, nomeCurto, subLinhaDe } from "@/lib/vitrine";
+import { LINHAS, SUBLINHAS, categoriasDe, corRotulo, interno, linhasExtras, marcaDe, nomeCurto, subLinhaDe } from "@/lib/vitrine";
 import { Quantidade, SeletorVariantes } from "./carrinho";
 import { QueroProduto } from "./quero-produto";
 import { TEXTOS, idiomaAtual, type Textos } from "@/lib/idioma";
@@ -19,7 +19,7 @@ type Preco = {
   ultima_compra: string | null; destaque: "promocao" | "recompra" | "sugestao" | null;
 };
 type Extra = { produto_id: string; vendidos_90d: string; promo_pct: string | null; promo_fim: string | null; destaque: boolean };
-type Produto = Publico & { linha: string; extras?: string[]; marcaNome: string | null; p?: Preco; x?: Extra; grupo?: string | null; variante?: string | null; variantes?: Produto[] };
+type Produto = Publico & { linha: string; extras?: string[]; subManual?: string | null; catManual?: string[] | null; marcaNome: string | null; p?: Preco; x?: Extra; grupo?: string | null; variante?: string | null; variantes?: Produto[] };
 
 const POR_PAGINA = 60;
 const sem = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -63,12 +63,16 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
   // A equipe arruma em Produtos → "Sem preço (fora do site)".
   const comPreco = cliente && token ? null : new Set(((await pool.query("select app.vitrine_com_preco() as id")).rows as { id: string }[]).map((r) => r.id));
   const temPreco = (id: string) => (comPreco ? comPreco.has(id) : precos.has(id));
+  const manuais = new Map<string, { categorias: string[] | null; subcategoria: string | null }>(
+    ((await pool.query("select * from app.vitrine_categorias()").catch(() => ({ rows: [] }))).rows as { produto_id: string; categorias: string[] | null; subcategoria: string | null }[])
+      .map((r) => [r.produto_id, r]));
   let todos: Produto[] = publicos.filter((p) => !interno(p.nome) && temPreco(p.produto_id)).map((p) => ({
-    ...p, grupo: grupos.get(p.produto_id)?.grupo ?? null, variante: grupos.get(p.produto_id)?.variante ?? null, linha: linhaDe(p.nome, p.marca, p.tipo), marcaNome: marcaDe(p.nome, p.marca), p: precos.get(p.produto_id), x: extras.get(p.produto_id),
+    ...p, grupo: grupos.get(p.produto_id)?.grupo ?? null, variante: grupos.get(p.produto_id)?.variante ?? null, linha: categoriasDe(p.nome, p.marca, p.tipo, manuais.get(p.produto_id)?.categorias).linha,
+    catManual: manuais.get(p.produto_id)?.categorias ?? null, subManual: manuais.get(p.produto_id)?.subcategoria ?? null, marcaNome: marcaDe(p.nome, p.marca), p: precos.get(p.produto_id), x: extras.get(p.produto_id),
   }));
   const contagem = new Map<string, number>();
   for (const p of todos) {
-    p.extras = linhasExtras(p.grupo ?? p.nome, p.linha);
+    p.extras = p.catManual?.length ? categoriasDe(p.nome, p.marca, p.tipo, p.catManual).extras : linhasExtras(p.grupo ?? p.nome, p.linha);
     for (const l of [p.linha, ...p.extras]) contagem.set(l, (contagem.get(l) ?? 0) + 1);
   }
   const marcas = new Map<string, number>();
@@ -88,9 +92,11 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
   if (linha) todos = todos.filter((p) => p.linha === linha || p.extras?.includes(linha));
   // subcategorias da linha (ex.: Cabelo → Ativador de cachos, Shampoos…)
   const contagemSub = new Map<string, number>();
-  if (linha && SUBLINHAS[linha]) for (const p of todos) { const k = subLinhaDe(linha, p.grupo ?? p.nome) ?? "outros"; contagemSub.set(k, (contagemSub.get(k) ?? 0) + 1); }
+  // subcategoria fixada à mão vale na categoria principal do produto
+  const subDe = (p: Produto, l: string) => (p.subManual && p.linha === l && SUBLINHAS[l]?.some((s) => s.chave === p.subManual) ? p.subManual : subLinhaDe(l, p.grupo ?? p.nome) ?? "outros");
+  if (linha && SUBLINHAS[linha]) for (const p of todos) { const k = subDe(p, linha); contagemSub.set(k, (contagemSub.get(k) ?? 0) + 1); }
   const sub = linha && f.sub && (contagemSub.has(f.sub)) ? f.sub : null;
-  if (sub && linha) todos = todos.filter((p) => (subLinhaDe(linha, p.grupo ?? p.nome) ?? "outros") === sub);
+  if (sub && linha) todos = todos.filter((p) => subDe(p, linha) === sub);
   if (marca) todos = todos.filter((p) => p.marcaNome === marca);
   if (soPromo) todos = todos.filter((p) => pct(p) > 0);
   if (soNovidade) todos = todos.filter((p) => p.novidade);

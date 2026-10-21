@@ -257,6 +257,17 @@ select teste.como(:'GERENTE');
 select teste.ok(app.aprovar_cadastro_site('00000000-0000-0000-0000-00000000ca02', '00000000-0000-0000-0000-0000000000a1') = :'cli_site', 'Mesmo WhatsApp: liga ao cliente que já existe, não duplica');
 reset role;
 
+\echo '== Categorias do site à mão =='
+set role vc_app;
+select teste.como(:'KEILA');
+select teste.falha(format($$select app.definir_categorias_site(array[%L::uuid], 'definir', array['matizadores'], null)$$, :'KIT'), 'gerente ou dono', 'Vendedora não muda categoria');
+select teste.como(:'GERENTE');
+select app.definir_categorias_site(array[:'KIT'::uuid], 'adicionar', array['matizadores'], null, format('{"%s":["kits"]}', :'KIT')::jsonb);
+select teste.ok((select site_categorias = array['kits','matizadores'] from app.produtos where id = :'KIT'), 'Somar categoria mantém a principal (Kits) e soma Matizadores');
+select app.definir_categorias_site(array[:'KIT'::uuid], 'auto', null, null);
+select teste.ok((select site_categorias is null from app.produtos where id = :'KIT'), 'Voltar ao automático');
+reset role;
+
 \echo '== Compra por unidade: vendedora pede, gerente aprova; VIP só caixa =='
 select categoria_preco as cat_c1 from app.clientes where id = '00000000-0000-0000-0000-0000000000c1' \gset
 update app.clientes set categoria_preco = 'normal', compra_unidade = false where id = '00000000-0000-0000-0000-0000000000c1';

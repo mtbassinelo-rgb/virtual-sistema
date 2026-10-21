@@ -5,7 +5,7 @@ import { pool } from "@/lib/db";
 import { linkWhatsApp, telefone } from "@/lib/formato";
 import { TEXTOS, idiomaAtual, textosCarrinho } from "@/lib/idioma";
 import { retiradaDoCliente } from "./acoes";
-import { LINHAS, interno, linhaDe, marcaDe } from "@/lib/vitrine";
+import { LINHAS, interno, marcaDe, categoriasDe } from "@/lib/vitrine";
 import { BotaoCarrinho, Carrinho } from "./carrinho";
 import { ehPrincipal, unidadeLoja } from "@/lib/unidade";
 import { vendedoraDoLink } from "@/lib/vendedora-link";
@@ -68,11 +68,12 @@ export default async function LayoutLoja({ children }: { children: React.ReactNo
     ?? String((await pool.query("select app.whatsapp_empresa($1) as w", [idioma === "es" ? "GS" : "BRL"])).rows[0]?.w ?? "");
   const zap = linkWhatsApp(numero, t.zapMsg);
   // Menu de categorias e marcas, com a quantidade de produtos de cada uma
-  const produtos = (await pool.query("select nome, marca, tipo from app.vitrine_publica_unidade($1)", [unidade.id])).rows as { nome: string; marca: string | null; tipo: string }[];
+  const produtos = (await pool.query("select produto_id, nome, marca, tipo from app.vitrine_publica_unidade($1)", [unidade.id])).rows as { produto_id: string; nome: string; marca: string | null; tipo: string }[];
+  const catManual = new Map<string, string[] | null>(((await pool.query("select produto_id, categorias from app.vitrine_categorias()").catch(() => ({ rows: [] }))).rows as { produto_id: string; categorias: string[] | null }[]).map((r) => [r.produto_id, r.categorias]));
   const porLinha = new Map<string, number>(), porMarca = new Map<string, number>();
   for (const p of produtos) {
     if (interno(p.nome)) continue;
-    const l = linhaDe(p.nome, p.marca, p.tipo);
+    const l = categoriasDe(p.nome, p.marca, p.tipo, catManual.get(p.produto_id)).linha;
     porLinha.set(l, (porLinha.get(l) ?? 0) + 1);
     const m = marcaDe(p.nome, p.marca);
     if (m) porMarca.set(m, (porMarca.get(m) ?? 0) + 1);

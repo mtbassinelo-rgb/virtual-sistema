@@ -182,3 +182,13 @@ export function linhasExtras(nome: string, linha: string): string[] {
   if (linha !== "corpo" && linha !== "kits" && /splash|body mist|perfume capilar|hair (perfume|mist)|perfume (de |para )?(calcinha|intim)|desodorante (de |para )?(intim|calcinha)|sabonete.*intim/.test(n)) return ["corpo"];
   return [];
 }
+
+/** Categorias do produto no site: as fixadas à mão (Produtos → Categorias do site) ou as automáticas pelo nome. */
+export function categoriasDe(nome: string, marca: string | null | undefined, tipo: string | null | undefined, manual?: string[] | null): { linha: string; extras: string[] } {
+  if (manual && manual.length) {
+    const validas = manual.filter((c) => LINHAS.some((l) => l.chave === c));
+    if (validas.length) return { linha: validas[0], extras: validas.slice(1) };
+  }
+  const linha = linhaDe(nome, marca, tipo);
+  return { linha, extras: linhasExtras(nome, linha) };
+}
