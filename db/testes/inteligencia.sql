@@ -43,7 +43,7 @@ select teste.ok((select count(*) from app.rentabilidade_py()) > 0, 'Consulta vê
 select teste.como(:'GERENTE');
 select app.definir_frete_marca('MARCA INT', 0.35, 'teste');
 select teste.ok(app.frete_produto(:'PI1') = 0.35, 'Produto sem exceção usa o frete da marca');
-select teste.ok(app.frete_produto(:'PI2') is null, 'Marca sem frete cadastrado: frete desconhecido');
+select teste.ok(app.frete_produto(:'PI2') = 0.35, 'Marca sem frete cadastrado usa o frete padrão de R$ 0,35');
 select teste.ok(app.frete_produto(:'KIT') = 0.70, 'Kit soma o frete dos componentes');
 select app.definir_frete_produto(:'PI3', 0.50);
 select teste.ok(app.frete_produto(:'PI3') = 0.50, 'Exceção por produto vale sobre a marca');
@@ -62,8 +62,8 @@ select teste.ok((select preco_minimo from app.rentabilidade_py() where produto_i
 select teste.ok((select completo and alertas = '{}' from app.rentabilidade_py() where produto_id = :'PI1'), 'Produto com todos os dados: completo e sem alertas');
 select teste.ok((select margem_bruta_vip_cambio_real > margem_bruta_vip from app.rentabilidade_py() where produto_id = :'PI1'),
   'No câmbio real de compra a margem é maior (folga do câmbio)');
-select teste.ok((select 'sem_frete' = any(alertas) and 'sem_preco_vip' = any(alertas) and not completo
-  from app.rentabilidade_py() where produto_id = :'PI2'), 'Sem frete e sem preço VIP: alertas e cálculo incompleto');
+select teste.ok((select not ('sem_frete' = any(alertas)) and 'sem_preco_vip' = any(alertas) and not completo
+  from app.rentabilidade_py() where produto_id = :'PI2'), 'Frete padrão evita o alerta de frete; sem preço VIP: cálculo incompleto');
 select teste.ok((select contribuicao_vip is null from app.rentabilidade_py() where produto_id = :'PI2'), 'Sem dados, a margem não é inventada');
 
 -- Margem mínima de 20% (só o dono altera parâmetros) e preço abaixo do mínimo

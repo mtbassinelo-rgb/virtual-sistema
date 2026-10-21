@@ -11,7 +11,7 @@ export const metadata = { title: "Parâmetros" };
 const GRUPOS: { titulo: string; chaves: string[] }[] = [
   { titulo: "Vendas e lucro", chaves: ["cambio_custo_gs", "pedido_exige_estoque", "link_pedido_validade_dias", "arredondamento_gs"] },
   { titulo: "Envios ao Paraguai", chaves: ["passeiro_custo_volume"] },
-  { titulo: "Inteligência comercial", chaves: ["cambio_compra_gs", "margem_minima_contribuicao", "classif_atracao_pct", "classif_margem_baixa", "margem_alvo_normal", "margem_alvo_vip", "sugestao_tolerancia_pct"] },
+  { titulo: "Inteligência comercial", chaves: ["cambio_compra_gs", "margem_minima_contribuicao", "classif_atracao_pct", "classif_margem_baixa", "frete_padrao_brl", "margem_alvo_normal", "margem_alvo_vip", "sugestao_tolerancia_pct"] },
   { titulo: "Recompra", chaves: ["recompra_intervalo_padrao", "recompra_tolerancia_pct", "recompra_inativo_dias", "recompra_novo_dias"] },
   { titulo: "Retire em Foz", chaves: ["retirada_foz_ativa", "retirada_foz_desconto_caixa", "retirada_foz_teto_mes"] },
   { titulo: "Promoções", chaves: ["promo_desconto_maximo", "promo_sugerida_desconto"] },
@@ -32,6 +32,7 @@ async function salvar(fd: FormData) {
     if (chave === "margem_minima_contribuicao" && valor >= 90) throw new Error("Margem mínima deve ficar abaixo de 90%.");
     if ((chave === "margem_alvo_normal" || chave === "margem_alvo_vip") && (valor < 0 || valor >= 90)) throw new Error("Margem-alvo entre 0 e 90%.");
     if (chave === "sugestao_tolerancia_pct" && (valor < 0 || valor > 50)) throw new Error("Tolerância entre 0 e 50%.");
+    if (chave === "frete_padrao_brl" && (valor < 0 || valor > 50)) throw new Error("Frete padrão em R$ por unidade (ex.: 0,35).");
     const r = await comUsuario(u.id, (c) => c.query("update app.parametros set valor = $2 where chave = $1", [chave, valor]));
     if (r.rowCount === 0) throw new Error("Você não tem permissão para alterar este parâmetro.");
   } catch (e) {
