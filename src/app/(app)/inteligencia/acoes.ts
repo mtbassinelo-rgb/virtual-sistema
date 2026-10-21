@@ -161,8 +161,13 @@ export async function salvarMarcaInteligencia(fd: FormData) {
     const mn = texto(fd, "margem_normal") === "" ? null : numero(fd, "margem_normal");
     const mv = texto(fd, "margem_vip") === "" ? null : numero(fd, "margem_vip");
     for (const m of [mn, mv]) if (m !== null && (m < 0 || m > 90)) throw new Error("Margem-alvo em % entre 0 e 90.");
-    await comUsuario(u.id, (c) => c.query("select app.definir_marca_inteligencia($1, $2, $3, $4, $5, $6)",
-      [marca, fd.get("gatilho") === "1", papel, mn, mv, texto(fd, "obs") || null]));
+    const retirada = texto(fd, "retirada");
+    await comUsuario(u.id, async (c) => {
+      await c.query("select app.definir_marca_inteligencia($1, $2, $3, $4, $5, $6)",
+        [marca, fd.get("gatilho") === "1", papel, mn, mv, texto(fd, "obs") || null]);
+      // Preço da marca: igual para todos, ou com desconto para o cliente local que retira em Foz
+      if (retirada === "local" || retirada === "todos") await c.query("select app.definir_retirada_foz_marca($1, $2)", [marca, retirada === "local"]);
+    });
   } catch (e) {
     erro = mensagemErro(e);
   }

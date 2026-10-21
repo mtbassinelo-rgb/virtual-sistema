@@ -20,10 +20,11 @@ export default async function Precificacao({ searchParams }: { searchParams: Pro
       where chave in ('cambio_custo_gs','margem_minima_contribuicao','arredondamento_gs','margem_alvo_normal','margem_alvo_vip','frete_padrao_brl')`)).rows.map((r) => [r.chave as string, Number(r.valor)]));
     const custos = (await c.query("select * from app.custos_variaveis_vigentes('PY')")).rows as { tipo: string; base: string; percentual: string | null; valor: string | null; moeda: string | null }[];
     const marcas = (await c.query(`select coalesce(nullif(trim(p.marca), ''), 'Sem marca') marca, count(*)::int n,
-        coalesce(mi.gatilho, false) gatilho, coalesce(mi.papel, 'acompanhar') papel, mi.margem_alvo_normal, mi.margem_alvo_vip
+        coalesce(mi.gatilho, false) gatilho, coalesce(mi.papel, 'acompanhar') papel, mi.margem_alvo_normal, mi.margem_alvo_vip,
+        app.retirada_foz_marca(coalesce(nullif(trim(p.marca), ''), 'Sem marca')) desconto_local
       from app.produtos p left join app.marcas_inteligencia mi on mi.marca = coalesce(nullif(trim(p.marca), ''), 'Sem marca')
       where p.ativo group by 1, 3, 4, 5, 6 order by 3 desc, 2 desc`)).rows as
-      { marca: string; n: number; gatilho: boolean; papel: string; margem_alvo_normal: string | null; margem_alvo_vip: string | null }[];
+      { marca: string; n: number; gatilho: boolean; papel: string; margem_alvo_normal: string | null; margem_alvo_vip: string | null; desconto_local: boolean }[];
     return { linhas, params, custos, marcas };
   });
   const imposto = d.custos.filter((x) => x.base === "venda").reduce((s, x) => s + Number(x.percentual ?? 0), 0);
@@ -71,14 +72,15 @@ export default async function Precificacao({ searchParams }: { searchParams: Pro
       })()}
 
       <details className="painel">
-        <summary><b>Marcas do motor</b> <span className="pequeno suave">({noMotor.length} marcada(s){noMotor.length ? ": " + noMotor.map((m) => m.marca).join(", ") : ""}) · margem-alvo própria por marca</span></summary>
-        <p className="pequeno suave">Marque as marcas que o motor acompanha e, se quiser, uma margem-alvo diferente do padrão (ex.: marca de atração com margem menor). O filtro “Só marcas do motor” mostra só elas.</p>
+        <summary><b>Marcas do motor e preço para clientes locais</b> <span className="pequeno suave">({noMotor.length} marcada(s){noMotor.length ? ": " + noMotor.map((m) => m.marca).join(", ") : ""}) · margem-alvo própria por marca</span></summary>
+        <p className="pequeno suave">Marque as marcas que o motor acompanha e, se quiser, uma margem-alvo diferente do padrão (ex.: marca de atração com margem menor). O filtro “Só marcas do motor” mostra só elas.
+          Em <b>Preço para quem</b>: “Desconto p/ clientes locais” = o cliente local que retira em Foz ganha o desconto por caixa nessa marca; “Mesmo preço para todos” = sem desconto local (ex.: Rhenuks). É a mesma escolha da aba Retire em Foz.</p>
         <div className="tabela"><table style={{ minWidth: 0 }}>
-          <thead><tr><th>Marca</th><th>Produtos</th><th>No motor</th><th>Papel</th><th>Alvo Normal %</th><th>Alvo VIP %</th><th></th></tr></thead>
+          <thead><tr><th>Marca</th><th>Produtos</th><th>No motor</th><th>Papel</th><th>Alvo Normal %</th><th>Alvo VIP %</th><th>Preço para quem</th><th></th></tr></thead>
           <tbody>{d.marcas.map((m) => (
             <tr key={m.marca}>
               <td>{m.marca}</td><td className="num">{m.n}</td>
-              <td colSpan={5}>
+              <td colSpan={6}>
                 <form action={salvarMarcaInteligencia} className="linha" style={{ gap: 8 }}>
                   <input type="hidden" name="marca" value={m.marca} />
                   <input type="hidden" name="volta" value="precificacao" />
@@ -90,6 +92,10 @@ export default async function Precificacao({ searchParams }: { searchParams: Pro
                     defaultValue={m.margem_alvo_normal == null ? "" : Number(m.margem_alvo_normal).toLocaleString("pt-BR")} />
                   <input name="margem_vip" inputMode="decimal" style={{ width: 70 }} placeholder={String(av)} aria-label={`Alvo VIP de ${m.marca}`}
                     defaultValue={m.margem_alvo_vip == null ? "" : Number(m.margem_alvo_vip).toLocaleString("pt-BR")} />
+                  <select name="retirada" defaultValue={m.desconto_local ? "local" : "todos"} aria-label={`Preço de ${m.marca} para clientes locais`} style={{ width: 230 }}>
+                    <option value="local">Desconto p/ clientes locais (retirando em Foz)</option>
+                    <option value="todos">Mesmo preço para todos</option>
+                  </select>
                   <button>Salvar</button>
                 </form>
               </td>
