@@ -7,7 +7,7 @@ import {
   type Moeda,
 } from "@/lib/formato";
 import { Avisos, Barra, Selo } from "../../avisos";
-import { atendimentoCliente, pedirCompraUnidade, bloquearCliente, decidirCompraUnidade, decidirClienteLocal, definirCredito, depositoCliente, recusarSugestaoCredito, salvarCliente, sugerirClienteLocal, sugerirCredito } from "../acoes";
+import { atendimentoCliente, pedirCompraUnidade, trocarVendedoraCliente, bloquearCliente, decidirCompraUnidade, decidirClienteLocal, definirCredito, depositoCliente, recusarSugestaoCredito, salvarCliente, sugerirClienteLocal, sugerirCredito } from "../acoes";
 import { AcessoCliente } from "./acesso-cliente";
 
 export const metadata = { title: "Cliente" };
@@ -40,6 +40,7 @@ export default async function Cliente({ params, searchParams }: {
                 coalesce(sum(v.a_conferir), 0) as conferir
            from app.v_pedidos v join app.pedidos x on x.id = v.id
           where v.cliente_id = $1 and v.status_comercial <> 'cancelado' and x.total_confirmado_em is not null`, [id])).rows[0],
+      vendedoras: (await c.query("select id, nome from app.vendedoras where ativo order by nome")).rows as { id: string; nome: string }[],
       atendimentos: (await c.query(
         `select a.*, u.nome as usuario_nome from app.atendimentos a left join app.usuarios u on u.id = a.usuario_id
           where a.cliente_id = $1 order by a.em desc limit 50`, [id])).rows,
@@ -65,10 +66,27 @@ export default async function Cliente({ params, searchParams }: {
           <Link href="/clientes">← Clientes</Link>
           <h1 style={{ marginTop: 4 }}>{cli.nome}</h1>
           <div className="linha pequeno suave">
-            <span>{cli.vendedora}</span>
+            <span>Vendedora: <b>{cli.vendedora}</b></span>
             <Selo cor={cli.categoria_preco === "vip" ? "marca" : ""}>{cli.pais === "PY" ? "Paraguai · Gs" : "Brasil · R$"} · {cli.categoria_preco === "vip" ? "VIP" : "Normal"}</Selo>
             {cli.perfil_comercial && <span>{cli.perfil_comercial}</span>}
           </div>
+          {gestao && (
+            <details style={{ marginTop: 6 }}>
+              <summary className="pequeno">Trocar vendedora</summary>
+              <form action={trocarVendedoraCliente} className="linha" style={{ gap: 10, alignItems: "center", flexWrap: "wrap", marginTop: 6 }}>
+                <input type="hidden" name="cliente_id" value={cli.id} />
+                <select name="vendedora_id" defaultValue={cli.vendedora_id} required>
+                  {d.vendedoras.map((v) => <option key={v.id} value={v.id}>{v.nome}</option>)}
+                </select>
+                <label className="pequeno" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <input type="checkbox" name="pedidos_abertos" value="1" defaultChecked style={{ width: "auto" }} />
+                  Passar junto os pedidos em andamento
+                </label>
+                <button className="principal">Trocar</button>
+              </form>
+              <div className="pequeno suave">Pedidos enviados, entregues ou cancelados ficam com quem vendeu. A troca fica no histórico do cliente.</div>
+            </details>
+          )}
         </div>
         <div className="linha">
           {!ro && <Link className="botao" href={`/pedidos/novo?cliente=${cli.id}`}>Novo pedido</Link>}

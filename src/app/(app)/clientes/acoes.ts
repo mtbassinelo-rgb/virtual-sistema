@@ -45,6 +45,23 @@ export async function criarCliente(fd: FormData) {
   redirect(`/clientes/${id}?ok=${encodeURIComponent("Cliente cadastrado." + extra)}`);
 }
 
+/** Gerente ou dono troca a vendedora responsável; pedidos em andamento podem passar junto. */
+export async function trocarVendedoraCliente(fd: FormData) {
+  const u = await exigirUsuario();
+  const id = texto(fd, "cliente_id");
+  const nova = texto(fd, "vendedora_id");
+  const comPedidos = texto(fd, "pedidos_abertos") === "1";
+  let erro: string | null = null, n = 0;
+  try {
+    n = await comUsuario(u.id, async (c) => Number((await c.query("select app.trocar_vendedora_cliente($1, $2::uuid, $3) n", [id, nova, comPedidos])).rows[0].n));
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  revalidatePath(`/clientes/${id}`);
+  revalidatePath("/clientes");
+  redirect(`/clientes/${id}?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Vendedora do cliente trocada." + (n ? ` ${n} pedido(s) em andamento passaram para ela.` : ""))}`);
+}
+
 export async function salvarCliente(fd: FormData) {
   const u = await exigirUsuario();
   const id = texto(fd, "cliente_id");

@@ -181,4 +181,20 @@ select teste.falha($$select app.decidir_compra_unidade('00000000-0000-0000-0000-
 reset role;
 update app.clientes set categoria_preco = :'cat_c1' where id = '00000000-0000-0000-0000-0000000000c1';
 
+\echo '== Gerente troca a vendedora do cliente =='
+set role vc_app;
+select teste.como(:'KEILA');
+select teste.falha($$select app.trocar_vendedora_cliente('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000a2')$$, 'gerente ou dono', 'Vendedora não troca a vendedora do cliente');
+select teste.como(:'GERENTE');
+select app.trocar_vendedora_cliente('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000a2', true);
+reset role;
+select teste.ok((select vendedora_id from app.clientes where id = '00000000-0000-0000-0000-0000000000c1') = '00000000-0000-0000-0000-0000000000a2', 'Cliente passa para a nova vendedora');
+select teste.ok(not exists (select 1 from app.pedidos where cliente_id = '00000000-0000-0000-0000-0000000000c1'
+  and status_comercial in ('aguardando_cliente','aguardando_aprovacao','em_separacao') and vendedora_id <> '00000000-0000-0000-0000-0000000000a2'), 'Pedidos em andamento vão junto');
+select teste.ok(exists (select 1 from app.atendimentos where cliente_id = '00000000-0000-0000-0000-0000000000c1' and nota like 'Vendedora trocada:%'), 'Troca fica no histórico do cliente');
+set role vc_app;
+select teste.como(:'GERENTE');
+select app.trocar_vendedora_cliente('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000a1', true);
+reset role;
+
 \echo '== Testes da inteligência comercial passaram =='
