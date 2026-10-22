@@ -5,7 +5,7 @@ import { dinheiro, data, type Moeda } from "@/lib/formato";
 import { categoriasDe, linhasEfetivas, type CategoriaDb, corRotulo, interno, linhasExtras, marcaDe, nomeCurto, subLinhaDe, sublinhasEfetivas, type SubLinhaDb } from "@/lib/vitrine";
 import { Quantidade, SeletorVariantes } from "./carrinho";
 import { TEXTOS, idiomaAtual, type Textos } from "@/lib/idioma";
-import { bannersPadrao, bannersDaEquipe, type Banner } from "@/lib/banners-padrao";
+import { bannersDaEquipe, type Banner } from "@/lib/banners-padrao";
 import { FaixaBanners } from "./banners";
 import { ehPrincipal, unidadeLoja } from "@/lib/unidade";
 import { SEO, urlMarca } from "@/lib/seo";
@@ -48,7 +48,8 @@ export async function Vitrine({ f, cabecalho }: { f: Filtros; cabecalho?: Cabeca
   };
   const proprios = (await pool.query("select * from app.banners_ativos($1)", [idioma])).rows as Banner[];
   // banners da equipe primeiro, depois os prontos (marcas e atacado)
-  const banners = [...bannersDaEquipe(proprios), ...bannersPadrao(idioma, Boolean(cliente))];
+  // só os banners que a equipe sobe no sistema, no idioma do visitante
+  const banners = bannersDaEquipe(proprios);
   const token = cliente ? await tokenCliente() : null;
 
   const publicos = (await pool.query("select * from app.vitrine_publica_unidade($1)", [unidade.id])).rows as Publico[];

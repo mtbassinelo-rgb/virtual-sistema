@@ -3,7 +3,7 @@ import { ehGestao, exigirUsuario } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
 import { dataHora, linkWhatsApp, telefone } from "@/lib/formato";
 import { Avisos, Selo } from "../avisos";
-import { alternarBanner, apagarBanner, aprovarCadastro, atenderCadastro, criarBanner, ordemBanner, salvarMensagemCliente } from "./acoes";
+import { alternarBanner, apagarBanner, aprovarCadastro, atenderCadastro, celularBanner, criarBanner, idiomaBanner, ordemBanner, salvarMensagemCliente } from "./acoes";
 import { TextoMensagem } from "@/app/loja/boas-vindas";
 
 export const metadata = { title: "Site" };
@@ -115,8 +115,8 @@ export default async function Site({ searchParams }: { searchParams: Promise<{ o
 
       <section className="painel">
         <h2>Banners do início</h2>
-        <p className="pequeno suave">Aparecem no topo da página inicial, na ordem abaixo (dá para deslizar entre eles). Imagem larga, de preferência 1600 × 600.</p>
-        {d.banners.length === 0 && <p className="suave">Nenhum banner cadastrado. Enquanto isso, a loja e a área do cliente mostram 4 banners prontos: kits Maycrene, atacado por caixa, Mary Life e Rhenuks. Os banners cadastrados aqui aparecem antes dos prontos.</p>}
+        <p className="pequeno suave">Só estes banners aparecem no site, no topo da página inicial e na área do cliente, na ordem abaixo. Cada cliente vê só os banners do idioma dele. A imagem aparece inteira, sem nome por cima. Tamanhos: <b>computador 1800 × 600</b>; <b>celular 1080 × 1080</b> (quadrada). Sem imagem de celular, o celular mostra a imagem do computador inteira, em tamanho menor.</p>
+        {d.banners.length === 0 && <p className="suave">Nenhum banner cadastrado: o site fica sem banners no topo até você subir o primeiro.</p>}
         {d.banners.map((b) => (
           <div key={b.id} className="painel linha" style={{ background: "var(--afundado)", alignItems: "flex-start" }}>
             {b.imagem ? <img src={b.imagem} alt="" style={{ width: 200, aspectRatio: "16/6", objectFit: "cover", borderRadius: 8 }} />
@@ -129,6 +129,24 @@ export default async function Site({ searchParams }: { searchParams: Promise<{ o
                 {b.inicio && ` · de ${String(b.inicio)}`}{b.fim && ` até ${String(b.fim)}`}
               </div>
               {b.link && <div className="pequeno">Link: <a href={b.link.startsWith("/") ? `https://distribuidoravirtualcosmeticos.com${b.link}` : b.link} target="_blank" rel="noopener noreferrer">{b.link}</a></div>}
+              <div className="pequeno">{b.imagem_celular ? "✓ Tem imagem para celular" : "Sem imagem para celular: no celular aparece a imagem do computador inteira"}</div>
+              {gestao && (
+                <div className="linha" style={{ gap: 8, marginTop: 6, flexWrap: "wrap", alignItems: "center" }}>
+                  <form action={idiomaBanner} className="linha" style={{ gap: 6, alignItems: "center" }}>
+                    <input type="hidden" name="id" value={b.id} />
+                    <select name="idioma" defaultValue={b.idioma} aria-label="Quem vê este banner">
+                      <option value="todos">Português e espanhol</option><option value="pt">Só português</option><option value="es">Só espanhol</option>
+                    </select>
+                    <button>Salvar idioma</button>
+                  </form>
+                  <form action={celularBanner} className="linha" style={{ gap: 6, alignItems: "center" }}>
+                    <input type="hidden" name="id" value={b.id} />
+                    <input type="file" name="imagem_celular" accept="image/jpeg,image/png,image/webp" aria-label="Imagem para celular" style={{ maxWidth: 220 }} />
+                    <button>{b.imagem_celular ? "Trocar imagem do celular" : "Enviar imagem do celular"}</button>
+                  </form>
+                  {b.imagem_celular && <form action={celularBanner}><input type="hidden" name="id" value={b.id} /><input type="hidden" name="tirar" value="1" /><button className="discreto">Tirar imagem do celular</button></form>}
+                </div>
+              )}
             </div>
             {gestao && (
               <div className="linha">
@@ -147,11 +165,12 @@ export default async function Site({ searchParams }: { searchParams: Promise<{ o
             <form action={criarBanner} className="campos" style={{ marginTop: 10 }}>
               <label className="largo">Nome do banner (só para sua organização, não aparece no site)<input name="titulo" required maxLength={120} placeholder="Ex.: Mais vendidos outubro" /></label>
               <label className="largo">Frase escrita por cima da imagem no site (opcional; deixe vazio se a imagem já tem tudo)<input name="subtitulo" maxLength={200} placeholder="Ex.: Kits com 10% de desconto até domingo" /></label>
-              <label className="largo">Imagem (JPG, PNG ou WEBP)<input type="file" name="imagem" accept="image/jpeg,image/png,image/webp" /></label>
+              <label className="largo">Imagem para computador: 1800 × 600 (JPG, PNG ou WEBP)<input type="file" name="imagem" accept="image/jpeg,image/png,image/webp" required /></label>
+              <label className="largo">Imagem para celular: 1080 × 1080 (opcional, recomendada)<input type="file" name="imagem_celular" accept="image/jpeg,image/png,image/webp" /></label>
               <label className="largo">Link ao clicar (opcional)
                 <input name="link" placeholder="Ex.: /loja?marca=Maycrene  ou  /loja?q=platinum  ou  /loja?linha=kits" />
               </label>
-              <label>Idioma
+              <label>Quem vê (idioma do cliente)
                 <select name="idioma" defaultValue="todos">
                   <option value="todos">Português e espanhol</option><option value="pt">Só português</option><option value="es">Só espanhol</option>
                 </select>

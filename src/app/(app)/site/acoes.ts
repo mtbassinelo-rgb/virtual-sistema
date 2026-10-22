@@ -34,27 +34,62 @@ function link(fd: FormData): string | null {
   throw new Error("Link do banner: cole um endereço do site (ex.: /loja?linha=kits) ou um link https.");
 }
 
+/** Grava a imagem enviada no formulário (JPG, PNG ou WEBP, até 8 MB) e devolve o endereço /fotos/... */
+async function salvarImagem(fd: FormData, campo: string): Promise<string | null> {
+  const arq = fd.get(campo);
+  if (!(arq instanceof File) || arq.size === 0) return null;
+  if (arq.size > 8 * 1024 * 1024) throw new Error("Imagem grande demais: máximo 8 MB.");
+  const bytes = Buffer.from(await arq.arrayBuffer());
+  const ext = tipoImagem(bytes);
+  if (!ext) throw new Error("A imagem precisa ser JPG, PNG ou WEBP.");
+  await mkdir(pastaFotos(), { recursive: true });
+  const nome = `${randomUUID()}-${Date.now()}.${ext}`;
+  await writeFile(path.join(pastaFotos(), nome), bytes);
+  return `/fotos/${nome}`;
+}
+const apagarArquivo = (img: string | null | undefined) => img ? rm(path.join(pastaFotos(), path.basename(img)), { force: true }) : Promise.resolve();
+
 export async function criarBanner(fd: FormData) {
   await executar("Banner criado.", async (uid) => {
-    let imagem: string | null = null;
-    const arq = fd.get("imagem");
-    if (arq instanceof File && arq.size > 0) {
-      if (arq.size > 8 * 1024 * 1024) throw new Error("Imagem grande demais: máximo 8 MB.");
-      const bytes = Buffer.from(await arq.arrayBuffer());
-      const ext = tipoImagem(bytes);
-      if (!ext) throw new Error("A imagem precisa ser JPG, PNG ou WEBP.");
-      await mkdir(pastaFotos(), { recursive: true });
-      const nome = `${randomUUID()}-${Date.now()}.${ext}`;
-      await writeFile(path.join(pastaFotos(), nome), bytes);
-      imagem = `/fotos/${nome}`;
-    }
+    const imagem = await salvarImagem(fd, "imagem");
+    let celular: string | null = null;
     try {
+      celular = await salvarImagem(fd, "imagem_celular");
       await comUsuario(uid, (c) => c.query(
-        `insert into app.banners (titulo, subtitulo, imagem, link, idioma, ordem, inicio, fim, criado_por)
-         values ($1, nullif($2,''), $3, $4, $5, coalesce(nullif($6,'')::int, 0), nullif($7,'')::date, nullif($8,'')::date, app.uid())`,
-        [texto(fd, "titulo"), texto(fd, "subtitulo"), imagem, link(fd), texto(fd, "idioma") || "todos", texto(fd, "ordem"), texto(fd, "inicio"), texto(fd, "fim")]));
+        `insert into app.banners (titulo, subtitulo, imagem, link, idioma, ordem, inicio, fim, criado_por, imagem_celular)
+         values ($1, nullif($2,''), $3, $4, $5, coalesce(nullif($6,'')::int, 0), nullif($7,'')::date, nullif($8,'')::date, app.uid(), $9)`,
+        [texto(fd, "titulo"), texto(fd, "subtitulo"), imagem, link(fd), texto(fd, "idioma") || "todos", texto(fd, "ordem"), texto(fd, "inicio"), texto(fd, "fim"), celular]));
     } catch (e) {
-      if (imagem) await rm(path.join(pastaFotos(), path.basename(imagem)), { force: true });
+      await apagarArquivo(imagem); await apagarArquivo(celular);
+      throw e;
+    }
+  });
+}
+
+/** Troca o idioma de um banner já cadastrado (quem vê: português, espanhol ou os dois). */
+export async function idiomaBanner(fd: FormData) {
+  const idioma = texto(fd, "idioma");
+  await executar("Idioma do banner atualizado.", async (uid) => {
+    if (!["todos", "pt", "es"].includes(idioma)) throw new Error("Idioma inválido.");
+    await comUsuario(uid, (c) => c.query("update app.banners set idioma = $2 where id = $1", [texto(fd, "id"), idioma]));
+  });
+}
+
+/** Coloca, troca ou tira a imagem para celular de um banner já cadastrado. */
+export async function celularBanner(fd: FormData) {
+  const tirar = texto(fd, "tirar") === "1";
+  await executar(tirar ? "Imagem do celular removida." : "Imagem do celular salva.", async (uid) => {
+    const nova = tirar ? null : await salvarImagem(fd, "imagem_celular");
+    if (!tirar && !nova) throw new Error("Escolha a imagem para celular.");
+    try {
+      const antiga = await comUsuario(uid, async (c) => {
+        const a = (await c.query("select imagem_celular from app.banners where id = $1", [texto(fd, "id")])).rows[0]?.imagem_celular as string | null;
+        await c.query("update app.banners set imagem_celular = $2 where id = $1", [texto(fd, "id"), nova]);
+        return a;
+      });
+      await apagarArquivo(antiga);
+    } catch (e) {
+      await apagarArquivo(nova);
       throw e;
     }
   });
@@ -72,9 +107,9 @@ export async function ordemBanner(fd: FormData) {
 
 export async function apagarBanner(fd: FormData) {
   await executar("Banner apagado.", async (uid) => {
-    const img = await comUsuario(uid, async (c) =>
-      (await c.query("delete from app.banners where id = $1 returning imagem", [texto(fd, "id")])).rows[0]?.imagem as string | null);
-    if (img) await rm(path.join(pastaFotos(), path.basename(img)), { force: true });
+    const r = await comUsuario(uid, async (c) =>
+      (await c.query("delete from app.banners where id = $1 returning imagem, imagem_celular", [texto(fd, "id")])).rows[0] as { imagem: string | null; imagem_celular: string | null } | undefined);
+    await apagarArquivo(r?.imagem); await apagarArquivo(r?.imagem_celular);
   });
 }
 

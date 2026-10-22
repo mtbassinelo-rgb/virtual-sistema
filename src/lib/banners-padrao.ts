@@ -1,10 +1,10 @@
 import type { Idioma } from "./idioma";
 
-export type Banner = { id: string; titulo: string; subtitulo: string | null; imagem: string | null; link: string | null };
+export type Banner = { id: string; titulo: string; subtitulo: string | null; imagem: string | null; link: string | null; imagem_celular?: string | null; soImagem?: boolean };
 
 /** Banners cadastrados pela equipe: o nome é só para organização no sistema e nunca aparece no site. */
 export function bannersDaEquipe(linhas: Banner[]): Banner[] {
-  return linhas.map((b) => ({ ...b, titulo: "" }));
+  return linhas.map((b) => ({ ...b, titulo: "", soImagem: true }));
 }
 
 /** Banners do site enquanto a equipe não cadastrar os próprios (Loja online → Banners e destaques). */

@@ -618,3 +618,11 @@
 
 /* Banner da equipe só com imagem: sem a sombra escura embaixo (não há texto para destacar) */
 .banner.sem-texto::after { display: none; }
+
+/* Banners da equipe: a imagem aparece inteira, sem cortar, no tamanho dela (computador e celular).
+   No celular usa a "imagem para celular" quando cadastrada; senão mostra a imagem larga inteira. */
+.banner.so-imagem { display: block; min-height: 0; background: var(--roxo-escuro); }
+.banner.so-imagem picture, .banner.so-imagem > img { display: block; }
+.banner.so-imagem img { position: static; display: block; width: 100%; height: auto; object-fit: contain; }
+.banner.so-imagem .banner-texto { position: absolute; left: 0; right: 0; bottom: 0; }
+.banners-compacta .banner.so-imagem { min-height: 0; }

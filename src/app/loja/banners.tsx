@@ -30,7 +30,13 @@ export function FaixaBanners({ banners, rotulo, acao, compacta }: { banners: Ban
           const temTexto = Boolean(b.titulo || b.subtitulo);
           const conteudo = (
             <>
-              {b.imagem ? <img src={b.imagem} alt="" /> : <img className="banner-icone" src="/marca/icone.png" alt="" />}
+              {b.imagem
+                ? <picture>
+                    {b.imagem_celular && <source media="(max-width: 640px)" srcSet={b.imagem_celular} />}
+                    <img src={b.imagem} alt="" />
+                  </picture>
+                : b.imagem_celular ? <img src={b.imagem_celular} alt="" />
+                : <img className="banner-icone" src="/marca/icone.png" alt="" />}
               {temTexto && (
                 <div className="banner-texto">
                   {b.titulo && <h2>{b.titulo}</h2>}
@@ -40,7 +46,7 @@ export function FaixaBanners({ banners, rotulo, acao, compacta }: { banners: Ban
               )}
             </>
           );
-          const classe = `banner ${b.imagem ? "com-imagem" : ""} ${temTexto ? "" : "sem-texto"}`;
+          const classe = `banner ${b.imagem || b.imagem_celular ? "com-imagem" : ""} ${temTexto ? "" : "sem-texto"} ${b.soImagem ? "so-imagem" : ""}`;
           return b.link
             ? <a key={b.id} href={b.link} className={classe} aria-label={temTexto ? undefined : acao}>{conteudo}</a>
             : <div key={b.id} className={classe}>{conteudo}</div>;
