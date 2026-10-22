@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { redirecionar } from "@/lib/redirecionar";
 import { pool } from "@/lib/db";
 import { COOKIE_CLIENTE, novoToken, sha256 } from "@/lib/portal";
 
@@ -15,8 +15,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
   const { token } = await params;
   const sessao = novoToken();
   const { rows } = await pool.query("select app.portal_entrar($1, $2) as ok", [sha256(token), sha256(sessao)]);
-  if (!rows[0]?.ok) return NextResponse.redirect(new URL("/loja/acesso?motivo=link", req.url), 303);
-  const r = NextResponse.redirect(new URL("/loja", req.url), 303);
+  if (!rows[0]?.ok) return redirecionar("/loja/acesso?motivo=link");
+  const r = redirecionar("/loja");
   r.cookies.set(COOKIE_CLIENTE, sessao, {
     httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/loja", maxAge: 90 * 86400,
   });
