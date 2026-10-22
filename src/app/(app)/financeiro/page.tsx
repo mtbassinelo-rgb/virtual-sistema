@@ -98,7 +98,19 @@ export default async function Financeiro({ searchParams }: { searchParams: Promi
       fornecedores: (await c.query(`select f.nome, count(*)::int notas, sum(c.total) total from app.compras c join app.fornecedores f on f.id = c.fornecedor_id
           where c.data between $1 and $2 group by 1 order by 3 desc limit 15`, [iniPer, fim])).rows,
     } : null;
-    return { cambio, meses, saldos, meta, metas, marcas, clientes, compras };
+    // vendido abaixo do custo: quase sempre custo da caixa gravado como custo da unidade
+    const abaixo = aba === "resumo" || aba === "marcas" ? (await c.query(`
+      select pr.id, pr.codigo, pr.nome, pr.marca, pr.unidades_caixa, pr.custo_unitario_brl custo_atual,
+             sum(i.quantidade) qtd,
+             round(sum(case when p.moeda = 'GS' then i.total / coalesce(i.cambio_custo, $3) else i.total end) / sum(i.quantidade), 2) preco_un,
+             round(sum(i.quantidade * i.custo_unitario_brl) / sum(i.quantidade), 2) custo_un,
+             round(sum(i.quantidade * i.custo_unitario_brl - case when p.moeda = 'GS' then i.total / coalesce(i.cambio_custo, $3) else i.total end), 2) prejuizo
+        from app.pedido_itens i join app.pedidos p on p.id = i.pedido_id join app.produtos pr on pr.id = i.produto_id
+       where app.conta_como_venda(p.status_comercial) and p.data_pedido between $1 and $2 and i.custo_unitario_brl is not null
+       group by 1, 2, 3, 4, 5, 6
+      having sum(i.quantidade * i.custo_unitario_brl) > sum(case when p.moeda = 'GS' then i.total / coalesce(i.cambio_custo, $3) else i.total end)
+       order by prejuizo desc limit 20`, [iniPer, fim, cambio])).rows : [];
+    return { cambio, meses, saldos, meta, metas, marcas, clientes, compras, abaixo };
   });
 
   const atual = d.meses[d.meses.length - 1];
@@ -174,6 +186,7 @@ export default async function Financeiro({ searchParams }: { searchParams: Promi
               {atual.fixas === 0 && fixoMes > 0 ? " (Custo fixo do mês ainda não lançado: usei a média dos últimos meses.)" : ""}</p>
           </>)}
         </section>
+        <AbaixoCusto ls={d.abaixo} />
         <section className="painel">
           <h2>DRE dos últimos 12 meses (R$)</h2>
           <div className="tabela"><table className="dre">
@@ -240,6 +253,7 @@ export default async function Financeiro({ searchParams }: { searchParams: Promi
           </section>
         </>);
       })()}
+      {aba === "marcas" && <AbaixoCusto ls={d.abaixo} />}
 
       {aba === "clientes" && (() => {
         const ls = d.clientes.filter((x) => x.rc > 0);
@@ -397,5 +411,31 @@ function TabelaClientes({ ls }: { ls: { cliente_id: string; nome: string; vended
           <td className="num">{pct(x.rc ? x.lucro / x.rc : null)}</td>
         </tr>))}</tbody>
     </table></div>
+  );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function AbaixoCusto({ ls }: { ls: any[] }) {
+  if (!ls.length) return null;
+  return (
+<section className="painel">
+        <h2>Vendido abaixo do custo · confira o custo</h2>
+        <p className="pequeno suave" style={{ margin: 0 }}>Quase sempre é o custo da caixa gravado como custo da unidade. Corrija em Precificação; o lucro dos próximos pedidos sai certo
+          (os pedidos já feitos guardam o custo da época).</p>
+        <div className="tabela"><table>
+          <thead><tr><th>Produto</th><th>Marca</th><th>Qtd</th><th>Venda/un</th><th>Custo/un no pedido</th><th>Custo hoje</th><th>Prejuízo</th></tr></thead>
+          <tbody>{ls.map((x) => (
+            <tr key={x.id}>
+              <td><Link href={`/produtos/${x.id}`}>{x.nome}</Link><div className="pequeno suave">{x.codigo}{x.unidades_caixa ? ` · ${x.unidades_caixa} por caixa` : ""}</div></td>
+              <td>{x.marca}</td><td className="num">{Number(x.qtd).toLocaleString("pt-BR")}</td>
+              <td className="num">{R(x.preco_un)}</td>
+              <td className="num" style={{ color: "var(--erro)" }}>{R(x.custo_un)}
+                {x.unidades_caixa > 1 && n(x.custo_un) / x.unidades_caixa < n(x.preco_un) && <div className="pequeno suave">÷{x.unidades_caixa} = {R(n(x.custo_un) / x.unidades_caixa)}?</div>}</td>
+              <td className="num">{x.custo_atual != null ? R(x.custo_atual) : "—"}</td>
+              <td className="num"><b>{R(x.prejuizo)}</b></td>
+            </tr>))}</tbody>
+        </table></div>
+        <Link href="/inteligencia/precificacao">Abrir Precificação →</Link>
+      </section>
   );
 }
