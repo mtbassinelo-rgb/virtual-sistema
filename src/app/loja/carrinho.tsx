@@ -185,7 +185,6 @@ function Gaveta({ cliente: clienteInicial }: { cliente: ClienteCarrinho }) {
                 <li key={i.id}>
                   <div>
                     <div className="g-nome">{i.nome}</div>
-                    {i.encomenda && <div className="g-encomenda">{t.itemEncomenda}</div>}
                     {i.caixa ? <div className="g-caixa">{t.caixas.replace("9999", String(i.qtd))} · {un(i)} {t.un}</div> : null}
                     {cliente && <div className="g-preco">{i.preco != null ? fmt(i.preco * un(i), cliente.moeda) : t.precoConfirmar}</div>}
                   </div>

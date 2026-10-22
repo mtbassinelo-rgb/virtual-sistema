@@ -79,7 +79,15 @@ export default async function Hoje() {
           coalesce(sum(valor) filter (where situacao in ('vence_hoje','vence_7_dias')), 0) valor_semana
           from app.v_despesas where pago_em is null group by moeda order by moeda desc`)).rows,
     } : null;
-    return { destaques, sugestoesCredito, cadastros, site, aConferir, metasPropostas, recusados, envioAtrasado, pagAtrasado, metasPerto, transferencias, portal, separar, confirmar, pendencias };
+    // Pedidos em aberto com item sem estoque (o cliente não vê "esgotado": a vendedora confere e avisa)
+    const semEstoque = (await c.query(`select p.id, coalesce(cl.nome, 'Cliente') cliente, v.nome vendedora, p.data_pedido,
+         string_agg(regexp_replace(i.descricao, ' · SEM ESTOQUE.*$', '') || ' (' || trim(to_char(i.quantidade, 'FM999990')) || ')', '; ' order by i.descricao) itens
+        from app.pedidos p join app.pedido_itens i on i.pedido_id = p.id
+        left join app.clientes cl on cl.id = p.cliente_id join app.vendedoras v on v.id = p.vendedora_id
+       where i.descricao ilike '%SEM ESTOQUE%' and p.status_comercial::text in ('aguardando_cliente','aguardando_aprovacao','em_separacao')
+       group by p.id, cl.nome, v.nome, p.data_pedido order by p.data_pedido desc limit 30`).catch(() => ({ rows: [] }))).rows as
+      { id: string; cliente: string; vendedora: string; data_pedido: string; itens: string }[];
+    return { semEstoque, destaques, sugestoesCredito, cadastros, site, aConferir, metasPropostas, recusados, envioAtrasado, pagAtrasado, metasPerto, transferencias, portal, separar, confirmar, pendencias };
   });
 
   return (
@@ -128,6 +136,19 @@ export default async function Hoje() {
         </div>
       </div>
 
+      {d.semEstoque.length > 0 && (
+        <section className="painel">
+          <h2 style={{ margin: 0 }}>Pedidos com produto esgotado ({d.semEstoque.length})</h2>
+          <p className="pequeno suave" style={{ margin: 0 }}>O cliente não vê que está esgotado. Confira com o estoque/fornecedor e avise o cliente: prazo de chegada ou troca do produto.</p>
+          <div className="tabela"><table style={{ minWidth: 0 }}>
+            <thead><tr><th>Pedido</th><th>Cliente</th><th>Vendedora</th><th>Sem estoque</th></tr></thead>
+            <tbody>{d.semEstoque.map((x) => (
+              <tr key={x.id}><td><Link href={`/pedidos/${x.id}`}>{new Date(x.data_pedido).toLocaleDateString("pt-BR", { timeZone: "UTC" })}</Link></td>
+                <td>{x.cliente}</td><td>{x.vendedora}</td><td className="pequeno">{x.itens}</td></tr>
+            ))}</tbody>
+          </table></div>
+        </section>
+      )}
       {d.cadastros > 0 && (
         <a href="/site#cadastros" className="aviso-caixa aviso" style={{ textDecoration: "none", color: "inherit" }}>
           <b>{d.cadastros} {d.cadastros === 1 ? "novo cadastro" : "novos cadastros"} pelo site</b> (Quero ser cliente) aguardando contato.

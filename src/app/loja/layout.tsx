@@ -5,7 +5,7 @@ import { pool } from "@/lib/db";
 import { linkWhatsApp, telefone } from "@/lib/formato";
 import { TEXTOS, idiomaAtual, textosCarrinho } from "@/lib/idioma";
 import { retiradaDoCliente } from "./acoes";
-import { LINHAS, interno, marcaDe, categoriasDe } from "@/lib/vitrine";
+import { interno, marcaDe, categoriasDe, linhasEfetivas, type CategoriaDb } from "@/lib/vitrine";
 import { BotaoCarrinho, Carrinho } from "./carrinho";
 import { ehPrincipal, unidadeLoja } from "@/lib/unidade";
 import { vendedoraDoLink } from "@/lib/vendedora-link";
@@ -59,7 +59,8 @@ export default async function LayoutLoja({ children }: { children: React.ReactNo
   const urlSistema = host && /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(host) && !/^\d/.test(host) ? `https://app.${host}/login` : "/login";
   const principal = ehPrincipal(unidade);
   const idioma = await idiomaAtual();
-  const t = TEXTOS[idioma];
+  const CATS = linhasEfetivas((await pool.query("select * from app.categorias_publicas()").catch(() => ({ rows: [] }))).rows as CategoriaDb[], idioma === "es");
+  const t = { ...TEXTOS[idioma], linhas: { ...TEXTOS[idioma].linhas, ...CATS.nomes } };
   // Português: WhatsApp principal. Espanhol (clientes em guaranis): WhatsApp de vendas em Gs.
   const vend = c ? null : await vendedoraDoLink();
   const descontos = (await pool.query("select * from app.descontos_quantidade_ativos()")).rows
@@ -99,7 +100,7 @@ export default async function LayoutLoja({ children }: { children: React.ReactNo
                 { href: "/loja#mais-vendidos", texto: t.maisVendidos },
                 { href: "/loja/quem-somos", texto: t.quemSomos },
               ] },
-              { titulo: t.categorias, links: LINHAS.filter((l) => porLinha.get(l.chave)).map((l) => ({ href: `/loja?linha=${l.chave}#catalogo`, texto: t.linhas[l.chave], qtd: porLinha.get(l.chave) })) },
+              { titulo: t.categorias, links: CATS.lista.filter((l) => porLinha.get(l.chave)).map((l) => ({ href: `/loja?linha=${l.chave}#catalogo`, texto: t.linhas[l.chave], qtd: porLinha.get(l.chave) })) },
               { titulo: t.marcas, links: [...marcas.slice().sort((a, b) => b[1] - a[1]).slice(0, 12).map(([m, n]) => ({ href: `/loja?marca=${encodeURIComponent(m)}#catalogo`, texto: m, qtd: n })),
                 { href: "/loja/marcas", texto: t.verTodasMarcas }] },
               { titulo: c ? c.nome : t.clientes, links: c
@@ -136,7 +137,7 @@ export default async function LayoutLoja({ children }: { children: React.ReactNo
             <details className="menu-cair">
               <summary>{t.categorias}</summary>
               <div className="menu-painel">
-                {LINHAS.filter((l) => porLinha.get(l.chave)).map((l) => (
+                {CATS.lista.filter((l) => porLinha.get(l.chave)).map((l) => (
                   <a key={l.chave} href={`/loja?linha=${l.chave}#catalogo`}>{t.linhas[l.chave]}<span>{porLinha.get(l.chave)}</span></a>
                 ))}
               </div>

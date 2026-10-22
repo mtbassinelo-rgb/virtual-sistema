@@ -208,7 +208,7 @@ export function linhasExtras(nome: string, linha: string): string[] {
 /** Categorias do produto no site: as fixadas à mão (Produtos → Categorias do site) ou as automáticas pelo nome. */
 export function categoriasDe(nome: string, marca: string | null | undefined, tipo: string | null | undefined, manual?: string[] | null): { linha: string; extras: string[] } {
   if (manual && manual.length) {
-    const validas = manual.filter((c) => LINHAS.some((l) => l.chave === c));
+    const validas = manual.filter((c) => /^[a-z0-9-]{2,30}$/.test(c));
     if (validas.length) return { linha: validas[0], extras: validas.slice(1) };
   }
   const linha = linhaDe(nome, marca, tipo);
@@ -229,4 +229,19 @@ export function sugerirCategoria(nome: string): string | null {
   ];
   for (const [c, re] of regras) if (re.test(n)) return c;
   return null;
+}
+
+export type CategoriaDb = { chave: string; nome: string; nome_es: string | null; ordem: number; ativo: boolean };
+/** Categorias principais valendo: as do programa (renomeadas/escondidas pela equipe) + as criadas pela equipe, antes de "Outros". */
+export function linhasEfetivas(db: CategoriaDb[] = [], es = false): { lista: Linha[]; nomes: Record<string, string> } {
+  const porChave = new Map(db.map((d) => [d.chave, d]));
+  const base = LINHAS.filter((l) => porChave.get(l.chave)?.ativo !== false).map((l) => {
+    const d = porChave.get(l.chave);
+    return d ? { chave: l.chave, nome: (es && d.nome_es) || d.nome } : l;
+  });
+  const novas = db.filter((d) => d.ativo && !LINHAS.some((l) => l.chave === d.chave)).sort((a, b) => a.ordem - b.ordem)
+    .map((d) => ({ chave: d.chave, nome: (es && d.nome_es) || d.nome }));
+  const i = base.findIndex((l) => l.chave === "outros");
+  const lista = i >= 0 ? [...base.slice(0, i), ...novas, ...base.slice(i)] : [...base, ...novas];
+  return { lista, nomes: Object.fromEntries(db.filter((d) => d.ativo).map((d) => [d.chave, (es && d.nome_es) || d.nome])) };
 }

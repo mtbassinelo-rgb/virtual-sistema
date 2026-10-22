@@ -2,9 +2,8 @@ import Link from "next/link";
 import { pool } from "@/lib/db";
 import { clienteAtual, sha256, tokenCliente } from "@/lib/portal";
 import { dinheiro, data, type Moeda } from "@/lib/formato";
-import { LINHAS, categoriasDe, corRotulo, interno, linhasExtras, marcaDe, nomeCurto, subLinhaDe, sublinhasEfetivas, type SubLinhaDb } from "@/lib/vitrine";
+import { categoriasDe, linhasEfetivas, type CategoriaDb, corRotulo, interno, linhasExtras, marcaDe, nomeCurto, subLinhaDe, sublinhasEfetivas, type SubLinhaDb } from "@/lib/vitrine";
 import { Quantidade, SeletorVariantes } from "./carrinho";
-import { QueroProduto } from "./quero-produto";
 import { TEXTOS, idiomaAtual, type Textos } from "@/lib/idioma";
 import { bannersPadrao, type Banner } from "@/lib/banners-padrao";
 import { FaixaBanners } from "./banners";
@@ -34,8 +33,11 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
   const vendeUnidade = unidade.vende_unidade
     || (sessaoCliente ? Boolean((await pool.query("select app.portal_compra_unidade($1) as ok", [sha256(sessaoCliente)])).rows[0]?.ok) : false);
   // site de outra unidade (ex.: CDE): os textos de abertura falam da loja dela, não do CD de Foz
-  const t: Textos = ehPrincipal(unidade) ? TEXTOS[idioma] : {
-    ...TEXTOS[idioma],
+  // categorias criadas/renomeadas pela equipe
+  const CATS = linhasEfetivas((await pool.query("select * from app.categorias_publicas()").catch(() => ({ rows: [] }))).rows as CategoriaDb[], idioma === "es");
+  const tLoja = { ...TEXTOS[idioma], linhas: { ...TEXTOS[idioma].linhas, ...CATS.nomes } } as Textos;
+  const t: Textos = ehPrincipal(unidade) ? tLoja : {
+    ...tLoja,
     heroTitulo: idioma === "es" ? `${unidade.loja_nome}: cosméticos por unidad y por caja cerrada.` : `${unidade.loja_nome}: cosméticos por unidade e por caixa fechada.`,
     heroTexto: idioma === "es" ? "Los mismos productos de la distribuidora, con stock propio en la tienda. Compre por unidad o por caja." : "Os mesmos produtos da distribuidora, com estoque próprio na loja. Compre por unidade ou por caixa.",
   };
@@ -87,7 +89,7 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
   const destaques = [...vendidos, ...todos.filter((p) => p.x?.destaque && !vendidos.includes(p))].slice(0, 12);
 
   const q = (f.q ?? "").trim();
-  const linha = LINHAS.find((l) => l.chave === f.linha)?.chave ?? null;
+  const linha = CATS.lista.find((l) => l.chave === f.linha)?.chave ?? null;
   const marca = f.marca && marcas.has(f.marca) ? f.marca : null;
   const soPromo = f.promocao === "1";
   const soNovidade = f.novidade === "1";
@@ -262,7 +264,7 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
           <nav className="linhas" aria-label={t.catalogo}>
             <b className="filtros-titulo">{t.categorias}</b>
             <Link href={url({ linha: null })} className={!linha ? "ativa" : ""}>{t.tudo}</Link>
-            {LINHAS.filter((l) => contagem.get(l.chave)).map((l) => (
+            {CATS.lista.filter((l) => contagem.get(l.chave)).map((l) => (
               <Link key={l.chave} href={url({ linha: l.chave })} className={linha === l.chave ? "ativa" : ""}>{t.linhas[l.chave] ?? l.nome} <small>{contagem.get(l.chave)}</small></Link>
             ))}
           </nav>
@@ -336,8 +338,7 @@ function Cartao({ p, moeda, cliente, t, vendeUnidade }: { p: Produto; moeda: Moe
         {promo && <span className="etiqueta-promo">−{Number(promo)}%</span>}
         {!promo && p.novidade && <span className="etiqueta-promo">{t.novo}</span>}
         {p.linha === "kits" && !promo && !p.novidade && <span className="etiqueta-kit">{t.kit}</span>}
-        {semEstoque ? <span className="etiqueta-esgotado">{t.esgotado}</span>
-          : Number(p.x?.vendidos_90d ?? 0) > 0 && <span className="etiqueta-vendido">{t.maisVendido}</span>}
+        {!semEstoque && Number(p.x?.vendidos_90d ?? 0) > 0 && <span className="etiqueta-vendido">{t.maisVendido}</span>}
       </div>
       <div className="cartao-corpo">
         <h3>{p.nome}</h3>
@@ -348,13 +349,11 @@ function Cartao({ p, moeda, cliente, t, vendeUnidade }: { p: Produto; moeda: Moe
           <div className="estoque">
             {pr.disponibilidade === "disponivel" && t.emEstoque}
             {pr.disponibilidade === "ultimas" && t.ultimas}
-            {pr.disponibilidade === "indisponivel" && pr.disponivel_abastecedor && t.encomenda(pr.prazo_abastecimento)}
-            {semEstoque && t.itemEncomenda}
           </div>
         )}
         {pr?.ultima_compra && <div className="estoque">{t.comprouEm(data(pr.ultima_compra))}</div>}
-        <Comprar p={p} item={item} vendeUnidade={vendeUnidade} t={t} rotulo={semEstoque ? t.pedirEncomenda : cliente ? t.adicionarPedido : t.adicionar} />
-        {semEstoque && <QueroProduto produtoId={p.produto_id} cliente={cliente} t={t.quero} />}
+        {/* sem estoque: o cliente não vê "esgotado"; o pedido entra e a vendedora confere */}
+        <Comprar p={p} item={item} vendeUnidade={vendeUnidade} t={t} rotulo={cliente ? t.adicionarPedido : t.adicionar} />
       </div>
     </article>
   );
@@ -379,7 +378,6 @@ function Comprar({ p, item, vendeUnidade, t, rotulo }: { p: Produto; item: Retur
 function CartaoGrupo({ p, moeda, cliente, t, vendeUnidade, linha }: { p: Produto; moeda: Moeda; cliente: boolean; t: Textos; vendeUnidade: boolean; linha?: boolean }) {
   const vs = p.variantes!;
   const cor = corRotulo(p.nome, p.linha);
-  const esgotados = vs.every((v) => esgotado(v, cliente));
   const promo = Math.max(0, ...vs.map((v) => Number(v.p?.desconto_pct ?? v.x?.promo_pct ?? 0)));
   const precos = vs.map((v) => v.p ? Number(v.p.preco) * (v.unidades_caixa || 1) : null).filter((x): x is number => x != null);
   const menor = precos.length ? Math.min(...precos) : null;
@@ -390,7 +388,6 @@ function CartaoGrupo({ p, moeda, cliente, t, vendeUnidade, linha }: { p: Produto
       <div className="rotulo" style={{ background: cor.fundo, color: cor.tinta }}>
         {p.foto ? <img src={p.foto} alt="" loading="lazy" /> : <span className="rotulo-nome">{p.marcaNome ?? t.linhas[p.linha]}</span>}
         {promo > 0 && <span className="etiqueta-promo">−{promo}%</span>}
-        {esgotados && <span className="etiqueta-esgotado">{t.esgotado}</span>}
       </div>
       <div className="cartao-corpo">
         <h3>{p.nome}</h3>
@@ -414,12 +411,11 @@ function CartaoGrupo({ p, moeda, cliente, t, vendeUnidade, linha }: { p: Produto
                     {cliente && v.p && <strong className="var-un">{dinheiro(Number(v.p.preco), moeda)}<small>/{t.un}</small></strong>}
                   </div>
                   <span>
-                    {esg ? <span className="etiqueta-mini esgotado">{t.esgotado}</span>
-                      : v.p?.disponibilidade === "ultimas" ? <span className="etiqueta-mini">{t.ultimas}</span> : null}
+                    {!esg && v.p?.disponibilidade === "ultimas" ? <span className="etiqueta-mini">{t.ultimas}</span> : null}
                     {cliente && pv != null && v.unidades_caixa ? <span className="var-preco">{t.cxAbrev} {dinheiro(pv, moeda)}</span> : null}
                   </span>
                 </div>
-                <Comprar p={v} item={itemCarrinho(v, esg)} vendeUnidade={vendeUnidade} t={t} rotulo={esg ? t.encomendar : t.adicionar} />
+                <Comprar p={v} item={itemCarrinho(v, esg)} vendeUnidade={vendeUnidade} t={t} rotulo={t.adicionar} />
               </div>
             );
           })}
@@ -475,12 +471,10 @@ function LinhaCatalogo({ p, moeda, cliente, t, vendeUnidade }: { p: Produto; moe
           {[p.marcaNome, t.linhas[p.linha], p.unidades_caixa ? t.caixaCom(p.unidades_caixa) : null].filter(Boolean).join(" · ")}
           {promo && <span className="etiqueta-mini promo">−{Number(promo)}%</span>}
           {p.novidade && !promo && <span className="etiqueta-mini">{t.novo}</span>}
-          {esgotado(p, cliente) && <span className="etiqueta-mini esgotado">{t.esgotado}</span>}
         </div>
       </div>
       <div className="linha-preco"><Precos p={p} moeda={moeda} cliente={cliente} t={t} /></div>
-      <div className="linha-qtd"><Comprar p={p} item={itemCarrinho(p, esgotado(p, cliente))} vendeUnidade={vendeUnidade} t={t} rotulo={esgotado(p, cliente) ? t.pedirEncomenda : t.adicionar} />
-        {esgotado(p, cliente) && <QueroProduto produtoId={p.produto_id} cliente={cliente} t={t.quero} />}</div>
+      <div className="linha-qtd"><Comprar p={p} item={itemCarrinho(p, esgotado(p, cliente))} vendeUnidade={vendeUnidade} t={t} rotulo={t.adicionar} /></div>
     </article>
   );
 }

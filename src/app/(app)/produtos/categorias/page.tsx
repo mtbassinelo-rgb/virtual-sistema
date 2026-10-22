@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { ehGestao, exigirUsuario } from "@/lib/auth";
 import { comUsuario, mensagemErro } from "@/lib/db";
-import { LINHAS, categoriasDe, subLinhaDe, sublinhasEfetivas, sugerirCategoria, type SubLinha, type SubLinhaDb } from "@/lib/vitrine";
+import { linhasEfetivas, type CategoriaDb, categoriasDe, subLinhaDe, sublinhasEfetivas, sugerirCategoria, type SubLinha, type SubLinhaDb } from "@/lib/vitrine";
 import { Avisos, Selo } from "../../avisos";
 import { MarcarTodos } from "./marcar-todos";
 
@@ -12,7 +12,6 @@ export const metadata = { title: "Categorias do site" };
 type Linha = { id: string; codigo: string; nome: string; marca: string | null; tipo: string; foto: string | null; grupo: string | null;
   site_categorias: string[] | null; site_subcategoria: string | null; site_topo: boolean; unidades_caixa: number | null; mostrar_no_site: boolean };
 
-const nomeLinha = (c: string) => LINHAS.find((l) => l.chave === c)?.nome ?? c;
 const nomeSubDe = (subs: Record<string, SubLinha[]>) => (l: string, s: string | null) => (s ? subs[l]?.find((x) => x.chave === s)?.nome ?? (s === "outros" ? "Outros" : s) : null);
 
 
@@ -56,7 +55,7 @@ async function aplicar(fd: FormData) {
         return -1;
       }
       const [cat, sub] = String(fd.get("categoria") ?? "").split("|");
-      if (!LINHAS.some((l) => l.chave === cat)) throw new Error("Escolha a categoria.");
+      if (!/^[a-z0-9-]{2,30}$/.test(cat ?? "")) throw new Error("Escolha a categoria.");
       if (acao === "definir") return Number((await c.query("select app.definir_categorias_site($1, 'definir', $2, $3) n", [ids, [cat], sub || null])).rows[0].n);
       if (acao === "adicionar") {
         // o que o produto já mostra hoje (automático), para não perder a categoria principal ao somar
@@ -106,6 +105,9 @@ export default async function CategoriasSite({ searchParams }: { searchParams: P
     `select id, codigo, nome, marca, tipo::text as tipo, foto, grupo, site_categorias, site_subcategoria, site_topo, unidades_caixa, mostrar_no_site
        from app.produtos where ativo and mostrar_no_site order by nome`)).rows as Linha[]);
   const SUBS = await comUsuario(u.id, async (c) => sublinhasEfetivas((await c.query("select * from app.subcategorias_publicas()")).rows as SubLinhaDb[]));
+  const CATS = await comUsuario(u.id, async (c) => linhasEfetivas((await c.query("select * from app.categorias_publicas()")).rows as CategoriaDb[]));
+  const LINHAS = CATS.lista;
+  const nomeLinha = (c: string) => LINHAS.find((l) => l.chave === c)?.nome ?? c;
   const nomeSub = nomeSubDe(SUBS);
   const linhas = todos.map((p) => {
     const x = categoriasDe(p.nome, p.marca, p.tipo, p.site_categorias);
@@ -136,6 +138,11 @@ export default async function CategoriasSite({ searchParams }: { searchParams: P
       </section>
       <Avisos ok={f.ok} erro={f.erro} />
 
+      <div className="linha" style={{ gap: 8, flexWrap: "wrap" }}>
+        <Link className="botao principal" href="/produtos/subcategorias#nova-categoria">+ Nova categoria</Link>
+        <Link className="botao" href="/produtos/subcategorias">+ Nova subcategoria / renomear</Link>
+        <Link className="botao" href="/produtos/marcas">Juntar marcas</Link>
+      </div>
       <nav className="linha" style={{ flexWrap: "wrap", gap: 6 }}>
         <Link className={`botao ${!f.cat ? "principal" : ""}`} href={`/produtos/categorias${f.marca ? `?marca=${encodeURIComponent(f.marca)}` : ""}`}>Todas ({linhas.length})</Link>
         {LINHAS.filter((l) => contagem.get(l.chave)).map((l) => (
@@ -202,7 +209,7 @@ export default async function CategoriasSite({ searchParams }: { searchParams: P
           </div>
           <p className="bs-nota"><b>Mostrar também em</b> mantém onde já está e soma a nova categoria (ex.: kit matizador em Kits e em Matizadores).
             <b> Mudar para</b> deixa só a categoria escolhida (com a subcategoria, se escolher uma). <b>Voltar ao automático</b> desfaz.
-            <b> Criar kit</b> junta os marcados num kit (1 de cada), ligado ao estoque deles. Subcategorias: <Link href="/produtos/subcategorias">criar e renomear</Link> · Marcas: <Link href="/produtos/marcas">juntar marcas repetidas</Link>.</p>
+            <b> Criar kit</b> junta os marcados num kit (1 de cada), ligado ao estoque deles.</p>
         </section>
 
         {f.cat === "outros" && vistos.some((p) => p.sugestao) && (
