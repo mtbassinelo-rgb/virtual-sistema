@@ -447,7 +447,7 @@ export default async function Inteligencia({ searchParams }: {
                 <button className="principal">Salvar marcas</button>
               </form>
             ) : (
-              <p className="pequeno">Sem desconto: {d.retirada.marcas.filter((m) => !m.aplica).map((m) => m.marca).join(", ") || "nenhuma (todas com desconto)"}</p>
+              <p className="pequeno">VIP só para locais: {d.retirada.marcas.filter((m) => m.aplica).map((m) => m.marca).join(", ") || "nenhuma (mesmo preço para todos)"}</p>
             )}
           </section>
 
