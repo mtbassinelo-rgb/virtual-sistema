@@ -10,7 +10,8 @@ const base = process.argv[2] ?? "http://localhost:3000";
 const db = new pg.Client({ connectionString: process.env.DATABASE_URL_ADMIN });
 await db.connect();
 let falhas = 0;
-const ok = (cond, msg) => { console.log(`${cond ? "ok" : "FALHOU"} - ${msg}`); if (!cond) falhas++; };
+// falha também vira aviso no resumo do GitHub (aparece sem precisar abrir o log)
+const ok = (cond, msg) => { console.log(`${cond ? "ok" : "FALHOU"} - ${msg}`); if (!cond) { falhas++; if (process.env.GITHUB_ACTIONS) console.log(`::error title=Teste de fumaça::${msg}`); } };
 
 async function sessao(email) {
   const token = randomBytes(32).toString("base64url");
