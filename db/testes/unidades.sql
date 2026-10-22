@@ -12,6 +12,7 @@ insert into app.produtos (id, codigo, nome, marca, custo_unitario_brl) values (:
 insert into app.usuarios (id, email, nome, perfil, ativo) values (:'EST', 'est-foz@teste.local', 'Estoquista Foz', 'estoquista', true);
 insert into app.deposito_responsaveis values (:'cd', :'EST') on conflict do nothing;
 insert into app.deposito_responsaveis values (:'cde', :'YESSICA') on conflict do nothing;
+insert into app.vendedora_depositos values ('00000000-0000-0000-0000-0000000000a2', :'cde', false) on conflict do nothing;
 select app._lancar(:'cd', :'UP1', 'entrada_compra', 50, 'teste', 'unidades', null);
 
 \echo '== Solicitação de CDE para Foz =='
@@ -57,6 +58,30 @@ select teste.como(:'KEILA');
 select app.aprovar_transferencia(current_setting('teste.t3')::uuid);
 select teste.ok((select status = 'enviada' from app.transferencias where id = current_setting('teste.t3')::uuid), 'Vendedora encarregada aprova o envio');
 select teste.falha(format('select app.cancelar_transferencia(%L)', current_setting('teste.t3')), 'já enviada', 'Enviada não cancela');
+
+\echo '== Caixa de CDE: banco de destino, confirmação, despesa e cofre =='
+reset role;
+insert into app.contas_bancarias (id, nome, banco, moeda, deposito_id) values ('00000000-0000-0000-0000-0000000c0db1', 'Itaú Gs CDE', 'Itaú', 'GS', :'cde');
+set role vc_app;
+select teste.como(:'YESSICA');
+select app.abrir_caixa(:'cde', 0, 0) as cxu \gset
+select teste.falha(format($$select app.venda_balcao(%L, null, 'GS', '[{"produto_id":"%s","quantidade":1,"preco":10000}]', '[{"modalidade":"transferencia","valor":10000}]')$$, :'cxu', :'UP1'),
+  'qual conta', 'Transferência pede o banco de destino');
+select app.venda_balcao(:'cxu', null, 'GS', format('[{"produto_id":"%s","quantidade":1,"preco":10000}]', :'UP1')::jsonb,
+  '[{"modalidade":"transferencia","valor":10000,"conta_bancaria_id":"00000000-0000-0000-0000-0000000c0db1","referencia":"comp 77"}]'::jsonb) as vu \gset
+select teste.ok((select confirmacao = 'pendente' and conta_bancaria_id = '00000000-0000-0000-0000-0000000c0db1' and referencia = 'comp 77'
+                   from app.caixa_movimentos where pedido_id = :'vu'), 'Recebimento por transferência fica a confirmar, com a conta e o comprovante');
+select teste.falha(format('select app.confirmar_recebimento_caixa(%s, true)', (select id from app.caixa_movimentos where pedido_id = :'vu')), 'gerente', 'Vendedora não confirma o próprio recebimento');
+select app.movimento_caixa(:'cxu', 'despesa', 'GS', 25000, 'Limpeza da loja', null, 'administrativo');
+select app.movimento_caixa(:'cxu', 'sangria', 'GS', 5000, null, 'cofre');
+select teste.como(:'GERENTE');
+select teste.ok((select count(*) = 1 from app.caixa_movimentos m join app.despesas d on d.id = m.despesa_id
+                   where m.caixa_id = :'cxu' and d.deposito_id = :'cde' and d.pago_em = current_date and d.categoria = 'administrativo'),
+  'Despesa do caixa vira conta paga da unidade');
+select teste.ok((select destino = 'cofre' from app.caixa_movimentos where caixa_id = :'cxu' and tipo = 'sangria'), 'Transferência ao cofre registrada');
+select app.confirmar_recebimento_caixa((select id from app.caixa_movimentos where pedido_id = :'vu'), true);
+select teste.ok((select status_conferencia = 'conferido' from app.pagamentos where pedido_id = :'vu'), 'Gerente confirma no extrato: pagamento conferido');
+select teste.falha(format('select app.confirmar_recebimento_caixa(%s, false)', (select id from app.caixa_movimentos where pedido_id = :'vu')), 'já foi', 'Não confirma duas vezes');
 
 reset role;
 \echo '== Testes das unidades passaram =='

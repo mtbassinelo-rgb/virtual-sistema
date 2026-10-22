@@ -4,6 +4,7 @@ import { exigirUsuario, ehGestao } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
 import { dinheiro, data, hojeISO, nomeMes, SITUACAO_DESPESA, type Moeda } from "@/lib/formato";
 import { Avisos, Selo } from "../avisos";
+import { unidadeSistema } from "@/lib/unidade-sistema";
 import { alterarValorRecorrente, apagarDespesa, desfazerPagamento, encerrarRecorrente, lancarDespesa, pagarDespesa, salvarRecorrente } from "./acoes";
 
 export const metadata = { title: "Contas a pagar" };
@@ -28,6 +29,7 @@ export default async function Despesas({ searchParams }: {
   const params = new URLSearchParams({ ver: visao.k, mes, ...(f.categoria ? { categoria: f.categoria } : {}) });
   const volta = `/despesas?${params}`;
   const gerir = u.perfil === "dono" || u.perfil === "gerente";
+  const { atual } = await unidadeSistema(u);
 
   const d = await comUsuario(u.id, async (c) => {
     // contas fixas: lança a do mês atual e a do próximo (não duplica)
@@ -42,6 +44,7 @@ export default async function Despesas({ searchParams }: {
       filtros.push(visao.k === "pagas" ? `date_trunc('month', pago_em) = $${vals.length}::date` : `competencia = $${vals.length}::date`);
     }
     if (f.categoria) { vals.push(f.categoria); filtros.push(`categoria = $${vals.length}`); }
+    if (atual) { vals.push(atual.id); filtros.push(`deposito_id = $${vals.length}`); }
     const lista = (await c.query(
       `select * from app.v_despesas where ${filtros.join(" and ")}
         order by case when pago_em is null then 0 else 1 end, vencimento nulls last, criado_em limit 500`, vals)).rows;
@@ -50,18 +53,19 @@ export default async function Despesas({ searchParams }: {
         coalesce(sum(valor) filter (where situacao in ('vence_hoje','vence_7_dias')), 0) semana,
         coalesce(sum(valor) filter (where pago_em is null), 0) a_pagar,
         coalesce(sum(valor_pago) filter (where date_trunc('month', pago_em) = date_trunc('month', current_date)), 0) pago_mes
-      from app.v_despesas group by moeda order by moeda desc`)).rows;
+      from app.v_despesas ${atual ? "where deposito_id = $1" : ""} group by moeda order by moeda desc`, atual ? [atual.id] : [])).rows;
+    const depositos = (await c.query("select id, nome from app.depositos where ativo order by tipo, nome")).rows as { id: string; nome: string }[];
     const categorias = (await c.query("select codigo, nome, tipo from app.despesa_categorias where ativo order by ordem, nome")).rows;
     const recorrentes = (await c.query(`select r.*, c.nome categoria_nome, c.tipo from app.despesas_recorrentes r
         join app.despesa_categorias c on c.codigo = r.categoria where r.ativo order by r.dia_vencimento, r.descricao`)).rows;
-    return { lista, resumo, categorias, recorrentes };
+    return { lista, resumo, categorias, recorrentes, depositos };
   });
 
   return (
     <>
       <section className="cabecalho-pagina">
         <div>
-          <h1>Contas a pagar</h1>
+          <h1>Contas a pagar{atual ? ` · ${atual.nome}` : ""}</h1>
           <p>Compras das marcas, aluguel, salários, transportadoras, passeiro e o que mais vencer. Lance a conta e marque quando pagar.</p>
         </div>
         <Link className="botao" href="/relatorios?aba=resultado">Ver resultado do mês</Link>
@@ -105,7 +109,7 @@ export default async function Despesas({ searchParams }: {
               return (
                 <tr key={x.id}>
                   <td className="num">{x.vencimento ? data(x.vencimento) : "—"}</td>
-                  <td>{x.descricao}{x.recorrente_id && <> <Selo>fixa</Selo></>}{x.compra_id && <> <Link className="pequeno" href={`/estoque/notas/${x.compra_id}`}>ver nota</Link></>}<div className="pequeno suave">{[x.fornecedor, x.documento, `ref. ${nomeMes(x.competencia)}`].filter(Boolean).join(" · ")}</div>
+                  <td>{x.descricao}{x.recorrente_id && <> <Selo>fixa</Selo></>}{x.compra_id && <> <Link className="pequeno" href={`/estoque/notas/${x.compra_id}`}>ver nota</Link></>}<div className="pequeno suave">{[x.fornecedor, x.documento, `ref. ${nomeMes(x.competencia)}`, !atual && x.deposito_id ? d.depositos.find((z) => z.id === x.deposito_id)?.nome : null].filter(Boolean).join(" · ")}</div>
                     {x.observacao && <div className="pequeno suave">{x.observacao}</div>}</td>
                   <td>{x.categoria_nome}</td>
                   <td className="num">{dinheiro(x.valor, x.moeda as Moeda)}
@@ -149,6 +153,7 @@ export default async function Despesas({ searchParams }: {
             </label>
             <label className="largo">Descrição<input name="descricao" required maxLength={200} placeholder="Ex.: Pedido 2303 Fonte da Beleza, aluguel do CD de Foz" /></label>
             <label>Fornecedor, marca ou a quem pagar<input name="fornecedor" maxLength={120} /></label>
+            <label>Unidade<select name="deposito" defaultValue={atual?.id ?? ""}><option value="">Empresa (geral)</option>{d.depositos.map((z) => <option key={z.id} value={z.id}>{z.nome}</option>)}</select></label>
             <label>Moeda
               <select name="moeda" defaultValue="GS"><option value="GS">Gs</option><option value="BRL">R$</option></select>
             </label>
@@ -204,6 +209,7 @@ export default async function Despesas({ searchParams }: {
             </label>
             <label className="largo">Descrição<input name="descricao" required maxLength={200} placeholder="Ex.: Aluguel do CD de Foz" /></label>
             <label>A quem pagar<input name="fornecedor" maxLength={120} /></label>
+            <label>Unidade<select name="deposito" defaultValue={atual?.id ?? ""}><option value="">Empresa (geral)</option>{d.depositos.map((z) => <option key={z.id} value={z.id}>{z.nome}</option>)}</select></label>
             <label>Moeda<select name="moeda" defaultValue="BRL"><option value="BRL">R$</option><option value="GS">Gs</option></select></label>
             <label>Valor<input name="valor" inputMode="decimal" required /></label>
             <label>Dia do vencimento<input name="dia" type="number" min={1} max={28} required defaultValue={10} /></label>

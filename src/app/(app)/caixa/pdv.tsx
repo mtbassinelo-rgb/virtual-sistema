@@ -7,6 +7,10 @@ import { abrirCaixa, fecharCaixa, finalizarVenda, movimentoCaixa, precosParaVend
 export type ProdutoPdv = { id: string; codigo: string; nome: string; gtin: string | null; caixa: number | null; saldo: number };
 export type ClientePdv = { id: string; nome: string; moeda: "GS" | "BRL" };
 export type PedidoReceber = { id: string; rotulo: string; moeda: "GS" | "BRL"; falta: number; status: string };
+export type ContaBancaria = { id: string; nome: string; moeda: "GS" | "BRL" };
+type LinhaPag = { modalidade: string; valor: string; conta?: string; ref?: string };
+const BANCARIA = ["transferencia", "pix", "deposito"];
+const paraEnvio = (l: LinhaPag[]) => l.map((x) => ({ modalidade: x.modalidade, valor: num(x.valor), conta_bancaria_id: BANCARIA.includes(x.modalidade) ? x.conta || null : null, referencia: BANCARIA.includes(x.modalidade) ? x.ref || null : null }));
 
 const MODALIDADES: [string, string][] = [
   ["efetivo", "Dinheiro (efetivo)"], ["pix", "Pix"], ["transferencia", "Transferência"], ["cartao", "Cartão"], ["deposito", "Depósito"], ["outro", "Outro"],
@@ -29,7 +33,7 @@ function Aviso({ r }: { r: Resultado }) {
 }
 
 /** Linhas de pagamento: forma + valor. Dinheiro mostra o troco a partir do valor entregue. */
-function Pagamentos({ total, moeda, linhas, setLinhas }: { total: number; moeda: "GS" | "BRL"; linhas: { modalidade: string; valor: string }[]; setLinhas: (l: { modalidade: string; valor: string }[]) => void }) {
+function Pagamentos({ total, moeda, linhas, setLinhas, contas }: { total: number; moeda: "GS" | "BRL"; linhas: LinhaPag[]; setLinhas: (l: LinhaPag[]) => void; contas: ContaBancaria[] }) {
   const [entregue, setEntregue] = useState("");
   const pago = linhas.reduce((s, l) => s + num(l.valor), 0);
   const efetivo = linhas.filter((l) => l.modalidade === "efetivo").reduce((s, l) => s + num(l.valor), 0);
@@ -45,8 +49,16 @@ function Pagamentos({ total, moeda, linhas, setLinhas }: { total: number; moeda:
           <input value={l.valor} inputMode="decimal" placeholder="Valor" aria-label="Valor"
                  onChange={(e) => setLinhas(linhas.map((x, k) => k === i ? { ...x, valor: e.target.value } : x))} />
           {linhas.length > 1 && <button type="button" className="discreto" onClick={() => setLinhas(linhas.filter((_, k) => k !== i))} aria-label="Tirar">×</button>}
+          {BANCARIA.includes(l.modalidade) && contas.length > 0 && (<>
+            <select value={l.conta ?? ""} onChange={(e) => setLinhas(linhas.map((x, k) => k === i ? { ...x, conta: e.target.value } : x))} aria-label="Conta que recebeu" required>
+              <option value="">Em qual conta caiu?</option>
+              {contas.map((c) => <option key={c.id} value={c.id}>{c.nome}{c.moeda !== moeda ? ` (${c.moeda === "GS" ? "Gs" : "R$"})` : ""}</option>)}
+            </select>
+            <input value={l.ref ?? ""} onChange={(e) => setLinhas(linhas.map((x, k) => k === i ? { ...x, ref: e.target.value } : x))} placeholder="Nº do comprovante" aria-label="Comprovante" maxLength={80} />
+          </>)}
         </div>
       ))}
+      {linhas.some((l) => BANCARIA.includes(l.modalidade)) && <small className="suave">Transferência fica "a confirmar" até o gerente conferir no extrato da conta escolhida.</small>}
       <div className="linha">
         <button type="button" className="discreto" onClick={() => setLinhas([...linhas, { modalidade: "pix", valor: falta > 0 ? String(moeda === "GS" ? Math.round(falta) : falta.toFixed(2).replace(".", ",")) : "" }])}>+ outra forma</button>
         {falta > 0.009 && <button type="button" className="discreto" onClick={() => setLinhas([{ modalidade: "efetivo", valor: String(moeda === "GS" ? Math.round(total) : total.toFixed(2).replace(".", ",")) }])}>Tudo em dinheiro</button>}
@@ -67,13 +79,13 @@ function Pagamentos({ total, moeda, linhas, setLinhas }: { total: number; moeda:
 }
 
 /** Venda no balcão: busca por nome, código ou código de barras (leitor), quantidades, preço e formas de pagamento. */
-export function VendaBalcao({ caixa, produtos, clientes, moedaPadrao }: { caixa: string; produtos: ProdutoPdv[]; clientes: ClientePdv[]; moedaPadrao: "GS" | "BRL" }) {
+export function VendaBalcao({ caixa, produtos, clientes, moedaPadrao, contas }: { caixa: string; produtos: ProdutoPdv[]; clientes: ClientePdv[]; moedaPadrao: "GS" | "BRL"; contas: ContaBancaria[] }) {
   const router = useRouter();
   const [busca, setBusca] = useState("");
   const [cliente, setCliente] = useState("");
   const [moeda, setMoeda] = useState<"GS" | "BRL">(moedaPadrao);
   const [itens, setItens] = useState<{ produto: ProdutoPdv; qtd: string; preco: string }[]>([]);
-  const [pags, setPags] = useState([{ modalidade: "efetivo", valor: "" }]);
+  const [pags, setPags] = useState<LinhaPag[]>([{ modalidade: "efetivo", valor: "" }]);
   const [obs, setObs] = useState("");
   const [r, setR] = useState<Resultado>({});
   const [enviando, iniciar] = useTransition();
@@ -108,7 +120,7 @@ export function VendaBalcao({ caixa, produtos, clientes, moedaPadrao }: { caixa:
     iniciar(async () => {
       const res = await finalizarVenda({ caixa, cliente: cliente || null, moeda, obs,
         itens: itens.map((i) => ({ produto_id: i.produto.id, quantidade: num(i.qtd), preco: num(i.preco) || null })),
-        pagamentos: pags.map((p) => ({ modalidade: p.modalidade, valor: num(p.valor) })) });
+        pagamentos: paraEnvio(pags) });
       setR(res);
       if (!res.erro) { setItens([]); setPags([{ modalidade: "efetivo", valor: "" }]); setObs(""); setCliente(""); router.refresh(); }
     });
@@ -156,7 +168,7 @@ export function VendaBalcao({ caixa, produtos, clientes, moedaPadrao }: { caixa:
       )}
       <div className="pdv-rodape">
         <div className="pdv-total">Total <b>{fmt(total, moeda)}</b></div>
-        <Pagamentos total={total} moeda={moeda} linhas={pags} setLinhas={setPags} />
+        <Pagamentos total={total} moeda={moeda} linhas={pags} setLinhas={setPags} contas={contas} />
         <input value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Observação (opcional)" />
         <button type="button" className="principal" disabled={enviando || !itens.length} onClick={finalizar}>{enviando ? "Registrando…" : `Finalizar venda · ${fmt(total, moeda)}`}</button>
         <Aviso r={r} />
@@ -166,10 +178,10 @@ export function VendaBalcao({ caixa, produtos, clientes, moedaPadrao }: { caixa:
 }
 
 /** Pedido que chegou do cliente (site ou vendedora): lança o pagamento no caixa e, se for retirar agora, entrega e baixa o estoque. */
-export function ReceberPedido({ caixa, pedidos }: { caixa: string; pedidos: PedidoReceber[] }) {
+export function ReceberPedido({ caixa, pedidos, contas }: { caixa: string; pedidos: PedidoReceber[]; contas: ContaBancaria[] }) {
   const router = useRouter();
   const [id, setId] = useState("");
-  const [pags, setPags] = useState([{ modalidade: "efetivo", valor: "" }]);
+  const [pags, setPags] = useState<LinhaPag[]>([{ modalidade: "efetivo", valor: "" }]);
   const [entregar, setEntregar] = useState(true);
   const [r, setR] = useState<Resultado>({});
   const [enviando, iniciar] = useTransition();
@@ -187,7 +199,7 @@ export function ReceberPedido({ caixa, pedidos }: { caixa: string; pedidos: Pedi
           </select>
           {p && (
             <>
-              <Pagamentos total={p.falta} moeda={p.moeda} linhas={pags} setLinhas={setPags} />
+              <Pagamentos total={p.falta} moeda={p.moeda} linhas={pags} setLinhas={setPags} contas={contas} />
               {!["entregue"].includes(p.status) && (
                 <label className="linha" style={{ flexDirection: "row", gap: 8, color: "inherit" }}>
                   <input type="checkbox" checked={entregar} onChange={(e) => setEntregar(e.target.checked)} /> Cliente leva agora: entregar e baixar do estoque
@@ -196,7 +208,7 @@ export function ReceberPedido({ caixa, pedidos }: { caixa: string; pedidos: Pedi
               <button type="button" className="principal" disabled={enviando} onClick={() => {
                 setR({});
                 iniciar(async () => {
-                  const res = await receberPedido({ caixa, pedido: p.id, entregar: entregar && p.status !== "entregue", pagamentos: pags.map((x) => ({ modalidade: x.modalidade, valor: num(x.valor) })) });
+                  const res = await receberPedido({ caixa, pedido: p.id, entregar: entregar && p.status !== "entregue", pagamentos: paraEnvio(pags) });
                   setR(res); if (!res.erro) { setId(""); router.refresh(); }
                 });
               }}>{enviando ? "Lançando…" : "Lançar no caixa"}</button>
@@ -226,24 +238,41 @@ export function AbrirCaixa({ deposito }: { deposito: string }) {
   );
 }
 
-export function MovimentoCaixa({ caixa }: { caixa: string }) {
+export function MovimentoCaixa({ caixa, contas, categorias }: { caixa: string; contas: ContaBancaria[]; categorias: { codigo: string; nome: string }[] }) {
   const [r, acao, enviando] = useActionState(movimentoCaixa, {});
+  const [tipo, setTipo] = useState("sangria");
+  const [destino, setDestino] = useState("cofre");
   return (
     <form action={acao} className="painel">
       <h2 style={{ margin: 0 }}>Entrada ou saída de dinheiro</h2>
       <input type="hidden" name="caixa_id" value={caixa} />
       <div className="campos">
         <label>O que é
-          <select name="tipo" defaultValue="sangria">
-            <option value="sangria">Sangria (retirada para cofre/banco)</option>
+          <select name="tipo" value={tipo} onChange={(e) => setTipo(e.target.value)}>
+            <option value="sangria">Retirada: transferência ao cofre ou banco</option>
             <option value="despesa">Despesa paga com o caixa</option>
             <option value="reforco">Reforço de troco (entrada)</option>
           </select>
         </label>
+        {tipo === "sangria" && (
+          <label>Para onde
+            <select name="destino" value={destino} onChange={(e) => setDestino(e.target.value)}>
+              <option value="cofre">Cofre</option><option value="banco">Depósito no banco</option><option value="outro">Outro</option>
+            </select>
+          </label>
+        )}
+        {tipo === "sangria" && destino === "banco" && contas.length > 0 && (
+          <label>Conta<select name="conta">{contas.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select></label>
+        )}
+        {tipo === "despesa" && (
+          <label>Categoria<select name="categoria" defaultValue="outros">{categorias.map((c) => <option key={c.codigo} value={c.codigo}>{c.nome}</option>)}</select></label>
+        )}
         <label>Moeda<select name="moeda" defaultValue="GS"><option value="GS">Guaranis</option><option value="BRL">Reais</option></select></label>
         <label>Valor<input name="valor" inputMode="decimal" required /></label>
-        <label className="largo">Motivo<input name="descricao" placeholder="Ex.: depósito no banco, compra de sacolas" /></label>
+        <label className="largo">{tipo === "despesa" ? "O que foi pago" : "Observação"}<input name="descricao" required={tipo === "despesa" || destino === "outro"}
+          placeholder={tipo === "despesa" ? "Ex.: limpeza, sacolas, frete do passeiro" : "Opcional"} /></label>
       </div>
+      {tipo === "despesa" && <small className="suave">A despesa entra no Contas a pagar da unidade, já paga.</small>}
       <button disabled={enviando}>{enviando ? "Lançando…" : "Lançar"}</button>
       <Aviso r={r} />
     </form>

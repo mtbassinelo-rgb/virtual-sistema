@@ -41,11 +41,11 @@ export async function lancarDespesa(fd: FormData) {
         const venc = vencimento ? somarMeses(vencimento, i) : null;
         const comp = i === 0 && /^\d{4}-\d{2}$/.test(competencia) ? `${competencia}-01` : venc;
         await c.query(
-          `insert into app.despesas (categoria, descricao, fornecedor, moeda, valor, competencia, vencimento, pago_em, forma, cambio, documento, observacao)
-           values ($1, $2, nullif($3,''), $4, $5, $6::date, $7::date, $8::date, nullif($9,''), $10, nullif($11,''), nullif($12,''))`,
+          `insert into app.despesas (categoria, descricao, fornecedor, moeda, valor, competencia, vencimento, pago_em, forma, cambio, documento, observacao, deposito_id)
+           values ($1, $2, nullif($3,''), $4, $5, $6::date, $7::date, $8::date, nullif($9,''), $10, nullif($11,''), nullif($12,''), nullif($13,'')::uuid)`,
           [texto(fd, "categoria"), texto(fd, "descricao") + (repetir > 1 ? ` (${i + 1}/${repetir})` : ""), texto(fd, "fornecedor"),
            moeda, valor, comp, venc, paga && i === 0 ? (texto(fd, "pago_em") || venc || new Date().toISOString().slice(0, 10)) : null,
-           texto(fd, "forma"), numero(fd, "cambio"), texto(fd, "documento"), texto(fd, "observacao")]);
+           texto(fd, "forma"), numero(fd, "cambio"), texto(fd, "documento"), texto(fd, "observacao"), texto(fd, "deposito")]);
       }
     });
   });
@@ -84,9 +84,9 @@ export async function salvarRecorrente(fd: FormData) {
     if (dia < 1 || dia > 28) throw new Error("Dia do vencimento entre 1 e 28.");
     const inicio = /^\d{4}-\d{2}$/.test(texto(fd, "inicio")) ? `${texto(fd, "inicio")}-01` : null;
     await comUsuario(uid, async (c) => {
-      await c.query(`insert into app.despesas_recorrentes (categoria, descricao, fornecedor, moeda, valor, dia_vencimento, inicio, criado_por)
-                     values ($1, $2, nullif($3, ''), $4, $5, $6, coalesce($7::date, date_trunc('month', current_date)::date), app.uid())`,
-        [texto(fd, "categoria"), texto(fd, "descricao"), texto(fd, "fornecedor"), texto(fd, "moeda") === "BRL" ? "BRL" : "GS", valor, dia, inicio]);
+      await c.query(`insert into app.despesas_recorrentes (categoria, descricao, fornecedor, moeda, valor, dia_vencimento, inicio, criado_por, deposito_id)
+                     values ($1, $2, nullif($3, ''), $4, $5, $6, coalesce($7::date, date_trunc('month', current_date)::date), app.uid(), nullif($8, '')::uuid)`,
+        [texto(fd, "categoria"), texto(fd, "descricao"), texto(fd, "fornecedor"), texto(fd, "moeda") === "BRL" ? "BRL" : "GS", valor, dia, inicio, texto(fd, "deposito")]);
       await c.query("select app.gerar_despesas_recorrentes(current_date)");
     });
   });

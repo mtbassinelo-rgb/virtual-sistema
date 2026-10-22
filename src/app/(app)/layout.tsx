@@ -49,6 +49,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
       { href: "/pedidos", texto: "Pedidos", contador: n.pedidos_abertos, dica: "Pedidos abertos: em separação ou aguardando" },
       { href: "/pedidos/novo", texto: "Novo pedido" },
       { href: "/caixa", texto: "Caixa do dia", dica: "Abrir e fechar o caixa, vender no balcão e receber pedidos" },
+      { href: "/caixa/contas", texto: "Contas da unidade", dica: "Contas a pagar da unidade em que você trabalha (ex.: CDE)" },
       ...(gestao ? [{ href: "/pedidos?desconto=pendente", texto: "Descontos a liberar", contador: n.descontos, dica: "Pedidos do site que atingiram o desconto por quantidade: o gerente libera ou não" }] : []),
     ] },
     { id: "clientes", titulo: "Clientes", icone: "clientes", itens: [
