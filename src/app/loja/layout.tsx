@@ -4,7 +4,8 @@ import { clienteAtual } from "@/lib/portal";
 import { pool } from "@/lib/db";
 import { linkWhatsApp, telefone } from "@/lib/formato";
 import { TEXTOS, idiomaAtual, textosCarrinho } from "@/lib/idioma";
-import { retiradaDoCliente } from "./acoes";
+import { precisaBoasVindas, retiradaDoCliente } from "./acoes";
+import { BoasVindas } from "./boas-vindas";
 import { interno, marcaDe, categoriasDe, linhasEfetivas, type CategoriaDb } from "@/lib/vitrine";
 import { BotaoCarrinho, Carrinho } from "./carrinho";
 import { ehPrincipal, unidadeLoja } from "@/lib/unidade";
@@ -89,6 +90,7 @@ export default async function LayoutLoja({ children }: { children: React.ReactNo
       <link rel="stylesheet" precedence="default"
             href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Figtree:wght@400;500;600;700&display=swap" />
       <Carrinho cliente={c ? { nome: c.nome, vendedora: c.vendedora, moeda: c.moeda, retirada: await retiradaDoCliente() } : null} t={textosCarrinho(t, c)} unidade={unidade.codigo} descontos={descontos}>
+        {c && await precisaBoasVindas() && <BoasVindas nome={c.nome} vendedora={c.vendedora} es={idioma === "es" || c.moeda === "GS"} />}
         <div className="fixo">
         <header className="topo">
           <div className="in topo-in">

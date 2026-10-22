@@ -262,3 +262,16 @@ export async function itensReposicao(): Promise<{ id: string; nome: string; marc
              qtd: caixa ? Math.max(1, Math.round(Number(x.quantidade_media) / caixa)) : Math.max(1, Math.round(Number(x.quantidade_media))) };
   });
 }
+
+/** O cliente fechou a mensagem de boas-vindas: não mostra mais. */
+export async function marcarBoasVindas(): Promise<void> {
+  const t = await tokenCliente();
+  if (t) await pool.query("select app.portal_marcar_boas_vindas($1)", [sha256(t)]).catch(() => undefined);
+}
+
+/** Mostrar boas-vindas? Só na primeira entrada do cliente. */
+export async function precisaBoasVindas(): Promise<boolean> {
+  const t = await tokenCliente();
+  if (!t) return false;
+  return Boolean((await pool.query("select app.portal_boas_vindas($1) as b", [sha256(t)]).catch(() => ({ rows: [] }))).rows[0]?.b);
+}
