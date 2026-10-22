@@ -153,5 +153,15 @@ select app.converter_orcamento(:'orc', null, current_date + 2) as ped_orc \gset
 select teste.ok((select status = 'convertido' and pedido_id = :'ped_orc' from app.orcamentos where id = :'orc')
             and (select count(*) = 1 from app.pedido_itens where pedido_id = :'ped_orc'), 'Virou pedido com os itens');
 
+\echo '== Saldo anterior do cliente =='
+select teste.como(:'KEILA');
+select teste.falha($$select app.lancar_saldo_anterior('00000000-0000-0000-0000-0000000000c1', 'divida', 'GS', 500000)$$, 'de onde vem', 'Dívida pede a descrição');
+select app.lancar_saldo_anterior('00000000-0000-0000-0000-0000000000c1', 'divida', 'GS', 500000, current_date - 30, current_date + 10, 'Saldo de setembro');
+select app.lancar_saldo_anterior('00000000-0000-0000-0000-0000000000c1', 'pagamento', 'GS', 200000, null, null, 'Pagou em efetivo');
+select teste.ok((select saldo = 300000 from app.v_saldo_anterior where cliente_id = '00000000-0000-0000-0000-0000000000c1' and moeda = 'GS'), 'Saldo = dívida − pagamento');
+select teste.falha($$select app.lancar_saldo_anterior('00000000-0000-0000-0000-0000000000c2', 'divida', 'GS', 1000, null, null, 'x')$$, 'outra vendedora', 'Não lança em cliente de outra vendedora');
+select teste.como(:'YESSICA');
+select teste.ok((select count(*) = 0 from app.saldos_anteriores where cliente_id = '00000000-0000-0000-0000-0000000000c1'), 'Outra vendedora não vê');
+
 reset role;
 \echo '== Testes das unidades passaram =='

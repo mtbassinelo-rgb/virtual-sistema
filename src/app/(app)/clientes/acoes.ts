@@ -327,3 +327,32 @@ export async function ativarCliente(fd: FormData) {
   revalidatePath("/clientes");
   redirect(`${voltaCli(fd, id)}${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent(ativo ? "Cliente ativado: volta a aparecer nas listas." : "Cliente desativado: sai das listas do dia a dia, mas continua no sistema e sendo atualizado.")}`);
 }
+
+/** Saldo anterior: dívida de antes do sistema, ou pagamento dela (lançado à mão). */
+export async function lancarSaldoAnterior(fd: FormData) {
+  const u = await exigirUsuario();
+  const id = texto(fd, "cliente_id");
+  let erro: string | null = null;
+  try {
+    await comUsuario(u.id, (c) => c.query("select app.lancar_saldo_anterior($1, $2, $3::app.moeda, $4, nullif($5, '')::date, nullif($6, '')::date, $7)",
+      [id, texto(fd, "tipo") === "pagamento" ? "pagamento" : "divida", texto(fd, "moeda") === "BRL" ? "BRL" : "GS", numero(fd, "valor"),
+       texto(fd, "data"), texto(fd, "vencimento"), texto(fd, "descricao") || null]));
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  revalidatePath(`/clientes/${id}`);
+  redirect(`${voltaCli(fd, id)}${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent(texto(fd, "tipo") === "pagamento" ? "Pagamento do saldo anterior lançado." : "Saldo anterior lançado.")}`);
+}
+
+export async function cancelarSaldoAnterior(fd: FormData) {
+  const u = await exigirUsuario();
+  const id = texto(fd, "cliente_id");
+  let erro: string | null = null;
+  try {
+    await comUsuario(u.id, (c) => c.query("select app.cancelar_saldo_anterior($1)", [texto(fd, "lancamento")]));
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  revalidatePath(`/clientes/${id}`);
+  redirect(`${voltaCli(fd, id)}${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Lançamento cancelado.")}`);
+}

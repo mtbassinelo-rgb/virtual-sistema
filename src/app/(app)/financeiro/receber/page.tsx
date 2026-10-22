@@ -38,6 +38,9 @@ export default async function Receber({ searchParams }: { searchParams: Promise<
     recebidoMes: (await c.query(`select p.moeda, coalesce(sum(pg.valor), 0) v from app.pagamentos pg join app.pedidos p on p.id = pg.pedido_id
       where pg.status_conferencia = 'conferido' and date_trunc('month', pg.data) = date_trunc('month', current_date) group by p.moeda`)).rows as { moeda: Moeda; v: string }[],
     vendedoras: (await c.query("select nome from app.vendedoras where ativo order by nome")).rows.map((r) => r.nome as string),
+    anteriores: (await c.query(`select s.cliente_id, s.moeda, s.saldo, s.vencimento, cl.nome cliente, v.nome vendedora
+      from app.v_saldo_anterior s join app.clientes cl on cl.id = s.cliente_id join app.vendedoras v on v.id = cl.vendedora_id
+      where s.saldo > 0 order by s.vencimento nulls last, s.saldo desc`)).rows as { cliente_id: string; moeda: Moeda; saldo: string; vencimento: string | null; cliente: string; vendedora: string }[],
   }));
   const todas = d.linhas.filter((l) => (!f.vendedora || l.vendedora_nome === f.vendedora) && (!f.moeda || l.moeda === f.moeda));
   const lista = todas.filter((l) => faixa === "todas" || (faixa === "vencidas" ? (l.atraso ?? 0) > 0 : faixaDe(l.atraso) === faixa));
@@ -92,6 +95,25 @@ export default async function Receber({ searchParams }: { searchParams: Promise<
           })}</tbody>
         </table></div>
       </section>
+
+      {d.anteriores.length > 0 && (
+        <section className="painel">
+          <h2>Saldos anteriores (dívidas de antes do sistema)</h2>
+          <div className="linha" style={{ flexWrap: "wrap", gap: 16 }}>{moedas.map((m) => {
+            const t = d.anteriores.filter((x) => x.moeda === m).reduce((s, x) => s + Number(x.saldo), 0);
+            return t > 0 ? <span key={m}>Total {m === "GS" ? "Gs" : "R$"}: <b className="num">{dinheiro(t, m)}</b></span> : null;
+          })}</div>
+          <div className="tabela"><table>
+            <thead><tr><th>Cliente</th><th>Vendedora</th><th>Vence</th><th className="num">Saldo</th></tr></thead>
+            <tbody>{d.anteriores.map((x) => (
+              <tr key={x.cliente_id + x.moeda}>
+                <td><Link href={`/clientes/${x.cliente_id}?aba=credito`}>{x.cliente}</Link></td><td>{x.vendedora}</td>
+                <td style={x.vencimento && new Date(x.vencimento) < new Date() ? { color: "var(--erro)" } : undefined}>{x.vencimento ? data(x.vencimento) : "—"}</td>
+                <td className="num"><b>{dinheiro(x.saldo, x.moeda)}</b></td>
+              </tr>))}</tbody>
+          </table></div>
+        </section>
+      )}
 
       <div className="duas-colunas">
         <section className="painel">

@@ -20,6 +20,7 @@ const T = {
     historico: "Histórico de compras", acompanhar: "Acompanhe seu pedido",
     credito: "Minha linha de crédito", limite: "Limite", aberto: "Em aberto", disponivel: "Disponível", vencido: "Vencido", proximo: "Próximo vencimento",
     prazo: (d: number) => `Prazo de ${d} dias para pagar cada pedido.`, conferencia: (v: string) => `${v} em pagamentos enviados aguardando aprovação do gerente.`,
+    saldoAnterior: "Saldo anterior", saldoAnteriorTexto: "Valor que ficou em aberto de compras anteriores, lançado pela sua vendedora.", divida: "Saldo devedor", pagamentoAnt: "Pagamento", venceEm: "vence",
     extrato: "Extrato", data: "Data", descricao: "Descrição", valor: "Valor", situacao: "Situação", vence: "Vence",
     sit: { pago: "Pago", vencido: "Vencido", em_aberto: "Em aberto", aprovado: "Aprovado", recusado: "Recusado", em_conferencia: "Aguardando aprovação" } as Record<string, string>, verTodos: "Ver todos os pedidos e pagamentos", nenhum: "Você ainda não fez pedidos por aqui.",
     maisComprados: "O que você mais compra", comprarNovo: "Ver catálogo", troca: "Trocar senha", senhaVendedora: "Você está usando a senha que a sua vendedora criou. Se quiser, troque por uma sua (é opcional).", atual: "Senha atual",
@@ -36,6 +37,7 @@ const T = {
     historico: "Historial de compras", acompanhar: "Siga su pedido",
     credito: "Mi línea de crédito", limite: "Límite", aberto: "Pendiente", disponivel: "Disponible", vencido: "Vencido", proximo: "Próximo vencimiento",
     prazo: (d: number) => `Plazo de ${d} días para pagar cada pedido.`, conferencia: (v: string) => `${v} en pagos enviados esperando aprobación del gerente.`,
+    saldoAnterior: "Saldo anterior", saldoAnteriorTexto: "Monto pendiente de compras anteriores, cargado por su vendedora.", divida: "Saldo deudor", pagamentoAnt: "Pago", venceEm: "vence",
     extrato: "Estado de cuenta", data: "Fecha", descricao: "Descripción", valor: "Monto", situacao: "Estado", vence: "Vence",
     sit: { pago: "Pagado", vencido: "Vencido", em_aberto: "Pendiente", aprovado: "Aprobado", recusado: "Rechazado", em_conferencia: "Esperando aprobación" } as Record<string, string>, verTodos: "Ver todos los pedidos y pagos", nenhum: "Todavía no hizo pedidos por aquí.",
     maisComprados: "Lo que más compra", comprarNovo: "Ver catálogo", troca: "Cambiar contraseña", senhaVendedora: "Usted está usando la contraseña que creó su vendedora. Si quiere, cámbiela por una suya (es opcional).", atual: "Contraseña actual",
@@ -83,17 +85,20 @@ export default async function MinhaArea({ searchParams }: { searchParams: Promis
   const t = T[idioma];
   const proprios = (await pool.query("select * from app.banners_ativos($1)", [idioma])).rows as Banner[];
   const banners = [...proprios, ...bannersPadrao(idioma, true)];
-  const [doc, pedidos, meta, credito, extrato] = await Promise.all([
+  const [doc, pedidos, meta, credito, extrato, anterior] = await Promise.all([
     pool.query("select app.portal_documento($1) as d", [sessao]).then((r) => String(r.rows[0]?.d ?? "")),
     pool.query("select * from app.portal_pedidos($1)", [sessao]).then((r) => r.rows as Pedido[]),
     pool.query("select * from app.portal_meta($1)", [sessao]).then((r) => (r.rows[0] as Meta | undefined) ?? null),
     pool.query("select * from app.portal_credito($1)", [sessao]).then((r) => (r.rows[0] as Credito | undefined) ?? null),
     pool.query("select * from app.portal_extrato($1)", [sessao]).then((r) => r.rows as Extrato[]),
+    pool.query("select * from app.portal_saldo_anterior($1)", [sessao]).then((r) => r.rows as { data: string; tipo: string; descricao: string | null; moeda: Moeda; valor: string; vencimento: string | null }[]).catch(() => []),
   ]);
+  const saldoAnt = new Map<Moeda, number>();
+  for (const a of anterior) saldoAnt.set(a.moeda, (saldoAnt.get(a.moeda) ?? 0) + (a.tipo === "divida" ? 1 : -1) * Number(a.valor));
   const moeda = cliente.moeda;
   const validos = pedidos.filter((p) => p.etapa !== "cancelado");
   const total = validos.reduce((s, p) => s + Number(p.valor_total), 0);
-  const saldo = validos.filter((p) => p.total_confirmado).reduce((s, p) => s + Number(p.saldo), 0);
+  const saldo = validos.filter((p) => p.total_confirmado).reduce((s, p) => s + Number(p.saldo), 0) + Math.max(0, saldoAnt.get(moeda) ?? 0);
   const contagem = new Map<string, number>();
   for (const p of validos) for (const i of p.itens) {
     const nome = i.descricao.replace(/ ·.*$/, "").replace(/ \(promoção.*\)$/, "");
@@ -124,6 +129,24 @@ export default async function MinhaArea({ searchParams }: { searchParams: Promis
         <div><span>{t.ultimo}</span><b>{validos[0] ? data(validos[0].data_pedido) : "—"}</b></div>
         <div><span>{t.saldo}</span><b>{dinheiro(saldo, moeda)}</b></div>
       </div>
+
+      {anterior.length > 0 && [...saldoAnt.values()].some((v) => v > 0) && (
+        <section className="painel area-bloco">
+          <h2>{t.saldoAnterior}</h2>
+          <p className="pequeno suave" style={{ margin: 0 }}>{t.saldoAnteriorTexto}</p>
+          <div className="area-numeros">{[...saldoAnt.entries()].filter(([, v]) => v > 0).map(([m, v]) => (
+            <div key={m}><span>{t.saldoAnterior} ({m === "GS" ? "Gs" : "R$"})</span><b>{dinheiro(v, m)}</b></div>))}</div>
+          <div className="extrato"><table>
+            <thead><tr><th>{t.data}</th><th>{t.descricao}</th><th>{t.valor}</th></tr></thead>
+            <tbody>{anterior.map((a, k) => (
+              <tr key={k} className={a.tipo === "pagamento" ? "pagamento" : ""}>
+                <td className="num">{data(a.data)}</td>
+                <td>{a.tipo === "divida" ? t.divida : t.pagamentoAnt}{a.descricao ? ` · ${a.descricao}` : ""}{a.vencimento && a.tipo === "divida" ? ` (${t.venceEm} ${data(a.vencimento)})` : ""}</td>
+                <td className="num">{a.tipo === "pagamento" ? "− " : ""}{dinheiro(a.valor, a.moeda)}</td>
+              </tr>))}</tbody>
+          </table></div>
+        </section>
+      )}
 
       {(() => {
         const emAndamento = pedidos.find((p) => !["entregue", "cancelado"].includes(p.etapa));

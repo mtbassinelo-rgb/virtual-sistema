@@ -7,7 +7,7 @@ import {
   type Moeda,
 } from "@/lib/formato";
 import { Avisos, Barra, Selo } from "../../avisos";
-import { ativarCliente, atendimentoCliente, pedirCompraUnidade, trocarVendedoraCliente, bloquearCliente, decidirCompraUnidade, decidirClienteLocal, definirCredito, depositoCliente, recusarSugestaoCredito, salvarCliente, sugerirClienteLocal, sugerirCredito } from "../acoes";
+import { ativarCliente, atendimentoCliente, cancelarSaldoAnterior, lancarSaldoAnterior, pedirCompraUnidade, trocarVendedoraCliente, bloquearCliente, decidirCompraUnidade, decidirClienteLocal, definirCredito, depositoCliente, recusarSugestaoCredito, salvarCliente, sugerirClienteLocal, sugerirCredito } from "../acoes";
 import { AcessoCliente } from "./acesso-cliente";
 
 export const metadata = { title: "Cliente" };
@@ -52,6 +52,9 @@ export default async function Cliente({ params, searchParams }: {
            from app.pedido_itens i join app.pedidos p on p.id = i.pedido_id left join app.produtos pr on pr.id = i.produto_id
           where p.cliente_id = $1 and p.status_comercial <> 'cancelado' and p.data_pedido >= current_date - 365
           group by 1 order by sum(i.total) desc limit 8`, [id])).rows as { nome: string; qtd: string; valor: string; ultima: string }[],
+      saldoAnterior: (await c.query("select moeda, saldo, vencimento from app.v_saldo_anterior where cliente_id = $1 and saldo <> 0", [id])).rows as { moeda: Moeda; saldo: string; vencimento: string | null }[],
+      saLanc: (await c.query(`select s.*, app.nome_usuario(s.criado_por) quem from app.saldos_anteriores s
+         where s.cliente_id = $1 order by s.data desc, s.criado_em desc limit 50`, [id])).rows,
       atendimentos: (await c.query(
         `select a.*, u.nome as usuario_nome from app.atendimentos a left join app.usuarios u on u.id = a.usuario_id
           where a.cliente_id = $1 order by a.em desc limit 50`, [id])).rows,
@@ -78,6 +81,7 @@ export default async function Cliente({ params, searchParams }: {
 
   // O que precisa de atenção neste cliente (cada item leva para a aba certa)
   const pend: { cor: string; texto: React.ReactNode; aba: Aba }[] = [];
+  for (const sa of d.saldoAnterior) if (Number(sa.saldo) > 0) pend.push({ cor: "aviso", texto: <>Saldo anterior: <b className="num">{dinheiro(sa.saldo, sa.moeda)}</b></>, aba: "credito" });
   if (vencido > 0) pend.push({ cor: "erro", texto: <>Pagamento vencido: <b className="num">{dinheiro(vencido, moeda)}</b></>, aba: "credito" });
   if (Number(d.credito.conferir) > 0) pend.push({ cor: "aviso", texto: <>Pagamentos a aprovar: <b className="num">{dinheiro(d.credito.conferir, moeda)}</b></>, aba: "credito" });
   if (cli.credito_sugestao_limite != null) pend.push({ cor: "aviso", texto: <>Sugestão de crédito aguardando o gerente</>, aba: "credito" });
@@ -315,6 +319,47 @@ export default async function Cliente({ params, searchParams }: {
               </label>
               <button>Salvar</button>
             </form>
+          )}
+        </section>
+      )}
+
+      {aba === "credito" && (
+        <section className="painel">
+          <h2>Saldo anterior (dívida de antes do sistema)</h2>
+          <p className="pequeno suave" style={{ margin: 0 }}>O que o cliente já devia antes de comprar pelo sistema. Não conta como venda; aparece para o cliente na área dele e no contas a receber.
+            Quando ele pagar, lance o pagamento aqui para abater.</p>
+          <div className="indicadores">
+            {d.saldoAnterior.length === 0 ? <div className="indicador"><span className="rotulo">Saldo anterior</span><span className="valor">nada</span></div>
+              : d.saldoAnterior.map((x) => (
+                <div key={x.moeda} className={`indicador ${Number(x.saldo) > 0 ? "destaque-aviso" : ""}`}><span className="rotulo">Saldo anterior ({x.moeda === "GS" ? "Gs" : "R$"})</span>
+                  <span className="valor num">{dinheiro(x.saldo, x.moeda)}</span>{x.vencimento && <span className="pequeno suave">vence {data(x.vencimento)}</span>}</div>))}
+          </div>
+          {!ro && (
+            <form action={lancarSaldoAnterior} className="campos">
+              <input type="hidden" name="cliente_id" value={cli.id} /><Aba k="credito" />
+              <label>O que é<select name="tipo" defaultValue="divida"><option value="divida">Dívida anterior (deve)</option><option value="pagamento">Pagamento (abate)</option></select></label>
+              <label>Moeda<select name="moeda" defaultValue={moeda}><option value="GS">Gs</option><option value="BRL">R$</option></select></label>
+              <label>Valor<input name="valor" inputMode="decimal" required /></label>
+              <label>Data<input type="date" name="data" /></label>
+              <label>Vence em<input type="date" name="vencimento" /></label>
+              <label className="largo">Descrição<input name="descricao" maxLength={300} placeholder="Ex.: saldo do pedido de 15/09; pagou em efetivo" /></label>
+              <button className="principal">Lançar</button>
+            </form>
+          )}
+          {d.saLanc.length > 0 && (
+            <div className="tabela"><table>
+              <thead><tr><th>Data</th><th>Lançamento</th><th className="num">Valor</th><th>Quem</th><th></th></tr></thead>
+              <tbody>{d.saLanc.map((x) => (
+                <tr key={x.id} className={x.cancelado_em ? "suave" : ""}>
+                  <td>{data(x.data)}</td>
+                  <td>{x.tipo === "divida" ? "Dívida" : "Pagamento"}{x.descricao ? ` · ${x.descricao}` : ""}{x.vencimento && x.tipo === "divida" ? <div className="pequeno suave">vence {data(x.vencimento)}</div> : null}
+                    {x.cancelado_em && <div className="pequeno">cancelado</div>}</td>
+                  <td className="num" style={{ color: x.tipo === "pagamento" ? "var(--ok)" : undefined }}>{x.tipo === "pagamento" ? "− " : ""}{dinheiro(x.valor, x.moeda)}</td>
+                  <td>{x.quem}</td>
+                  <td>{!x.cancelado_em && !ro && <form action={cancelarSaldoAnterior}><input type="hidden" name="cliente_id" value={cli.id} /><input type="hidden" name="lancamento" value={x.id} /><Aba k="credito" />
+                    <button className="discreto pequeno">Cancelar</button></form>}</td>
+                </tr>))}</tbody>
+            </table></div>
           )}
         </section>
       )}
