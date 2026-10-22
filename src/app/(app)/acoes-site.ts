@@ -12,3 +12,12 @@ export async function marcarPedidoSiteAtendido(fd: FormData) {
     "update app.pedidos_site set atendido_em = now(), atendido_por = app.uid() where id = $1 and atendido_em is null", [texto(fd, "id")]));
   revalidatePath("/");
 }
+
+/** Gerente/dono apaga pedidos do site feitos só para teste (um ou vários: campos "id"). */
+export async function apagarPedidosSite(fd: FormData) {
+  const u = await exigirUsuario();
+  const ids = fd.getAll("id").map(String).filter((x) => /^[0-9a-f-]{36}$/i.test(x));
+  if (!ids.length) return;
+  await comUsuario(u.id, (c) => c.query("select app.apagar_pedidos_site($1::uuid[])", [ids]));
+  revalidatePath("/");
+}

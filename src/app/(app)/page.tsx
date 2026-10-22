@@ -3,7 +3,7 @@ import { exigirUsuario, ehGestao } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
 import { dinheiro, data, dataHora, linkWhatsApp, MODALIDADES, telefone, type Moeda } from "@/lib/formato";
 import { Selo } from "./avisos";
-import { marcarPedidoSiteAtendido } from "./acoes-site";
+import { apagarPedidosSite, marcarPedidoSiteAtendido } from "./acoes-site";
 
 export const metadata = { title: "Hoje" };
 
@@ -159,6 +159,12 @@ export default async function Hoje() {
         <section className="painel">
           <h2>Pedidos do site (ainda não são clientes)</h2>
           <p className="pequeno suave">A pessoa montou o pedido no site e foi enviada para o WhatsApp da empresa. Responda com os preços e, se fechar, cadastre como cliente.</p>
+          {gestao && d.site.length > 1 && (
+            <form action={apagarPedidosSite} className="linha" style={{ gap: 8 }}>
+              {d.site.map((s) => <input key={s.id} type="hidden" name="id" value={s.id} />)}
+              <button className="perigo pequeno">Apagar todos os {d.site.length} desta lista (eram testes)</button>
+            </form>
+          )}
           <div className="tabela"><table>
             <thead><tr><th>Quando</th><th>Quem</th><th>Itens</th><th></th></tr></thead>
             <tbody>{d.site.map((s) => {
@@ -173,7 +179,10 @@ export default async function Hoje() {
                     {s.observacao && <div className="pequeno">{s.observacao}</div>}
                   </td>
                   <td className="pequeno">{itens.map((i, k) => <div key={k}>{Number(i.quantidade)}× {i.nome}</div>)}</td>
-                  <td><form action={marcarPedidoSiteAtendido}><input type="hidden" name="id" value={s.id} /><button>Atendido</button></form></td>
+                  <td><div className="linha" style={{ gap: 6, flexWrap: "wrap" }}>
+                    <form action={marcarPedidoSiteAtendido}><input type="hidden" name="id" value={s.id} /><button>Atendido</button></form>
+                    {gestao && <form action={apagarPedidosSite}><input type="hidden" name="id" value={s.id} /><button className="discreto pequeno" title="Pedido de teste: some da lista">Apagar (teste)</button></form>}
+                  </div></td>
                 </tr>
               );
             })}</tbody>
