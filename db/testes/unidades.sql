@@ -88,7 +88,9 @@ reset role;
 insert into app.produtos (id, codigo, nome, marca) values ('00000000-0000-0000-0000-0000000c0d02', 'UNI-002', 'Shampoo Preço CDE', 'Marca Preco Uni');
 insert into app.precos (produto_id, tabela, valor, vigente_desde) values
   ('00000000-0000-0000-0000-0000000c0d02', 'py_normal', 10000, current_date - 1), ('00000000-0000-0000-0000-0000000c0d02', 'cde_normal', 12000, current_date - 1),
-  (:'UP1', 'py_normal', 8000, current_date - 1);
+  (:'UP1', 'py_normal', 8000, current_date - 1), ('00000000-0000-0000-0000-0000000c0d02', 'py_vip', 9000, current_date - 1);
+select app._lancar(:'cd', '00000000-0000-0000-0000-0000000c0d02', 'entrada_compra', 50, 'teste', 'orc', null);
+select app._lancar(:'cde', '00000000-0000-0000-0000-0000000c0d02', 'entrada_compra', 50, 'teste', 'orc', null);
 insert into app.clientes (id, nome, vendedora_id, pais, deposito_id) values
   ('00000000-0000-0000-0000-0000000c0dc1', 'Cliente CDE', '00000000-0000-0000-0000-0000000000a2', 'PY', :'cde'),
   ('00000000-0000-0000-0000-0000000c0dc2', 'Cliente Foz', '00000000-0000-0000-0000-0000000000a2', 'PY', :'cd');
@@ -134,6 +136,22 @@ select app.registrar_inventario(:'cde', format('[{"produto_id":"%s","contado":8,
 select teste.ok((select quantidade from app.estoque_saldos where deposito_id = :'cde' and produto_id = :'UP1') = 7, 'Contado 8 sobre a base 5 = +3 (a venda do meio não é desfeita)');
 select app.registrar_inventario(:'cde', format('[{"produto_id":"%s","contado":2}]', :'UP1')::jsonb);
 select teste.ok((select quantidade from app.estoque_saldos where deposito_id = :'cde' and produto_id = :'UP1') = 2, 'Sem base: fica igual ao contado');
+
+\echo '== Orçamento: sem cliente, vincula e vira pedido =='
+select teste.como(:'KEILA');
+select app.salvar_orcamento(null, jsonb_build_object('contato_nome', 'Ana da loja', 'contato_whatsapp', '595981222333', 'tabela', 'py_normal',
+  'itens', jsonb_build_array(jsonb_build_object('produto_id', '00000000-0000-0000-0000-0000000c0d02', 'quantidade', 3)))) as orc \gset
+select teste.ok((select total = 30000 and status = 'aberto' and cliente_id is null from app.orcamentos where id = :'orc'), 'Orçamento sem cliente com a tabela escolhida (3 × 10.000)');
+select teste.falha(format('select app.converter_orcamento(%L, null, null)', :'orc'), 'Vincule', 'Sem cliente não vira pedido');
+select teste.como(:'YESSICA');
+select teste.ok((select count(*) = 0 from app.orcamentos where id = :'orc'), 'Outra vendedora não vê o orçamento');
+select teste.falha(format('select app.vincular_orcamento(%L, %L)', :'orc', '00000000-0000-0000-0000-0000000000c1'), 'outra vendedora', 'Outra vendedora não mexe');
+select teste.como(:'KEILA');
+select app.vincular_orcamento(:'orc', '00000000-0000-0000-0000-0000000000c1');
+select teste.ok((select cliente_id = '00000000-0000-0000-0000-0000000000c1' from app.orcamentos where id = :'orc'), 'Vinculado ao cliente');
+select app.converter_orcamento(:'orc', null, current_date + 2) as ped_orc \gset
+select teste.ok((select status = 'convertido' and pedido_id = :'ped_orc' from app.orcamentos where id = :'orc')
+            and (select count(*) = 1 from app.pedido_itens where pedido_id = :'ped_orc'), 'Virou pedido com os itens');
 
 reset role;
 \echo '== Testes das unidades passaram =='

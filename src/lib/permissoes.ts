@@ -8,7 +8,7 @@ export type Perfil = "dono" | "gerente" | "vendedora" | "consulta" | "estoquista
 export type Permissao = { chave: string; nome: string; rotas: string[]; gestao?: boolean; soDono?: boolean };
 
 export const PERMISSOES: Permissao[] = [
-  { chave: "pedidos", nome: "Pedidos (ver, criar e separar)", rotas: ["/pedidos"] },
+  { chave: "pedidos", nome: "Pedidos e orçamentos (ver, criar e separar)", rotas: ["/pedidos", "/orcamentos"] },
   { chave: "caixa", nome: "Caixa do dia", rotas: ["/caixa"] },
   { chave: "clientes", nome: "Clientes", rotas: ["/clientes"] },
   { chave: "metas", nome: "Metas", rotas: ["/metas"] },
