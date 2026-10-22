@@ -114,6 +114,7 @@ export async function salvarAcessos(fd: FormData) {
     const depositos = fd.getAll("dep").map(String).filter((x) => /^[0-9a-f-]{36}$/i.test(x));
     await comUsuario(u.id, (c) => c.query("select app.definir_acesso_usuario($1, $2::jsonb, $3::jsonb, $4::uuid[])",
       [id, JSON.stringify(permissoes), JSON.stringify(horarios), depositos]));
+    await comUsuario(u.id, (c) => c.query("select app.definir_aprova_transferencias($1, $2)", [id, fd.get("aprova_transf") === "1"]));
     q = "ok=" + encodeURIComponent("Acessos salvos. Valem a partir da próxima página que a pessoa abrir.");
   } catch (e) {
     q = "erro=" + encodeURIComponent(mensagemErro(e));

@@ -184,7 +184,7 @@ export default async function Pedido({ params, searchParams }: {
       )}
 
       {p.status_comercial === "em_separacao" && p.origem !== "bling" && !fluxo?.separacao_conferida_em && (gestao || fluxo?.opera) && (
-        <section className="painel" style={{ borderColor: "var(--info)" }}>
+        <section className="painel" id="separar" style={{ borderColor: "var(--info)" }}>
           <h2>Conferir separação</h2>
           <p className="suave pequeno">Informe quanto foi separado de cada item. Se não tem, marque “Não tem”: o item sai do pedido, o total é recalculado e o cliente vê no acompanhamento que ele não estava disponível.</p>
           <form action={conferirSeparacao} className="campos">
@@ -204,6 +204,14 @@ export default async function Pedido({ params, searchParams }: {
         <div className="aviso-caixa">Aguardando a expedição conferir a separação.</div>
       )}
 
+      {escrever && (p.status_comercial === "cancelado" || p.status_comercial === "em_separacao") && (
+        <div className="aviso-caixa linha entre" style={{ flexWrap: "wrap" }}>
+          <span className="pequeno">{p.status_comercial === "cancelado"
+            ? "Pedido cancelado: quer levar estes produtos para outra unidade (ex.: CDE)?"
+            : "Faltou produto nesta unidade? Peça à outra unidade e avise o cliente que chega em poucos dias."}</span>
+          <Link className="botao" href={`/estoque/transferencias/nova?pedido=${p.id}`}>Pedir à outra unidade</Link>
+        </div>
+      )}
       {escrever && p.status_comercial === "em_separacao" && (fluxo?.separacao_conferida_em || p.origem === "bling") && !fluxo?.total_confirmado_em && (
         <section className="painel" style={{ borderColor: "var(--marca)" }}>
           <h2>Confirmar total para o cliente</h2>

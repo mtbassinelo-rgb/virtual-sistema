@@ -394,3 +394,11 @@ button.discreto:hover { color: var(--erro); border-color: transparent; }
 table.dre td, table.dre th { white-space: nowrap; }
 table.dre tr.atual td { background: var(--marca-suave); }
 table.dre tfoot th { border-top: 2px solid var(--linha); }
+
+/* Pedidos entre unidades */
+.linha-tempo-transf { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.linha-tempo-transf > div { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 8px; background: var(--afundado); color: var(--suave); font-size: .85rem; border-left: 3px solid var(--linha); }
+.linha-tempo-transf > div.feito { background: var(--ok-suave); color: var(--texto); border-left-color: var(--ok); }
+.linha-tempo-transf > div.cancelado { background: var(--erro-suave); color: var(--texto); border-left-color: var(--erro); }
+.linha-tempo-transf b { color: var(--texto); }
+@media print { .nao-imprimir, .lateral, .barra-topo, form button, details { display: none !important; } }

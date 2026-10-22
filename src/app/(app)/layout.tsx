@@ -29,7 +29,11 @@ export default async function AreaInterna({ children }: { children: React.ReactN
            (select count(*) from app.produtos p where p.ativo and p.mostrar_no_site and (not exists (select 1 from app.precos z where z.produto_id = p.id and z.tabela = 'br_normal') or not exists (select 1 from app.precos z where z.produto_id = p.id and z.tabela = 'py_normal')))::int as fora_site,
            (select count(*) from app.carrinhos_parados() where avisado_em is null)::int as carrinhos,
            (select count(*) from app.procuras_chegaram())::int as chegaram,
-           (select count(*) from app.pedidos where desconto_qtd_status = 'pendente' and status_comercial <> 'cancelado')::int as descontos
+           (select count(*) from app.pedidos where desconto_qtd_status = 'pendente' and status_comercial <> 'cancelado')::int as descontos,
+           ((select count(*) from app.pedidos where status_comercial = 'em_separacao' and origem <> 'bling' and separacao_conferida_em is null and app.pode_operar_deposito(deposito_id))
+            + (select count(*) from app.transferencias where status = 'solicitada' and app.pode_operar_deposito(origem_id)))::int as a_separar,
+           (select count(*) from app.transferencias where (status = 'separada' and app.pode_aprovar_transferencia())
+               or (status = 'enviada' and (app.pode_operar_deposito(destino_id) or app.trabalha_na_unidade(destino_id))))::int as transf_acao
   `)).rows[0] as { pedidos_abertos: number; contas_vencidas: number; procuras: number; fotos: number; sem_preco: number; fora_site: number; carrinhos: number; chegaram: number; descontos: number }).catch(() => ({ pedidos_abertos: 0, contas_vencidas: 0, procuras: 0, fotos: 0, sem_preco: 0, fora_site: 0, carrinhos: 0, chegaram: 0, descontos: 0 }));
 
   // Menu: Dashboard → operação do dia (vendas, clientes) → cadastro (produtos, estoque) → loja e marketing → análise → financeiro → configurações
@@ -72,6 +76,8 @@ export default async function AreaInterna({ children }: { children: React.ReactN
       { href: "/produtos?filtro=inativos", texto: "Inativos" },
     ] },
     { id: "estoque", titulo: "Estoque e compras", icone: "estoque", itens: [
+      { href: "/estoque/separacao", texto: "Área do estoquista", contador: n.a_separar, dica: "Pedidos e transferências a separar" },
+      { href: "/estoque/transferencias", texto: "Pedidos entre unidades", contador: n.transf_acao, dica: "A aprovar ou a receber" },
       { href: "/estoque", texto: "Saldo e movimentos" },
       { href: "/estoque/inventario", texto: "Inventário (contagem)" },
       { href: "/relatorios?aba=estoque", texto: "Para comprar / estoque baixo" },

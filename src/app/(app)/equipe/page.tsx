@@ -22,6 +22,7 @@ export default async function Equipe({ searchParams }: { searchParams: Promise<{
     vendedoras: (await c.query("select id, nome, slug from app.vendedoras where nome <> 'Marketplace' order by nome")).rows as { id: string; nome: string; slug: string | null }[],
     depositos: (await c.query("select id, nome from app.depositos where ativo order by tipo, nome")).rows as { id: string; nome: string }[],
     vinculos: (await c.query("select vendedora_id, deposito_id, padrao from app.vendedora_depositos")).rows as { vendedora_id: string; deposito_id: string; padrao: boolean }[],
+    aprovadores: (await c.query("select id from app.usuarios where aprova_transferencias")).rows.map((r) => r.id as string),
     acessos: (await c.query("select * from app.acessos_equipe()")).rows as { usuario_id: string; permissoes: Record<string, boolean>; horarios: { dia: number; inicio: string; fim: string }[]; depositos: string[] }[],
   }));
   const DIAS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
@@ -118,6 +119,10 @@ export default async function Equipe({ searchParams }: { searchParams: Promise<{
                   <div className="acesso-grade">{d.depositos.map((x) => (
                     <label key={x.id} className="acesso-item"><input type="checkbox" name="dep" value={x.id} defaultChecked={a?.depositos.includes(x.id)} /> {x.nome}</label>
                   ))}</div>
+                </fieldset>
+                <fieldset>
+                  <legend>Pedidos entre unidades</legend>
+                  <label className="acesso-item"><input type="checkbox" name="aprova_transf" value="1" defaultChecked={d.aprovadores.includes(p.id)} /> Pode aprovar o envio de mercadoria entre unidades (encarregada do estoque)</label>
                 </fieldset>
                 <div><button className="principal">Salvar acessos de {p.nome.split(" ")[0]}</button></div>
               </form>
