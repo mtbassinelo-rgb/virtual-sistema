@@ -9,7 +9,7 @@ import { aprovarCadastro } from "../site/acoes";
 
 export const metadata = { title: "Clientes" };
 
-export default async function Clientes({ searchParams }: { searchParams: Promise<{ q?: string; vendedora?: string; compra?: string; situacao?: string; erro?: string; ok?: string }> }) {
+export default async function Clientes({ searchParams }: { searchParams: Promise<{ q?: string; vendedora?: string; compra?: string; situacao?: string; unidade?: string; erro?: string; ok?: string }> }) {
   const u = await exigirUsuario();
   const f = await searchParams;
   const par: unknown[] = [];
@@ -22,7 +22,9 @@ export default async function Clientes({ searchParams }: { searchParams: Promise
   if (f.situacao === "inativos") cond.push("not c.ativo"); else if (f.situacao !== "todos") cond.push("c.ativo");
   // clientes de cada unidade não se misturam: com uma unidade escolhida no topo, só os clientes dela
   const { atual } = await unidadeSistema(u);
-  if (atual) { par.push(atual.id); cond.push(`app.deposito_do_cliente(c.id) = $${par.length}::uuid`); }
+  // a vendedora sempre vê todos os clientes dela; gestão pode separar por unidade (ou ver todas)
+  const porUnidade = Boolean(atual) && ehGestao(u) && f.unidade !== "todas";
+  if (porUnidade && atual) { par.push(atual.id); cond.push(`app.deposito_do_cliente(c.id) = $${par.length}::uuid`); }
 
   const d = await comUsuario(u.id, async (c) => ({
     clientes: (await c.query(
@@ -49,7 +51,8 @@ export default async function Clientes({ searchParams }: { searchParams: Promise
   return (
     <>
       <section className="linha entre">
-        <div><h1>Clientes</h1><div className="suave pequeno">{d.clientes.length} cliente(s)</div></div>
+        <div><h1>Clientes</h1><div className="suave pequeno">{d.clientes.length} cliente(s)
+          {porUnidade && atual && <> · só os da unidade <b>{atual.nome}</b> (<a href={`/clientes?${new URLSearchParams({ ...(f.q ? { q: f.q } : {}), unidade: "todas" })}`}>ver de todas as unidades</a>)</>}</div></div>
       </section>
       <Avisos erro={f.erro} ok={f.ok} />
       {d.leads.length > 0 && (
@@ -85,6 +88,7 @@ export default async function Clientes({ searchParams }: { searchParams: Promise
         </div>
       )}
       <form className="painel campos" method="get">
+        {f.unidade === "todas" && <input type="hidden" name="unidade" value="todas" />}
         <label>Nome ou telefone<input name="q" defaultValue={f.q} /></label>
         <label>Situação
           <select name="situacao" defaultValue={f.situacao ?? ""}>
