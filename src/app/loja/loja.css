@@ -615,3 +615,6 @@
 .rotulo:has(> img)::before { display: none; }
 .rotulo > img { inset: 14px; width: calc(100% - 28px); height: calc(100% - 28px); object-fit: contain; object-position: center; background: transparent; }
 .compacta .rotulo > img { inset: 8px; width: calc(100% - 16px); height: calc(100% - 16px); }
+
+/* Banner da equipe só com imagem: sem a sombra escura embaixo (não há texto para destacar) */
+.banner.sem-texto::after { display: none; }

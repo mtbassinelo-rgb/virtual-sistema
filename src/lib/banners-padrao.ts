@@ -2,6 +2,11 @@ import type { Idioma } from "./idioma";
 
 export type Banner = { id: string; titulo: string; subtitulo: string | null; imagem: string | null; link: string | null };
 
+/** Banners cadastrados pela equipe: o nome é só para organização no sistema e nunca aparece no site. */
+export function bannersDaEquipe(linhas: Banner[]): Banner[] {
+  return linhas.map((b) => ({ ...b, titulo: "" }));
+}
+
 /** Banners do site enquanto a equipe não cadastrar os próprios (Loja online → Banners e destaques). */
 export function bannersPadrao(idioma: Idioma, cliente: boolean): Banner[] {
   const es = idioma === "es";

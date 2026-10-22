@@ -26,19 +26,24 @@ export function FaixaBanners({ banners, rotulo, acao, compacta }: { banners: Ban
     <section className={`banners ${compacta ? "banners-compacta" : ""}`} aria-label={rotulo}>
       <div className="banners-trilho" ref={trilho}>
         {banners.map((b) => {
+          // banner da equipe sem texto: só a imagem (o nome cadastrado é interno e não aparece)
+          const temTexto = Boolean(b.titulo || b.subtitulo);
           const conteudo = (
             <>
               {b.imagem ? <img src={b.imagem} alt="" /> : <img className="banner-icone" src="/marca/icone.png" alt="" />}
-              <div className="banner-texto">
-                <h2>{b.titulo}</h2>
-                {b.subtitulo && <p>{b.subtitulo}</p>}
-                {b.link && <span className="banner-acao">{acao}</span>}
-              </div>
+              {temTexto && (
+                <div className="banner-texto">
+                  {b.titulo && <h2>{b.titulo}</h2>}
+                  {b.subtitulo && <p>{b.subtitulo}</p>}
+                  {b.link && <span className="banner-acao">{acao}</span>}
+                </div>
+              )}
             </>
           );
+          const classe = `banner ${b.imagem ? "com-imagem" : ""} ${temTexto ? "" : "sem-texto"}`;
           return b.link
-            ? <a key={b.id} href={b.link} className={`banner ${b.imagem ? "com-imagem" : ""}`}>{conteudo}</a>
-            : <div key={b.id} className={`banner ${b.imagem ? "com-imagem" : ""}`}>{conteudo}</div>;
+            ? <a key={b.id} href={b.link} className={classe} aria-label={temTexto ? undefined : acao}>{conteudo}</a>
+            : <div key={b.id} className={classe}>{conteudo}</div>;
         })}
       </div>
     </section>

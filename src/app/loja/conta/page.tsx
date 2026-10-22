@@ -7,7 +7,7 @@ import { idiomaAtual } from "@/lib/idioma";
 import { conferirCliente, exigirCliente } from "@/lib/portal";
 import { Acompanhamento, type PedidoAcomp } from "../acompanhamento";
 import { FaixaBanners } from "../banners";
-import { bannersPadrao, type Banner } from "@/lib/banners-padrao";
+import { bannersPadrao, bannersDaEquipe, type Banner } from "@/lib/banners-padrao";
 
 export const metadata = { title: "Minha área" };
 
@@ -84,7 +84,7 @@ export default async function MinhaArea({ searchParams }: { searchParams: Promis
   const idioma = await idiomaAtual();
   const t = T[idioma];
   const proprios = (await pool.query("select * from app.banners_ativos($1)", [idioma])).rows as Banner[];
-  const banners = [...proprios, ...bannersPadrao(idioma, true)];
+  const banners = [...bannersDaEquipe(proprios), ...bannersPadrao(idioma, true)];
   const [doc, pedidos, meta, credito, extrato, anterior] = await Promise.all([
     pool.query("select app.portal_documento($1) as d", [sessao]).then((r) => String(r.rows[0]?.d ?? "")),
     pool.query("select * from app.portal_pedidos($1)", [sessao]).then((r) => r.rows as Pedido[]),

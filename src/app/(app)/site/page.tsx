@@ -122,8 +122,8 @@ export default async function Site({ searchParams }: { searchParams: Promise<{ o
             {b.imagem ? <img src={b.imagem} alt="" style={{ width: 200, aspectRatio: "16/6", objectFit: "cover", borderRadius: 8 }} />
               : <div style={{ width: 200, aspectRatio: "16/6", borderRadius: 8, background: "var(--marca)" }} />}
             <div style={{ flex: 1, minWidth: 200 }}>
-              <b>{b.titulo}</b> {!b.ativo && <Selo>desligado</Selo>}
-              {b.subtitulo && <div className="pequeno">{b.subtitulo}</div>}
+              <b>{b.titulo}</b> <span className="pequeno suave">(nome interno)</span> {!b.ativo && <Selo>desligado</Selo>}
+              {b.subtitulo && <div className="pequeno">No site: “{b.subtitulo}”</div>}
               <div className="pequeno suave">
                 {IDIOMA[b.idioma]} · ordem {b.ordem}
                 {b.inicio && ` · de ${String(b.inicio)}`}{b.fim && ` até ${String(b.fim)}`}
@@ -145,8 +145,8 @@ export default async function Site({ searchParams }: { searchParams: Promise<{ o
           <details>
             <summary>Novo banner</summary>
             <form action={criarBanner} className="campos" style={{ marginTop: 10 }}>
-              <label className="largo">Título<input name="titulo" required maxLength={120} placeholder="Ex.: Semana dos kits Maycrene" /></label>
-              <label className="largo">Texto (opcional)<input name="subtitulo" maxLength={200} placeholder="Ex.: Kits com 10% de desconto até domingo" /></label>
+              <label className="largo">Nome do banner (só para sua organização, não aparece no site)<input name="titulo" required maxLength={120} placeholder="Ex.: Mais vendidos outubro" /></label>
+              <label className="largo">Frase escrita por cima da imagem no site (opcional; deixe vazio se a imagem já tem tudo)<input name="subtitulo" maxLength={200} placeholder="Ex.: Kits com 10% de desconto até domingo" /></label>
               <label className="largo">Imagem (JPG, PNG ou WEBP)<input type="file" name="imagem" accept="image/jpeg,image/png,image/webp" /></label>
               <label className="largo">Link ao clicar (opcional)
                 <input name="link" placeholder="Ex.: /loja?marca=Maycrene  ou  /loja?q=platinum  ou  /loja?linha=kits" />
