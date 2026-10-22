@@ -101,5 +101,39 @@ select teste.ok((select valor = 8000 and tabela = 'py_normal' from app.preco_par
 select teste.ok((select preco = 12000 from app.preco_final_moeda('00000000-0000-0000-0000-0000000c0dc1', '00000000-0000-0000-0000-0000000c0d02', 'GS')),
   'Preço final (loja e pedido) usa a tabela de CDE');
 
+\echo '== Vendas de marketplace pelo relatório =='
+reset role;
+insert into app.produto_codigos (codigo, produto_id) values ('SHP-UNI-1', :'UP1') on conflict do nothing;
+set role vc_app;
+select teste.como(:'EST');
+select app.lancar_vendas_marketplace('shopee', :'cd', jsonb_build_array(
+  jsonb_build_object('pedido', 'SHP-9001', 'data', current_date, 'taxa', 3, 'itens', jsonb_build_array(
+    jsonb_build_object('sku', 'SHP-UNI-1', 'quantidade', 2, 'valor', 15), jsonb_build_object('sku', 'NAO-EXISTE', 'quantidade', 1, 'valor', 9)))), 'teste.csv') as mk \gset
+select teste.ok((:'mk'::jsonb->>'novos')::int = 1 and (:'mk'::jsonb->>'sem_sku')::int = 1, 'Pedido do relatório entra; SKU sem cadastro vira pendência');
+select teste.ok((select quantidade from app.estoque_saldos where deposito_id = :'cd' and produto_id = :'UP1') = 40, 'Baixou 2 do estoque do CD (42 → 40)');
+select teste.ok((select canal = 'shopee' and valor_total = 39 and status_comercial = 'entregue' and repasse_previsto = 36 from app.pedidos where numero_externo = 'SHP-9001'),
+  'Pedido do canal com total do relatório e repasse (total − taxa)');
+select teste.ok((app.lancar_vendas_marketplace('shopee', :'cd', jsonb_build_array(jsonb_build_object('pedido', 'SHP-9001', 'itens', jsonb_build_array(jsonb_build_object('sku', 'SHP-UNI-1', 'quantidade', 2)))))->>'repetidos')::int = 1,
+  'O mesmo pedido não entra duas vezes');
+select teste.ok((select quantidade from app.estoque_saldos where deposito_id = :'cd' and produto_id = :'UP1') = 40, 'Repetido não baixa de novo');
+select teste.como(:'GERENTE');
+select teste.ok(app.ligar_sku('NAO-EXISTE', :'UP1') = 1, 'Ligar o SKU resolve a pendência');
+select teste.ok((select quantidade from app.estoque_saldos where deposito_id = :'cd' and produto_id = :'UP1') = 39, 'E dá a baixa que faltou');
+select teste.como(:'KEILA');
+select teste.falha(format($$select app.lancar_vendas_marketplace('shopee', %L, '[{"pedido":"X","itens":[]}]')$$, :'cd'), 'Só gerente', 'Vendedora não lança relatório de marketplace');
+
+\echo '== Inventário com venda no meio da contagem =='
+select teste.como(:'YESSICA');
+-- abriu a lista com 5 em CDE; contou 8; enquanto contava saiu 1 no balcão (saldo foi para 4) → fica 7
+select teste.ok((select quantidade from app.estoque_saldos where deposito_id = :'cde' and produto_id = :'UP1') = 5, 'Antes: 5 em CDE');
+reset role;
+select app._lancar(:'cde', :'UP1', 'saida_venda', 1, 'teste', 'inv', null);
+set role vc_app;
+select teste.como(:'YESSICA');
+select app.registrar_inventario(:'cde', format('[{"produto_id":"%s","contado":8,"base":5}]', :'UP1')::jsonb);
+select teste.ok((select quantidade from app.estoque_saldos where deposito_id = :'cde' and produto_id = :'UP1') = 7, 'Contado 8 sobre a base 5 = +3 (a venda do meio não é desfeita)');
+select app.registrar_inventario(:'cde', format('[{"produto_id":"%s","contado":2}]', :'UP1')::jsonb);
+select teste.ok((select quantidade from app.estoque_saldos where deposito_id = :'cde' and produto_id = :'UP1') = 2, 'Sem base: fica igual ao contado');
+
 reset role;
 \echo '== Testes das unidades passaram =='

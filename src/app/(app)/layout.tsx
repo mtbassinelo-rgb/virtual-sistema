@@ -81,6 +81,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
       { href: "/estoque/separacao", texto: "Área do estoquista", contador: n.a_separar, dica: "Pedidos e transferências a separar" },
       { href: "/estoque/transferencias", texto: "Pedidos entre unidades", contador: n.transf_acao, dica: "A aprovar ou a receber" },
       { href: "/estoque", texto: "Saldo e movimentos" },
+      { href: "/estoque/marketplace", texto: "Vendas Shopee / Mercado Livre", dica: "Lance o relatório do dia: pedidos entram e o estoque sai" },
       { href: "/estoque/inventario", texto: "Inventário (contagem)" },
       { href: "/relatorios?aba=estoque", texto: "Para comprar / estoque baixo" },
       { href: "/relatorios/compra", texto: "Planejar compra por marca", dica: "Escolha a marca: estoque, venda por mês, quando acaba e quanto comprar" },

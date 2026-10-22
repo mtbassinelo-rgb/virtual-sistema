@@ -14,7 +14,8 @@ export default async function Inventario({ searchParams }: { searchParams: Promi
     const podem = (await c.query("select id, nome from app.depositos where ativo and app.pode_operar_deposito(id) order by tipo, nome")).rows as { id: string; nome: string }[];
     const dep = podem.find((x) => x.id === f.u) ?? podem.find((x) => x.id === atual?.id) ?? podem[0];
     if (!dep) return { podem, dep: null, itens: [] as ItemInventario[] };
-    const itens = (await c.query(`select p.id, p.codigo, p.nome, p.marca, p.gtin,
+    const itens = (await c.query(`select p.id, p.codigo, p.nome, p.marca, p.gtin, p.unidades_caixa::float as caixa,
+        coalesce((select array_agg(pc.codigo) from app.produto_codigos pc where pc.produto_id = p.id), '{}') as codigos,
         coalesce((select quantidade from app.estoque_saldos s where s.deposito_id = $1 and s.produto_id = p.id), 0)::float as saldo
       from app.produtos p where p.tipo <> 'kit' and (p.ativo or exists (select 1 from app.estoque_saldos s where s.deposito_id = $1 and s.produto_id = p.id and s.quantidade <> 0))
       order by p.marca nulls last, p.nome`, [dep.id])).rows as ItemInventario[];
@@ -28,7 +29,7 @@ export default async function Inventario({ searchParams }: { searchParams: Promi
         <div>
           <div className="trilha"><Link href="/estoque">Estoque</Link> / Inventário</div>
           <h1>Inventário · {d.dep.nome}</h1>
-          <p>Conte as peças da prateleira: bipe cada uma com o leitor ou digite a quantidade. A contagem fica guardada neste celular ou computador até você salvar. Ao salvar, o estoque da unidade fica igual ao contado.</p>
+          <p>Conte as peças da prateleira: bipe cada uma com o leitor ou digite a quantidade. Caixa fechada: digite 2cx (vira 2 × peças da caixa). A contagem fica guardada neste aparelho até salvar. Venda feita enquanto você conta não é desfeita: vale o que você contou naquele momento.</p>
         </div>
         {d.podem.length > 1 && (
           <nav className="troca-unidade" aria-label="Unidade">
