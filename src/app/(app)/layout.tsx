@@ -70,6 +70,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
         { href: "/produtos?filtro=fora-do-site", texto: "Sem preço (fora do site)", contador: n.fora_site, dica: "Sem preço Normal em R$ ou em Gs: ficam ocultos no site para quem não tem o preço. Arrume e eles voltam a aparecer" },
         { href: "/estoque/precos", texto: "Preços por planilha" },
         { href: "/produtos/precos-cde", texto: "Preços da loja CDE" },
+        { href: "/produtos/custos", texto: "Revisar custos", dica: "Custo da caixa gravado como custo da unidade" },
         { href: "/produtos/kits", texto: "Kits capilares (montar)" },
         { href: "/produtos/grupos", texto: "Fragrâncias agrupadas", dica: "Mesmo produto em várias fragrâncias vira um cartão só no site" },
         { href: "/produtos/fotos", texto: "Fotos do catálogo", contador: n.fotos, dica: "Fotos esperando conferência" },
