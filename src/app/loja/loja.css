@@ -609,3 +609,9 @@
 .seo-texto { padding-top: 48px; }
 .seo-texto h2 { font-size: clamp(1.15rem, 2vw, 1.4rem); margin-bottom: 10px; }
 .seo-texto p { color: var(--apagado); max-width: 80ch; margin: 0 0 10px; }
+
+/* Fotos dos produtos: quadro quadrado e branco, foto inteira (sem cortar) e centralizada */
+.rotulo:has(> img) { aspect-ratio: 1 / 1; background: #fff !important; border-bottom: 1px solid var(--linha-l); }
+.rotulo:has(> img)::before { display: none; }
+.rotulo > img { inset: 14px; width: calc(100% - 28px); height: calc(100% - 28px); object-fit: contain; object-position: center; background: transparent; }
+.compacta .rotulo > img { inset: 8px; width: calc(100% - 16px); height: calc(100% - 16px); }
