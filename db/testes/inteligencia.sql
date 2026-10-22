@@ -184,11 +184,19 @@ set role vc_app;
 select teste.como(:'KEILA');
 select teste.falha($$select app.definir_retirada_foz_marca('MARCA INT', false)$$, 'gerente ou dono', 'Vendedora não escolhe as marcas do Retire em Foz');
 select teste.como(:'GERENTE');
-select app.definir_retirada_foz_marca('MARCA INT', false);
-select teste.ok(not app.retirada_foz_marca('MARCA INT') and app.retirada_foz_marca('OUTRA') and 'MARCA INT' = any(app.retirada_foz_marcas_fora()),
-  'Gerente tira a marca do desconto; marcas fora da lista continuam com desconto');
-select teste.ok((select coalesce(sum(caixas), 0) = 0 from app.simular_retirada_foz(current_date - 30, current_date)), 'Simulação ignora a marca sem desconto');
 select app.definir_retirada_foz_marca('MARCA INT', true);
+select teste.ok(app.retirada_foz_marca('MARCA INT') and not app.retirada_foz_marca('OUTRA') and 'MARCA INT' = any(app.retirada_foz_marcas_fora()),
+  'Gerente marca "VIP só para locais"; marca sem escolha = mesmo preço para todos');
+select teste.ok((select coalesce(sum(caixas), 0) = 0 from app.simular_retirada_foz(current_date - 30, current_date)), 'Marca com preço de local não soma desconto de retirada');
+reset role;
+update app.clientes set cliente_local = true where id = '00000000-0000-0000-0000-0000000000c1';
+select teste.ok((select tabela = 'py_vip' from app.preco_final('00000000-0000-0000-0000-0000000000c1', :'PI1')), 'Cliente local paga o VIP na marca marcada');
+update app.clientes set cliente_local = false where id = '00000000-0000-0000-0000-0000000000c1';
+select teste.ok((select tabela = 'py_normal' from app.preco_final('00000000-0000-0000-0000-0000000000c1', :'PI1')), 'Cliente não local paga o Normal na marca marcada');
+update app.clientes set cliente_local = true where id = '00000000-0000-0000-0000-0000000000c1';
+set role vc_app;
+select teste.como(:'GERENTE');
+select app.definir_retirada_foz_marca('MARCA INT', false);
 reset role;
 
 \echo '== Retire em Foz: candidatos a cliente local e relatório =='

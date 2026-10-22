@@ -91,7 +91,7 @@ export default async function Inteligencia({ searchParams }: {
       locais: (await c.query(`select c.id, c.nome, v.nome vendedora from app.clientes c join app.vendedoras v on v.id = c.vendedora_id
           where c.cliente_local and c.mesclado_em is null order by c.nome`)).rows,
       sim: (await c.query("select * from app.simular_retirada_foz((date_trunc('month', current_date) - interval '5 months')::date, current_date)")).rows,
-      marcas: (await c.query(`select m.marca, coalesce(r.aplica, true) aplica, m.produtos
+      marcas: (await c.query(`select m.marca, coalesce(r.aplica, false) aplica, m.produtos
           from (select marca, count(*)::int produtos from app.produtos where ativo and marca is not null group by marca) m
           left join app.retirada_foz_marcas r on r.marca = m.marca order by m.marca`)).rows as { marca: string; aplica: boolean; produtos: number }[],
       relatorio: (await c.query("select * from app.relatorio_retirada_foz((date_trunc('month', current_date) - interval '11 months')::date, current_date)")).rows as
@@ -430,9 +430,10 @@ export default async function Inteligencia({ searchParams }: {
           </section>
 
           <section className="painel">
-            <h2>Marcas com desconto de retirada</h2>
-            <p className="pequeno suave" style={{ margin: 0 }}>Marcadas = o cliente local que retira em Foz ganha o desconto por caixa nessa marca. Desmarque as marcas em que o preço
-              já é igual para todos e não deve ter desconto (ex.: deixar Soul com desconto e tirar Rhenuks). Marca nova entra marcada.</p>
+            <h2>Marcas com preço especial para clientes locais</h2>
+            <p className="pequeno suave" style={{ margin: 0 }}><b>Marcadas = VIP só para locais:</b> no Paraguai o cliente local paga o preço VIP e quem não é local paga o Normal
+              (seja VIP ou não). <b>Desmarcadas = mesmo preço para todos:</b> cada cliente paga a tabela dele e o cliente local que escolhe Retirar em Foz ganha o desconto por caixa.
+              É a mesma escolha da coluna “Preço para quem” na Precificação.</p>
             {gerir ? (
               <form action={salvarRetiradaMarcas}>
                 <div className="linha" style={{ flexWrap: "wrap", gap: "6px 18px", margin: "10px 0" }}>

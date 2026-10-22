@@ -82,7 +82,9 @@ export default async function Precificacao({ searchParams }: { searchParams: Pro
       <details className="painel">
         <summary><b>Marcas do motor e preço para clientes locais</b> <span className="pequeno suave">({noMotor.length} marcada(s){noMotor.length ? ": " + noMotor.map((m) => m.marca).join(", ") : ""}) · margem-alvo própria por marca</span></summary>
         <p className="pequeno suave">Marque as marcas que o motor acompanha e, se quiser, uma margem-alvo diferente do padrão (ex.: marca de atração com margem menor). O filtro “Só marcas do motor” mostra só elas.
-          Em <b>Preço para quem</b>: “Desconto p/ clientes locais” = o cliente local que retira em Foz ganha o desconto por caixa nessa marca; “Mesmo preço para todos” = sem desconto local (ex.: Rhenuks). É a mesma escolha da aba Retire em Foz.</p>
+          Em <b>Preço para quem</b>: <b>“VIP só p/ locais”</b> = no Paraguai o cliente <b>local</b> paga o preço VIP e quem <b>não é local</b> paga o Normal, seja VIP ou não
+          (ex.: Pimenta Negra Rhenuks: local Gs 6.000, demais Gs 7.000). <b>“Mesmo preço para todos”</b> = cada cliente paga a tabela dele (Normal ou VIP), e o cliente local
+          que retira em Foz ganha o desconto por caixa.</p>
         <div className="tabela"><table style={{ minWidth: 0 }}>
           <thead><tr><th>Marca</th><th>Produtos</th><th>No motor</th><th>Papel</th><th>Alvo Normal %</th><th>Alvo VIP %</th><th>Preço para quem</th><th></th></tr></thead>
           <tbody>{d.marcas.map((m, i) => {
@@ -105,7 +107,7 @@ export default async function Precificacao({ searchParams }: { searchParams: Pro
                 <td><input form={f} name="margem_vip" inputMode="decimal" style={{ width: 70 }} placeholder={String(av)} aria-label={`Alvo VIP de ${m.marca}`}
                   defaultValue={m.margem_alvo_vip == null ? "" : Number(m.margem_alvo_vip).toLocaleString("pt-BR")} /></td>
                 <td><select form={f} name="retirada" defaultValue={m.desconto_local ? "local" : "todos"} aria-label={`Preço de ${m.marca} para clientes locais`} style={{ width: 240 }}>
-                  <option value="local">Desconto p/ locais (retirando em Foz)</option>
+                  <option value="local">VIP só p/ locais (os outros pagam Normal)</option>
                   <option value="todos">Mesmo preço para todos</option>
                 </select></td>
                 <td><button form={f}>Salvar</button></td>
