@@ -98,7 +98,7 @@ export function VendaBalcao({ caixa, produtos, clientes, moedaPadrao, contas }: 
   }, [busca, produtos]);
 
   async function precosDe(lista: ProdutoPdv[], cli = cliente, m = moeda) {
-    return precosParaVenda(cli || null, m, lista.map((p) => p.id));
+    return precosParaVenda(cli || null, m, lista.map((p) => p.id), caixa);
   }
   async function adicionar(p: ProdutoPdv, qtd = 1) {
     setBusca(""); campo.current?.focus();

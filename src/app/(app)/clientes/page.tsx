@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { exigirUsuario, ehGestao, podeEscrever } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
+import { unidadeSistema } from "@/lib/unidade-sistema";
 import { dinheiro, data, type Moeda } from "@/lib/formato";
 import { Avisos, Selo } from "../avisos";
 import { criarCliente, decidirCompraUnidade, trocarVendedoraCliente } from "./acoes";
@@ -19,6 +20,9 @@ export default async function Clientes({ searchParams }: { searchParams: Promise
   if (f.compra === "unidade") cond.push("c.compra_unidade and c.categoria_preco = 'normal'");
   if (f.compra === "caixa") cond.push("not (c.compra_unidade and c.categoria_preco = 'normal')");
   if (f.situacao === "inativos") cond.push("not c.ativo"); else if (f.situacao !== "todos") cond.push("c.ativo");
+  // clientes de cada unidade não se misturam: com uma unidade escolhida no topo, só os clientes dela
+  const { atual } = await unidadeSistema(u);
+  if (atual) { par.push(atual.id); cond.push(`app.deposito_do_cliente(c.id) = $${par.length}::uuid`); }
 
   const d = await comUsuario(u.id, async (c) => ({
     clientes: (await c.query(
@@ -149,6 +153,8 @@ export default async function Clientes({ searchParams }: { searchParams: Promise
         <details className="painel">
           <summary>Cadastrar cliente</summary>
           <form action={criarCliente} className="campos" style={{ marginTop: 10 }}>
+            {atual && <input type="hidden" name="deposito" value={atual.id} />}
+            {atual && <p className="largo pequeno suave" style={{ margin: 0 }}>O cliente fica ligado à unidade <b>{atual.nome}</b> (vê o estoque e os preços dela).</p>}
             <label className="largo">Nome ou empresa<input name="nome" required /></label>
             <label>WhatsApp<input name="whatsapp" placeholder="595981000000" /></label>
             <label>Telefone<input name="telefone" /></label>

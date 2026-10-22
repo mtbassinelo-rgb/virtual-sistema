@@ -32,14 +32,18 @@ export async function abrirCaixa(_: Resultado, fd: FormData): Promise<Resultado>
 }
 
 /** Preço de cada produto para a venda: tabela do cliente (com promoção) ou a tabela normal da moeda para cliente avulso. */
-export async function precosParaVenda(cliente: string | null, moeda: "GS" | "BRL", produtos: string[]): Promise<Record<string, number | null>> {
+export async function precosParaVenda(cliente: string | null, moeda: "GS" | "BRL", produtos: string[], caixa?: string): Promise<Record<string, number | null>> {
   const u = await exigirUsuario();
   const ids = produtos.filter(uuid).slice(0, 300);
   if (!ids.length) return {};
   const r = await comUsuario(u.id, (c) => cliente && uuid(cliente)
     ? c.query("select p.id, f.preco from unnest($2::uuid[]) p(id) left join lateral app.preco_final_moeda($1, p.id, $3::app.moeda) f on true", [cliente, ids, moeda])
-    : c.query(`select p.id, (select valor from app.precos z where z.produto_id = p.id and z.tabela = $2 and z.vigente_desde <= current_date
-                               order by vigente_desde desc limit 1) as preco from unnest($1::uuid[]) p(id)`, [ids, moeda === "GS" ? "py_normal" : "br_normal"]));
+    : c.query(`select p.id, coalesce(
+          (select valor from app.precos z where z.produto_id = p.id and z.vigente_desde <= current_date and $2 = 'py_normal'
+              and z.tabela = (select d.prefixo_tabela || '_normal' from app.caixas cx join app.depositos d on d.id = cx.deposito_id where cx.id = $3::uuid)
+            order by vigente_desde desc limit 1),
+          (select valor from app.precos z where z.produto_id = p.id and z.tabela = $2 and z.vigente_desde <= current_date
+            order by vigente_desde desc limit 1)) as preco from unnest($1::uuid[]) p(id)`, [ids, moeda === "GS" ? "py_normal" : "br_normal", caixa && uuid(caixa) ? caixa : null]));
   return Object.fromEntries(r.rows.map((x) => [String(x.id), x.preco == null ? null : Number(x.preco)]));
 }
 

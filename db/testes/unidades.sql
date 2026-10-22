@@ -83,5 +83,23 @@ select app.confirmar_recebimento_caixa((select id from app.caixa_movimentos wher
 select teste.ok((select status_conferencia = 'conferido' from app.pagamentos where pedido_id = :'vu'), 'Gerente confirma no extrato: pagamento conferido');
 select teste.falha(format('select app.confirmar_recebimento_caixa(%s, false)', (select id from app.caixa_movimentos where pedido_id = :'vu')), 'já foi', 'Não confirma duas vezes');
 
+\echo '== Preço próprio de CDE =='
+reset role;
+insert into app.produtos (id, codigo, nome, marca) values ('00000000-0000-0000-0000-0000000c0d02', 'UNI-002', 'Shampoo Preço CDE', 'Marca Preco Uni');
+insert into app.precos (produto_id, tabela, valor, vigente_desde) values
+  ('00000000-0000-0000-0000-0000000c0d02', 'py_normal', 10000, current_date - 1), ('00000000-0000-0000-0000-0000000c0d02', 'cde_normal', 12000, current_date - 1),
+  (:'UP1', 'py_normal', 8000, current_date - 1);
+insert into app.clientes (id, nome, vendedora_id, pais, deposito_id) values
+  ('00000000-0000-0000-0000-0000000c0dc1', 'Cliente CDE', '00000000-0000-0000-0000-0000000000a2', 'PY', :'cde'),
+  ('00000000-0000-0000-0000-0000000c0dc2', 'Cliente Foz', '00000000-0000-0000-0000-0000000000a2', 'PY', :'cd');
+select teste.ok((select valor = 12000 and tabela = 'cde_normal' from app.preco_para_cliente('00000000-0000-0000-0000-0000000c0dc1', '00000000-0000-0000-0000-0000000c0d02')),
+  'Cliente de CDE paga a tabela de CDE');
+select teste.ok((select valor = 10000 from app.preco_para_cliente('00000000-0000-0000-0000-0000000c0dc2', '00000000-0000-0000-0000-0000000c0d02')),
+  'Cliente de Foz paga a tabela do Paraguai');
+select teste.ok((select valor = 8000 and tabela = 'py_normal' from app.preco_para_cliente('00000000-0000-0000-0000-0000000c0dc1', :'UP1')),
+  'Sem preço de CDE: vale o do Paraguai (nunca fica sem preço)');
+select teste.ok((select preco = 12000 from app.preco_final_moeda('00000000-0000-0000-0000-0000000c0dc1', '00000000-0000-0000-0000-0000000c0d02', 'GS')),
+  'Preço final (loja e pedido) usa a tabela de CDE');
+
 reset role;
 \echo '== Testes das unidades passaram =='

@@ -1,4 +1,5 @@
 import { exigirUsuario, ehGestao } from "@/lib/auth";
+import { unidadeSistema } from "@/lib/unidade-sistema";
 import { comUsuario } from "@/lib/db";
 import { dataHora, STATUS_TRANSFERENCIA } from "@/lib/formato";
 import { Avisos, Selo } from "../avisos";
@@ -13,6 +14,7 @@ const COR: Record<string, string> = { rascunho: "", enviada: "aviso", recebida: 
 export default async function Estoque({ searchParams }: { searchParams: Promise<{ q?: string; situacao?: string; deposito?: string; ok?: string; erro?: string }> }) {
   const u = await exigirUsuario();
   const f = await searchParams;
+  const { atual } = await unidadeSistema(u);
   const d = await comUsuario(u.id, async (c) => {
     const depositos = (await c.query(
       "select id, nome, cidade, app.pode_operar_deposito(id) as opera from app.depositos where ativo order by tipo, nome")).rows;
@@ -58,7 +60,8 @@ export default async function Estoque({ searchParams }: { searchParams: Promise<
   // Filtro de situação: "zerado" = sem estoque; "com" = com estoque. Com um depósito escolhido,
   // vale o saldo daquele depósito; sem depósito, vale o total de todos.
   const situacao = f.situacao === "zerado" || f.situacao === "com" ? f.situacao : "";
-  const depFiltro = d.depositos.some((x) => x.id === f.deposito) ? String(f.deposito) : "";
+  // sem escolha na tela, vale a unidade do topo (CD Foz / CD CDE); "todos" mostra as duas
+  const depFiltro = f.deposito === "todos" ? "" : d.depositos.some((x) => x.id === f.deposito) ? String(f.deposito) : atual?.id ?? "";
   const saldoFiltro = (p: Linha) =>
     depFiltro ? (p.dep[depFiltro]?.saldo ?? 0) : Object.values(p.dep).reduce((s, v) => s + v.saldo, 0);
   const todas = [...porProduto.values()];
@@ -112,8 +115,8 @@ export default async function Estoque({ searchParams }: { searchParams: Promise<
           </select>
         </label>
         <label>Depósito
-          <select name="deposito" defaultValue={depFiltro}>
-            <option value="">Todos (soma)</option>
+          <select name="deposito" defaultValue={depFiltro || "todos"}>
+            <option value="todos">Todos (soma)</option>
             {d.depositos.map((x) => <option key={x.id} value={x.id}>{x.nome}</option>)}
           </select>
         </label>

@@ -1,0 +1,140 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { exigirUsuario, ehGestao } from "@/lib/auth";
+import { comUsuario } from "@/lib/db";
+import { dinheiro, hojeISO, nomeMes } from "@/lib/formato";
+
+export const metadata = { title: "Painel das unidades" };
+
+const R = (v: number) => dinheiro(v, "BRL");
+const n = (v: unknown) => Number(v ?? 0);
+const pct = (v: number | null) => v == null || !Number.isFinite(v) ? "—" : `${(v * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
+const somaMes = (m: string, k: number) => { const [a, b] = m.split("-").map(Number); return new Date(Date.UTC(a, b - 1 + k, 1)).toISOString().slice(0, 7); };
+const fimMes = (m: string) => { const [a, b] = m.split("-").map(Number); return new Date(Date.UTC(a, b, 0)).toISOString().slice(0, 10); };
+
+type Un = {
+  id: string; nome: string; codigo: string; vendas: number; rc: number; custo: number; pedidos: number; clientes: number; vendas_gs: number; vendas_brl_orig: number;
+  hoje: number; hoje_pedidos: number; recebido: number; transf_entrou: number; transf_saiu: number; fixas: number; variaveis: number;
+  a_receber: number; vencido: number; estoque_valor: number; estoque_itens: number; a_separar: number; transf_pend: number;
+  caixa_aberto: boolean; caixa_gs: number; a_confirmar: number;
+};
+
+export default async function Unidades({ searchParams }: { searchParams: Promise<{ mes?: string }> }) {
+  const u = await exigirUsuario();
+  if (!ehGestao(u)) redirect("/");
+  const f = await searchParams;
+  const hoje = hojeISO();
+  const mes = /^\d{4}-\d{2}$/.test(f.mes ?? "") ? f.mes! : hoje.slice(0, 7);
+  const ini = `${mes}-01`, fim = fimMes(mes), ini12 = `${somaMes(mes, -11)}-01`;
+
+  const d = await comUsuario(u.id, async (c) => {
+    const cambio = n((await c.query("select app.param('cambio_custo_gs') v")).rows[0]?.v) || 1300;
+    const gs = (col: string, moeda = "moeda", camb = "null") => `case when ${moeda} = 'GS' then ${col} / coalesce(${camb}, ${cambio}) else ${col} end`;
+    const unidades = (await c.query(`
+      with dep as (select id, nome, codigo from app.depositos where ativo),
+      it as (select p.deposito_id, sum(x.receita_brl) vendas, sum(x.receita_brl) filter (where x.custo_brl is not null) rc, sum(x.custo_brl) custo,
+                    count(distinct x.pedido_id) pedidos, count(distinct x.cliente_id) clientes
+               from app.fin_itens($1, $2) x join app.pedidos p on p.id = x.pedido_id group by 1),
+      ped as (select deposito_id, sum(valor_total) filter (where moeda = 'GS') gs, sum(valor_total) filter (where moeda = 'BRL') brl,
+                     sum(${gs("valor_total")}) filter (where data_pedido = current_date) hoje, count(*) filter (where data_pedido = current_date) hoje_n
+                from app.pedidos where app.conta_como_venda(status_comercial) and data_pedido between $1 and $2 group by 1),
+      rec as (select p.deposito_id, sum(${gs("pg.valor", "p.moeda")}) v from app.pagamentos pg join app.pedidos p on p.id = pg.pedido_id
+               where pg.status_conferencia <> 'recusado' and pg.data between $1 and $2 group by 1),
+      tin as (select destino_id dep, sum(valor_custo) v from app.transferencias where status in ('enviada','recebida','recebida_com_divergencia') and enviada_em::date between $1 and $2 group by 1),
+      tout as (select origem_id dep, sum(valor_custo) v from app.transferencias where status in ('enviada','recebida','recebida_com_divergencia') and enviada_em::date between $1 and $2 group by 1),
+      des as (select d.deposito_id, sum(${gs("d.valor", "d.moeda", "d.cambio")}) filter (where c.operacional and c.tipo = 'fixa') fixas,
+                     sum(${gs("d.valor", "d.moeda", "d.cambio")}) filter (where c.operacional and c.tipo = 'variavel') variaveis
+                from app.despesas d join app.despesa_categorias c on c.codigo = d.categoria where d.competencia = $1::date group by 1),
+      ar as (select deposito_id, sum(${gs("saldo")}) v, sum(${gs("saldo")}) filter (where vencimento < current_date) venc from app.v_pedidos
+              where status_comercial <> 'cancelado' and app.conta_como_venda(status_comercial) and saldo > 0 group by 1),
+      est as (select s.deposito_id, sum(s.quantidade * coalesce(app.custo_produto(s.produto_id), 0)) v, count(*) filter (where s.quantidade > 0) itens
+                from app.estoque_saldos s group by 1),
+      sep as (select deposito_id, count(*) n from app.pedidos where status_comercial = 'em_separacao' and origem <> 'bling' and separacao_conferida_em is null group by 1),
+      tp as (select dep, count(*) n from (select destino_id dep from app.transferencias where status in ('solicitada','separada','enviada')
+                                          union all select origem_id from app.transferencias where status in ('solicitada','separada')) z group by 1),
+      cx as (select deposito_id, true aberto, app.caixa_esperado(id, 'GS') gs from app.caixas where status = 'aberto'),
+      conf as (select cx.deposito_id, count(*) n from app.caixa_movimentos m join app.caixas cx on cx.id = m.caixa_id where m.confirmacao = 'pendente' group by 1)
+      select dep.id, dep.nome, dep.codigo, coalesce(it.vendas, 0) vendas, coalesce(it.rc, 0) rc, coalesce(it.custo, 0) custo, coalesce(it.pedidos, 0) pedidos,
+             coalesce(it.clientes, 0) clientes, coalesce(ped.gs, 0) vendas_gs, coalesce(ped.brl, 0) vendas_brl_orig, coalesce(ped.hoje, 0) hoje, coalesce(ped.hoje_n, 0) hoje_pedidos,
+             coalesce(rec.v, 0) recebido, coalesce(tin.v, 0) transf_entrou, coalesce(tout.v, 0) transf_saiu, coalesce(des.fixas, 0) fixas, coalesce(des.variaveis, 0) variaveis,
+             coalesce(ar.v, 0) a_receber, coalesce(ar.venc, 0) vencido, coalesce(est.v, 0) estoque_valor, coalesce(est.itens, 0) estoque_itens,
+             coalesce(sep.n, 0) a_separar, coalesce(tp.n, 0) transf_pend, coalesce(cx.aberto, false) caixa_aberto, coalesce(cx.gs, 0) caixa_gs, coalesce(conf.n, 0) a_confirmar
+        from dep left join it on it.deposito_id = dep.id left join ped on ped.deposito_id = dep.id left join rec on rec.deposito_id = dep.id
+        left join tin on tin.dep = dep.id left join tout on tout.dep = dep.id left join des on des.deposito_id = dep.id left join ar on ar.deposito_id = dep.id
+        left join est on est.deposito_id = dep.id left join sep on sep.deposito_id = dep.id left join tp on tp.dep = dep.id left join cx on cx.deposito_id = dep.id
+        left join conf on conf.deposito_id = dep.id
+       order by dep.codigo = 'cd-foz' desc, dep.nome`, [ini, fim])).rows.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) =>
+         [k, ["id", "nome", "codigo", "caixa_aberto"].includes(k) ? v : n(v)]))) as Un[];
+    // despesas da empresa sem unidade (geral)
+    const geral = (await c.query(`select coalesce(sum(${gs("d.valor", "d.moeda", "d.cambio")}) filter (where c.tipo = 'fixa'), 0) fixas,
+        coalesce(sum(${gs("d.valor", "d.moeda", "d.cambio")}) filter (where c.tipo = 'variavel'), 0) variaveis
+      from app.despesas d join app.despesa_categorias c on c.codigo = d.categoria where c.operacional and d.deposito_id is null and d.competencia = $1::date`, [ini])).rows[0];
+    const evolucao = (await c.query(`select to_char(date_trunc('month', x.data_pedido), 'YYYY-MM') mes, p.deposito_id,
+        sum(x.receita_brl) vendas, sum(x.receita_brl) filter (where x.custo_brl is not null) - coalesce(sum(x.custo_brl), 0) lucro
+      from app.fin_itens($1, $2) x join app.pedidos p on p.id = x.pedido_id group by 1, 2`, [ini12, fim])).rows;
+    return { cambio, unidades, geral, evolucao };
+  });
+
+  const lb = (x: Un) => x.rc - x.custo;
+  const res = (x: Un) => lb(x) - x.fixas - x.variaveis;
+  const fluxo = (x: Un) => x.recebido - x.transf_entrou - x.fixas - x.variaveis;
+  const NUM = ["vendas", "rc", "custo", "pedidos", "clientes", "vendas_gs", "vendas_brl_orig", "hoje", "hoje_pedidos", "recebido", "transf_entrou", "transf_saiu",
+    "fixas", "variaveis", "a_receber", "vencido", "estoque_valor", "estoque_itens", "a_separar", "transf_pend", "caixa_gs", "a_confirmar"] as const;
+  const tot = { id: "todas", nome: "Geral", codigo: "geral", caixa_aberto: false,
+    ...Object.fromEntries(NUM.map((k) => [k, d.unidades.reduce((s, x) => s + x[k], 0)])) } as Un;
+  tot.fixas += n(d.geral.fixas); tot.variaveis += n(d.geral.variaveis);
+  // geral: transferência entre unidades não é custo da empresa (só muda de lugar)
+  const meses = Array.from({ length: 12 }, (_, i) => somaMes(mes, i - 11)).reverse();
+  const evo = (m: string, dep: string, k: "vendas" | "lucro") => n(d.evolucao.find((r) => r.mes === m && r.deposito_id === dep)?.[k]);
+
+  const Cartao = ({ x, geral }: { x: Un; geral?: boolean }) => (
+    <section className={`painel unidade-cartao ${geral ? "geral" : ""}`}>
+      <div className="linha entre"><h2>{x.nome}</h2>{!geral && <Link className="pequeno" href={`/unidade?d=${x.id}`}>Abrir esta unidade →</Link>}</div>
+      <div className="unidade-grade">
+        <div><span>Vendas no mês</span><b>{R(x.vendas)}</b><small>{x.pedidos} pedidos · {x.clientes} clientes</small></div>
+        <div><span>Vendas hoje</span><b>{R(x.hoje)}</b><small>{x.hoje_pedidos} pedido(s)</small></div>
+        <div><span>Lucro bruto</span><b>{R(lb(x))}</b><small>margem {pct(x.rc ? lb(x) / x.rc : null)}</small></div>
+        <div><span>Despesas</span><b>{R(x.fixas + x.variaveis)}</b><small>fixas {R(x.fixas)}</small></div>
+        <div className={res(x) < 0 ? "ruim" : "bom"}><span>Resultado (lucro − despesas)</span><b>{R(res(x))}</b></div>
+        {!geral && <div><span>Mercadoria recebida (custo)</span><b>{R(x.transf_entrou)}</b><small>enviada a outras: {R(x.transf_saiu)}</small></div>}
+        {!geral && <div className={fluxo(x) < 0 ? "ruim" : ""}><span>Caixa do mês</span><b>{R(fluxo(x))}</b><small>recebido − mercadoria − despesas</small></div>}
+        <div><span>A receber</span><b>{R(x.a_receber)}</b><small>{x.vencido > 0 ? `${R(x.vencido)} vencido` : "nada vencido"}</small></div>
+        <div><span>Estoque (custo)</span><b>{R(x.estoque_valor)}</b><small>{x.estoque_itens} produtos com saldo</small></div>
+        {!geral && <div><span>Caixa do dia</span><b>{x.caixa_aberto ? dinheiro(x.caixa_gs, "GS") : "fechado"}</b><small>{x.a_confirmar ? `${x.a_confirmar} transferência(s) a confirmar` : "nada a confirmar"}</small></div>}
+        {!geral && <div><span>Operação</span><b>{x.a_separar} a separar</b><small>{x.transf_pend} pedido(s) entre unidades</small></div>}
+      </div>
+    </section>
+  );
+
+  return (
+    <>
+      <section className="cabecalho-pagina">
+        <div>
+          <h1>Painel das unidades</h1>
+          <p>Geral e por unidade, em R$ (Gs ÷ {d.cambio.toLocaleString("pt-BR")}). Na unidade que recebe mercadoria de outra, o custo enviado conta no "Caixa do mês";
+            no geral, transferência não é custo (a mercadoria só muda de lugar).</p>
+        </div>
+        <form className="linha" method="get"><label>Mês<input type="month" name="mes" defaultValue={mes} /></label><button>Ver</button></form>
+      </section>
+      <Cartao x={tot} geral />
+      <div className="unidades-lado">{d.unidades.map((x) => <Cartao key={x.id} x={x} />)}</div>
+      {n(d.geral.fixas) + n(d.geral.variaveis) > 0 && <p className="pequeno suave">Despesas da empresa sem unidade (entram só no Geral): {R(n(d.geral.fixas) + n(d.geral.variaveis))}.</p>}
+
+      <section className="painel">
+        <h2>Últimos 12 meses por unidade</h2>
+        <div className="tabela"><table className="dre">
+          <thead><tr><th>Mês</th>{d.unidades.map((x) => <th key={x.id} colSpan={2}>{x.nome}</th>)}<th colSpan={2}>Geral</th></tr>
+            <tr><th></th>{[...d.unidades, tot].map((x) => [<th key={x.id + "v"}>Vendas</th>, <th key={x.id + "l"}>Lucro</th>])}</tr></thead>
+          <tbody>{meses.map((m) => (
+            <tr key={m} className={m === mes ? "atual" : ""}>
+              <td><Link href={`/unidades?mes=${m}`}>{nomeMes(m)}</Link></td>
+              {d.unidades.map((x) => [<td key={x.id + "v"} className="num">{R(evo(m, x.id, "vendas"))}</td>, <td key={x.id + "l"} className="num">{R(evo(m, x.id, "lucro"))}</td>])}
+              <td className="num"><b>{R(d.unidades.reduce((s, x) => s + evo(m, x.id, "vendas"), 0))}</b></td>
+              <td className="num"><b>{R(d.unidades.reduce((s, x) => s + evo(m, x.id, "lucro"), 0))}</b></td>
+            </tr>))}</tbody>
+        </table></div>
+      </section>
+      <p className="pequeno"><Link href="/financeiro">Painel financeiro completo →</Link> · <Link href="/estoque/transferencias">Pedidos entre unidades →</Link> · <Link href="/caixa">Caixa →</Link></p>
+    </>
+  );
+}

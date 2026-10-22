@@ -402,3 +402,17 @@ table.dre tfoot th { border-top: 2px solid var(--linha); }
 .linha-tempo-transf > div.cancelado { background: var(--erro-suave); color: var(--texto); border-left-color: var(--erro); }
 .linha-tempo-transf b { color: var(--texto); }
 @media print { .nao-imprimir, .lateral, .barra-topo, form button, details { display: none !important; } }
+
+/* Painel das unidades */
+.unidades-lado { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
+.unidade-cartao h2 { margin: 0; }
+.unidade-cartao.geral { border-left: 4px solid var(--marca); }
+.unidade-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.unidade-grade > div { display: flex; flex-direction: column; gap: 2px; padding: 10px; border-radius: 8px; background: var(--afundado); }
+.unidade-grade span { font-size: .78rem; color: var(--suave); }
+.unidade-grade b { font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+.unidade-grade small { font-size: .75rem; color: var(--suave); }
+.unidade-grade > div.bom b { color: var(--ok); }
+.unidade-grade > div.ruim { background: var(--erro-suave); }
+.unidade-grade > div.ruim b { color: var(--erro); }
+@media (max-width: 420px) { .unidades-lado { grid-template-columns: minmax(0, 1fr); } }

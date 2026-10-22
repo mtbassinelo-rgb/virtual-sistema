@@ -67,6 +67,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
         { href: "/produtos/precos-rapido", texto: "Editar preços rápido", contador: n.sem_preco, dica: "Produtos ativos sem nenhum preço" },
         { href: "/produtos?filtro=fora-do-site", texto: "Sem preço (fora do site)", contador: n.fora_site, dica: "Sem preço Normal em R$ ou em Gs: ficam ocultos no site para quem não tem o preço. Arrume e eles voltam a aparecer" },
         { href: "/estoque/precos", texto: "Preços por planilha" },
+        { href: "/produtos/precos-cde", texto: "Preços da loja CDE" },
         { href: "/produtos/kits", texto: "Kits capilares (montar)" },
         { href: "/produtos/grupos", texto: "Fragrâncias agrupadas", dica: "Mesmo produto em várias fragrâncias vira um cartão só no site" },
         { href: "/produtos/fotos", texto: "Fotos do catálogo", contador: n.fotos, dica: "Fotos esperando conferência" },
@@ -114,6 +115,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
     ] },
     gestao
       ? { id: "financeiro", titulo: "Financeiro", icone: "financeiro", itens: [
+          { href: "/unidades", texto: "Painel das unidades", dica: "Geral, CD Foz e CDE: vendas, lucro, despesas, caixa, estoque" },
           { href: "/financeiro", texto: "Painel financeiro", dica: "DRE, ponto de equilíbrio, lucro por marca e cliente, metas" },
           { href: "/despesas", texto: "Contas a pagar", contador: n.contas_vencidas, dica: "Contas vencidas" },
           { href: "/financeiro/receber", texto: "Contas a receber" },

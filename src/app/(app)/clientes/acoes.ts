@@ -30,10 +30,10 @@ export async function criarCliente(fd: FormData) {
     if (!vendedora) throw new Error("Escolha a vendedora responsável.");
     id = await comUsuario(u.id, async (c) => (await c.query(
       `insert into app.clientes (nome, telefone, whatsapp, cidade, departamento, pais, categoria_preco,
-                                 perfil_comercial, preferencias, observacoes, vendedora_id)
+                                 perfil_comercial, preferencias, observacoes, vendedora_id, deposito_id)
        values ($1, nullif($2,''), nullif($3,''), nullif($4,''), nullif($5,''), $6::app.pais, $7::app.categoria_preco,
-               nullif($8,''), nullif($9,''), nullif($10,''), $11) returning id`,
-      [...campos(fd), vendedora])).rows[0].id);
+               nullif($8,''), nullif($9,''), nullif($10,''), $11, (select id from app.depositos where id::text = nullif($12, ''))) returning id`,
+      [...campos(fd), vendedora, texto(fd, "deposito")])).rows[0].id);
   } catch (e) {
     erro = mensagemErro(e);
   }
