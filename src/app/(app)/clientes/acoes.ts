@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { exigirUsuario } from "@/lib/auth";
 import { comUsuario, mensagemErro } from "@/lib/db";
-import { texto } from "@/lib/formato";
+import { numero, texto } from "@/lib/formato";
 
 function campos(fd: FormData) {
   return [
