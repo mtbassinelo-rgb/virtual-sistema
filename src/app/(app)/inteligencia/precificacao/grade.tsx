@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { marcaEmMassa, produtosLotePrecificacao } from "./acoes";
+import { categoriaEmMassa, marcaEmMassa, produtosLotePrecificacao } from "./acoes";
 
 export type LinhaPrec = {
   produto_id: string; codigo: string; nome: string; marca: string | null; foto: string | null; tipo: string; caixa: number | null;
@@ -69,7 +69,8 @@ function Ord({ k, k2, atual, set, children }: { k: string; k2?: string; atual: s
   );
 }
 
-export function GradePrecificacao({ linhas, premissas, acao }: {
+export function GradePrecificacao({ linhas, premissas, acao, categorias = [] }: {
+  categorias?: { valor: string; nome: string }[];
   linhas: LinhaPrec[]; premissas: Premissas;
   acao: (fd: FormData) => Promise<{ ok?: string; erro?: string }>;
 }) {
@@ -142,6 +143,18 @@ export function GradePrecificacao({ linhas, premissas, acao }: {
   // Edição em massa nos selecionados: marca grava na hora; preço, custo, frete e caixa preenchem a tabela (grava no Salvar)
   const [massaCampo, setMassaCampo] = useState("normal");
   const [massaValor, setMassaValor] = useState("");
+  const [orgMarca, setOrgMarca] = useState("");
+  const [orgCat, setOrgCat] = useState("");
+  function aplicarMarca(ls: LinhaPrec[]) {
+    const v = orgMarca.trim();
+    if (!ls.length || !v) { setMsg({ erro: "Escreva a marca." }); return; }
+    if (!window.confirm(`Colocar a marca "${v.toUpperCase()}" em ${ls.length} produto(s)?`)) return;
+    iniciar(async () => { const r = await marcaEmMassa(ls.map((l) => l.produto_id), v); setMsg(r); if (r.ok) { setOrgMarca(""); router.refresh(); } });
+  }
+  function aplicarCategoria(ls: LinhaPrec[], modo: "adicionar" | "definir") {
+    if (!ls.length || !orgCat) { setMsg({ erro: "Escolha a categoria." }); return; }
+    iniciar(async () => { const r = await categoriaEmMassa(ls.map((l) => l.produto_id), orgCat, modo); setMsg(r); });
+  }
   const marcasLista = useMemo(() => [...new Set(linhas.map((l) => l.marca).filter(Boolean) as string[])].sort(), [linhas]);
   function aplicarMassa(ls: LinhaPrec[]) {
     const v = massaValor.trim();
@@ -283,7 +296,6 @@ export function GradePrecificacao({ linhas, premissas, acao }: {
                   <option value="custo">Custo (R$)</option>
                   <option value="frete">Frete (R$)</option>
                   <option value="caixa">Peças por caixa</option>
-                  <option value="marca">Marca</option>
                 </select>
                 <input value={massaValor} onChange={(e) => setMassaValor(e.target.value)} list={massaCampo === "marca" ? "marcas-prec" : undefined}
                   inputMode={massaCampo === "marca" ? "text" : "decimal"} aria-label="Valor para aplicar"
@@ -291,6 +303,22 @@ export function GradePrecificacao({ linhas, premissas, acao }: {
                   placeholder={massaCampo === "pct" ? "ex.: 5 ou -3" : massaCampo === "marca" ? "Nome da marca" : massaCampo === "custo" || massaCampo === "frete" ? "ex.: 2,35" : "ex.: 15000"} />
                 <datalist id="marcas-prec">{marcasLista.map((m) => <option key={m} value={m} />)}</datalist>
                 <button type="button" className="principal" disabled={salvando} onClick={() => aplicarMassa(selecionados)}>Aplicar</button>
+              </div>
+            </div>
+            <div className="bs-grupo bs-massa">
+              <span className="bs-rotulo">Organizar (vale na hora)</span>
+              <div className="bs-linha">
+                <input value={orgMarca} onChange={(e) => setOrgMarca(e.target.value)} list="marcas-prec" placeholder="Marca" aria-label="Marca para os selecionados" style={{ flex: "1 1 140px" }}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); aplicarMarca(selecionados); } }} />
+                <button type="button" disabled={salvando} onClick={() => aplicarMarca(selecionados)}>Pôr na marca</button>
+              </div>
+              <div className="bs-linha">
+                <select value={orgCat} onChange={(e) => setOrgCat(e.target.value)} aria-label="Categoria do site" style={{ flex: "1 1 180px" }}>
+                  <option value="">Categoria do site…</option>
+                  {categorias.map((c) => <option key={c.valor} value={c.valor}>{c.nome}</option>)}
+                </select>
+                <button type="button" disabled={salvando} onClick={() => aplicarCategoria(selecionados, "adicionar")}>Mostrar também</button>
+                <button type="button" disabled={salvando} onClick={() => aplicarCategoria(selecionados, "definir")}>Mudar para</button>
               </div>
             </div>
             <div className="bs-grupo bs-remover">
@@ -301,7 +329,7 @@ export function GradePrecificacao({ linhas, premissas, acao }: {
               </div>
             </div>
           </div>
-          <p className="bs-nota">Preencher e preços só mudam a tabela: grave com <b>Salvar</b>. Marca, inativar e excluir valem na hora.</p>
+          <p className="bs-nota">Preencher e edição em massa só mudam a tabela: grave com <b>Salvar</b>. Organizar e remover valem na hora.</p>
         </section>
       )}
 

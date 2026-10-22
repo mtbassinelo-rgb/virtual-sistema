@@ -4,6 +4,7 @@ import { rm } from "node:fs/promises";
 import path from "node:path";
 import { revalidatePath } from "next/cache";
 import { pastaFotos } from "@/lib/arquivos";
+import { categoriasDe } from "@/lib/vitrine";
 import { exigirUsuario, ehGestao } from "@/lib/auth";
 import { comUsuario, mensagemErro } from "@/lib/db";
 
@@ -79,6 +80,31 @@ export async function marcaEmMassa(ids: string[], marca: string): Promise<{ ok?:
     const n = await comUsuario(u.id, async (c) => (await c.query("update app.produtos set marca = $2 where id = any($1::uuid[]) and marca is distinct from $2", [lista, m])).rowCount ?? 0);
     revalidatePath("/inteligencia/precificacao"); revalidatePath("/produtos"); revalidatePath("/loja");
     return { ok: `Marca ${m} aplicada em ${n} produto(s).` };
+  } catch (e) {
+    return { erro: mensagemErro(e) };
+  }
+}
+
+/** Categorias do site para os selecionados: somar uma categoria ou mudar para ela. */
+export async function categoriaEmMassa(ids: string[], categoria: string, modo: "adicionar" | "definir"): Promise<{ ok?: string; erro?: string }> {
+  const u = await exigirUsuario();
+  try {
+    if (!ehGestao(u)) throw new Error("Só gerente ou dono organiza as categorias.");
+    const lista = ids.filter((x) => /^[0-9a-f-]{36}$/i.test(x)).slice(0, 1000);
+    if (!lista.length) throw new Error("Nenhum produto escolhido.");
+    const [cat, sub] = categoria.split("|");
+    if (!/^[a-z0-9-]{2,30}$/.test(cat ?? "")) throw new Error("Escolha a categoria.");
+    const n = await comUsuario(u.id, async (c) => {
+      if (modo === "definir") return Number((await c.query("select app.definir_categorias_site($1, 'definir', $2, $3) n", [lista, [cat], sub || null])).rows[0].n);
+      const atuais: Record<string, string[]> = {};
+      for (const r of (await c.query("select id, nome, marca, tipo::text tipo, site_categorias from app.produtos where id = any($1::uuid[])", [lista])).rows) {
+        const x = categoriasDe(r.nome, r.marca, r.tipo, r.site_categorias);
+        atuais[r.id] = [x.linha, ...x.extras];
+      }
+      return Number((await c.query("select app.definir_categorias_site($1, 'adicionar', $2, null, $3::jsonb) n", [lista, [cat], JSON.stringify(atuais)])).rows[0].n);
+    });
+    revalidatePath("/produtos/categorias"); revalidatePath("/loja");
+    return { ok: `${n} produto(s) ${modo === "definir" ? "mudaram de categoria" : "agora aparecem também nessa categoria"} no site.` };
   } catch (e) {
     return { erro: mensagemErro(e) };
   }

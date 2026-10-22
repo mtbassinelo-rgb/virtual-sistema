@@ -5,6 +5,7 @@ import { Avisos } from "../../avisos";
 import { salvarMarcaInteligencia } from "../acoes";
 import { salvarPrecificacao } from "./acoes";
 import { GradePrecificacao, type LinhaPrec } from "./grade";
+import { linhasEfetivas, sublinhasEfetivas, type CategoriaDb, type SubLinhaDb } from "@/lib/vitrine";
 
 export const metadata = { title: "Precificação" };
 
@@ -28,7 +29,11 @@ export default async function Precificacao({ searchParams }: { searchParams: Pro
       from app.produtos p left join app.marcas_inteligencia mi on mi.marca = coalesce(nullif(trim(p.marca), ''), 'Sem marca')
       where p.ativo group by 1, 3, 4, 5, 6 order by 3 desc, 2 desc`)).rows as
       { marca: string; n: number; gatilho: boolean; papel: string; margem_alvo_normal: string | null; margem_alvo_vip: string | null; desconto_local: boolean }[];
-    return { linhas, params, custos, marcas };
+    const cats = (await c.query("select * from app.categorias_publicas()")).rows as CategoriaDb[];
+    const subs = (await c.query("select * from app.subcategorias_publicas()")).rows as SubLinhaDb[];
+    const ef = linhasEfetivas(cats).lista, se = sublinhasEfetivas(subs);
+    const opcoesCategoria = ef.flatMap((l) => [{ valor: l.chave, nome: l.nome }, ...(se[l.chave] ?? []).map((s) => ({ valor: `${l.chave}|${s.chave}`, nome: `${l.nome} › ${s.nome}` }))]);
+    return { linhas, params, custos, marcas, opcoesCategoria };
   });
   const imposto = d.custos.filter((x) => x.base === "venda").reduce((s, x) => s + Number(x.percentual ?? 0), 0);
   const entregaCaixa = d.custos.filter((x) => x.base === "caixa" && x.moeda === "GS").reduce((s, x) => s + Number(x.valor ?? 0), 0);
@@ -106,7 +111,7 @@ export default async function Precificacao({ searchParams }: { searchParams: Pro
         </table></div>
       </details>
 
-      <GradePrecificacao linhas={d.linhas} premissas={premissas} acao={salvarPrecificacao} />
+      <GradePrecificacao linhas={d.linhas} premissas={premissas} acao={salvarPrecificacao} categorias={d.opcoesCategoria} />
     </>
   );
 }
