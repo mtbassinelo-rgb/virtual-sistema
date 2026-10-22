@@ -167,8 +167,30 @@ export const SUBLINHAS: Record<string, { chave: string; nome: string; es: string
   ],
 };
 
-export function subLinhaDe(linha: string, nome: string): string | null {
-  const subs = SUBLINHAS[linha];
+export type SubLinha = { chave: string; nome: string; es: string; re: RegExp; p?: number };
+export type SubLinhaDb = { linha: string; chave: string; nome: string; nome_es: string | null; palavras: string | null; ativo: boolean };
+
+/** Subcategorias valendo: as do programa + as criadas/renomeadas pela equipe (Produtos → Categorias do site). */
+export function sublinhasEfetivas(db: SubLinhaDb[] = []): Record<string, SubLinha[]> {
+  const r: Record<string, SubLinha[]> = {};
+  for (const [l, subs] of Object.entries(SUBLINHAS)) r[l] = subs.map((x) => ({ ...x }));
+  const palavrasRe = (txt: string | null) => {
+    const ps = (txt ?? "").split(/[,;\n]/).map((x) => sem(x).trim()).filter(Boolean).map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    return ps.length ? new RegExp(ps.join("|")) : null;
+  };
+  for (const d of db) {
+    const lista = (r[d.linha] ??= []);
+    const i = lista.findIndex((x) => x.chave === d.chave);
+    if (!d.ativo) { if (i >= 0) lista.splice(i, 1); continue; }
+    const re = palavrasRe(d.palavras);
+    if (i >= 0) lista[i] = { ...lista[i], nome: d.nome, es: d.nome_es || d.nome, ...(re ? { re, p: 2 } : {}) };
+    else lista.push({ chave: d.chave, nome: d.nome, es: d.nome_es || d.nome, re: re ?? /$^/, p: re ? 2 : 9 });
+  }
+  return r;
+}
+
+export function subLinhaDe(linha: string, nome: string, mapa: Record<string, SubLinha[]> = SUBLINHAS): string | null {
+  const subs = mapa[linha];
   if (!subs) return null;
   const n = sem(nome);
   let melhor: string | null = null, pm = 99;
@@ -191,4 +213,20 @@ export function categoriasDe(nome: string, marca: string | null | undefined, tip
   }
   const linha = linhaDe(nome, marca, tipo);
   return { linha, extras: linhasExtras(nome, linha) };
+}
+
+/** Sugestão de categoria para quem o site deixou em "Outros" (a equipe confirma na tela Categorias do site). */
+export function sugerirCategoria(nome: string): string | null {
+  const n = sem(nome);
+  const regras: [string, RegExp][] = [
+    ["sexshop", /garganta|lubrific|excitante|retardante|vibrador|sensual/],
+    ["matizadores", /\bmtox\b|matiz|desamarel/],
+    ["maquiagem", /base liquida|paleta|sombra|batom|rimel|mascara de cilios|blush|corretivo|po compacto|delineador|primer/],
+    ["rosto", /argila|lenco|mosqueta|facial|micelar|tonico|acne|olheira/],
+    ["cabelo", /\bmask\b|mascara capilar|capilar|cabelo|spray (condicionante|desembara)|desembaracante|escova|esvova|raquete|chapinha|tonalizante/],
+    ["corpo", /cera depil|depila|creme|gel|hid\.? ?corp|hidratante|firmador|redutor|nivea|locao|oleo corporal|sabonete|desodorante|massage|pomada/],
+    ["perfumaria", /perfume|colonia|body splash|eau de/],
+  ];
+  for (const [c, re] of regras) if (re.test(n)) return c;
+  return null;
 }

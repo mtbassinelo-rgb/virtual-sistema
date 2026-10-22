@@ -268,6 +268,25 @@ select app.definir_categorias_site(array[:'KIT'::uuid], 'auto', null, null);
 select teste.ok((select site_categorias is null from app.produtos where id = :'KIT'), 'Voltar ao automático');
 reset role;
 
+\echo '== Organização: juntar marcas, subcategorias, topo =='
+update app.produtos set marca = 'MARCA INTT' where id = :'PI3';
+set role vc_app;
+select teste.como(:'KEILA');
+select teste.falha($$select app.juntar_marcas(array['MARCA INTT'], 'MARCA INT')$$, 'gerente ou dono', 'Vendedora não junta marcas');
+select teste.como(:'GERENTE');
+select teste.ok(app.juntar_marcas(array['MARCA INTT'], 'MARCA INT') = 1, 'Junta a marca escrita diferente');
+reset role;
+select teste.ok((select marca = 'MARCA INT' from app.produtos where id = :'PI3'), 'Produto ficou com a marca certa');
+update app.produtos set marca = 'marca intt' where id = :'PI3';
+select teste.ok((select marca = 'MARCA INT' from app.produtos where id = :'PI3'), 'Nome antigo volta a virar o nome certo (importação)');
+set role vc_app;
+select teste.como(:'GERENTE');
+select teste.ok(app.salvar_subcategoria('kits', null, 'Kit Matizador', null, 'matizador, desamarelador', true) = 'kit-matizador', 'Cria subcategoria com chave pelo nome');
+select teste.ok(app.fixar_topo(array[:'PI1'::uuid], true) = 1, 'Fixa produto no topo');
+select teste.ok(exists (select 1 from app.vitrine_topo() x where x = :'PI1'), 'Site vê o produto fixado no topo');
+select app.fixar_topo(array[:'PI1'::uuid], false);
+reset role;
+
 \echo '== Compra por unidade: vendedora pede, gerente aprova; VIP só caixa =='
 select categoria_preco as cat_c1 from app.clientes where id = '00000000-0000-0000-0000-0000000000c1' \gset
 update app.clientes set categoria_preco = 'normal', compra_unidade = false where id = '00000000-0000-0000-0000-0000000000c1';

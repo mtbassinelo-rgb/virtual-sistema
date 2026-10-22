@@ -65,6 +65,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
         { href: "/produtos/kits", texto: "Kits capilares (montar)" },
         { href: "/produtos/grupos", texto: "Fragrâncias agrupadas", dica: "Mesmo produto em várias fragrâncias vira um cartão só no site" },
         { href: "/produtos/fotos", texto: "Fotos do catálogo", contador: n.fotos, dica: "Fotos esperando conferência" },
+        { href: "/produtos/marcas", texto: "Marcas", dica: "Juntar marcas escritas diferente e renomear" },
         { href: "/produtos/categorias", texto: "Categorias do site", dica: "Em que categoria cada produto aparece na loja: mudar, somar outra categoria, trocar marca em massa" },
         { href: "/produtos/fotos-faltando", texto: "Buscar fotos", dica: "Produtos sem foto: procure no Google e arraste a foto aprovada" },
       ] : [{ href: "/produtos?filtro=sem-foto", texto: "Sem foto" }]),

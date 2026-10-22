@@ -17,7 +17,7 @@ export const PERMISSOES: Permissao[] = [
   { chave: "procuras", nome: "Produtos procurados", rotas: ["/procuras"] },
   { chave: "produtos", nome: "Ver produtos", rotas: ["/produtos"] },
   { chave: "produtos_editar", nome: "Cadastrar produtos, preços, kits e fotos", gestao: true,
-    rotas: ["/produtos/novo", "/produtos/precos-rapido", "/produtos/kits", "/produtos/grupos", "/produtos/categorias", "/produtos/fotos", "/produtos/fotos-faltando", "/estoque/precos"] },
+    rotas: ["/produtos/novo", "/produtos/precos-rapido", "/produtos/kits", "/produtos/grupos", "/produtos/categorias", "/produtos/subcategorias", "/produtos/marcas", "/produtos/fotos", "/produtos/fotos-faltando", "/estoque/precos"] },
   { chave: "estoque", nome: "Estoque e inventário", rotas: ["/estoque"] },
   { chave: "estoque_importar", nome: "Importar estoque do Bling", rotas: ["/estoque/importar"], gestao: true },
   { chave: "estoque_notas", nome: "Notas a chegar (entrada de compra)", rotas: ["/estoque/notas"], gestao: true },

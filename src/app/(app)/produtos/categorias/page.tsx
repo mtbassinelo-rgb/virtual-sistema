@@ -3,17 +3,18 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { ehGestao, exigirUsuario } from "@/lib/auth";
 import { comUsuario, mensagemErro } from "@/lib/db";
-import { LINHAS, SUBLINHAS, categoriasDe, subLinhaDe } from "@/lib/vitrine";
+import { LINHAS, categoriasDe, subLinhaDe, sublinhasEfetivas, sugerirCategoria, type SubLinha, type SubLinhaDb } from "@/lib/vitrine";
 import { Avisos, Selo } from "../../avisos";
 import { MarcarTodos } from "./marcar-todos";
 
 export const metadata = { title: "Categorias do site" };
 
 type Linha = { id: string; codigo: string; nome: string; marca: string | null; tipo: string; foto: string | null; grupo: string | null;
-  site_categorias: string[] | null; site_subcategoria: string | null };
+  site_categorias: string[] | null; site_subcategoria: string | null; site_topo: boolean; unidades_caixa: number | null; mostrar_no_site: boolean };
 
 const nomeLinha = (c: string) => LINHAS.find((l) => l.chave === c)?.nome ?? c;
-const nomeSub = (l: string, s: string | null) => (s ? SUBLINHAS[l]?.find((x) => x.chave === s)?.nome ?? (s === "outros" ? "Outros" : s) : null);
+const nomeSubDe = (subs: Record<string, SubLinha[]>) => (l: string, s: string | null) => (s ? subs[l]?.find((x) => x.chave === s)?.nome ?? (s === "outros" ? "Outros" : s) : null);
+
 
 function voltar(fd: FormData, q: string) {
   revalidatePath("/produtos/categorias"); revalidatePath("/loja");
@@ -38,6 +39,22 @@ async function aplicar(fd: FormData) {
         return (await c.query("update app.produtos set marca = $2 where id = any($1::uuid[]) and marca is distinct from $2", [ids, m])).rowCount ?? 0;
       }
       if (acao === "auto") return Number((await c.query("select app.definir_categorias_site($1, 'auto', null, null) n", [ids])).rows[0].n);
+      if (acao === "topo" || acao === "tirar_topo") return Number((await c.query("select app.fixar_topo($1, $2) n", [ids, acao === "topo"])).rows[0].n);
+      if (acao === "kit") {
+        // kit a partir dos marcados: cada item 1×; o kit fica com a marca em comum e os itens soltos podem sair do site
+        const nome = String(fd.get("kit_nome") ?? "").trim();
+        if (nome.length < 3) throw new Error("Dê um nome ao kit (ex.: KIT MATIZADOR PLATINUM - MAYCRENE).");
+        if (ids.length < 2) throw new Error("Marque pelo menos 2 produtos para montar o kit.");
+        const itens = (await c.query("select id, marca, unidades_caixa, foto from app.produtos where id = any($1::uuid[])", [ids])).rows as { id: string; marca: string | null; unidades_caixa: number | null; foto: string | null }[];
+        const marcas = [...new Set(itens.map((i) => i.marca).filter(Boolean))];
+        const codigo = String(fd.get("kit_codigo") ?? "").trim() || `KIT-${Date.now().toString(36).toUpperCase()}`;
+        const kit = String((await c.query("select app.salvar_produto(null, $1, $2, $3, 'UN', null, null, true) id", [codigo, nome, marcas.length === 1 ? marcas[0] : null])).rows[0].id);
+        await c.query("select app.definir_kit($1, $2::jsonb)", [kit, JSON.stringify(ids.map((id) => ({ produto_id: id, quantidade: 1 })))]);
+        const caixa = itens.find((i) => i.unidades_caixa)?.unidades_caixa ?? null;
+        await c.query("update app.produtos set unidades_caixa = $2, foto = $3, mostrar_no_site = true where id = $1", [kit, caixa, itens.find((i) => i.foto)?.foto ?? null]);
+        if (fd.get("kit_esconder") === "1") await c.query("update app.produtos set mostrar_no_site = false where id = any($1::uuid[])", [ids]);
+        return -1;
+      }
       const [cat, sub] = String(fd.get("categoria") ?? "").split("|");
       if (!LINHAS.some((l) => l.chave === cat)) throw new Error("Escolha a categoria.");
       if (acao === "definir") return Number((await c.query("select app.definir_categorias_site($1, 'definir', $2, $3) n", [ids, [cat], sub || null])).rows[0].n);
@@ -52,8 +69,31 @@ async function aplicar(fd: FormData) {
       }
       throw new Error("Escolha o que fazer.");
     });
-    const txt: Record<string, string> = { definir: "categoria definida", adicionar: "categoria somada", auto: "voltaram ao automático", marca: "marca trocada" };
-    q = "ok=" + encodeURIComponent(`${n} produto(s): ${txt[acao] ?? "atualizado"}. O site já mostra assim.`);
+    const txt: Record<string, string> = { definir: "categoria definida", adicionar: "categoria somada", auto: "voltaram ao automático", marca: "marca trocada", topo: "fixados no topo da categoria", tirar_topo: "saíram do topo" };
+    q = "ok=" + encodeURIComponent(n === -1 ? "Kit criado com os produtos marcados. Coloque o preço dele na Precificação para aparecer no site." : `${n} produto(s): ${txt[acao] ?? "atualizado"}. O site já mostra assim.`);
+  } catch (e) { q = "erro=" + encodeURIComponent(mensagemErro(e)); }
+  voltar(fd, q);
+}
+
+/** "Outros": aplica a categoria sugerida em todos os produtos marcados que têm sugestão. */
+async function aplicarSugestoes(fd: FormData) {
+  "use server";
+  const u = await exigirUsuario();
+  let q: string;
+  try {
+    if (!ehGestao(u)) throw new Error("Só gerente ou dono organiza os produtos.");
+    const ids = fd.getAll("id").map(String).filter((x) => /^[0-9a-f-]{36}$/i.test(x));
+    const n = await comUsuario(u.id, async (c) => {
+      let k = 0;
+      for (const r of (await c.query("select id, nome from app.produtos where id = any($1::uuid[])", [ids])).rows as { id: string; nome: string }[]) {
+        const s = sugerirCategoria(r.nome);
+        if (!s) continue;
+        await c.query("select app.definir_categorias_site(array[$1::uuid], 'definir', array[$2], null)", [r.id, s]);
+        k++;
+      }
+      return k;
+    });
+    q = "ok=" + encodeURIComponent(`${n} produto(s) saíram de "Outros" para a categoria sugerida.`);
   } catch (e) { q = "erro=" + encodeURIComponent(mensagemErro(e)); }
   voltar(fd, q);
 }
@@ -63,12 +103,15 @@ export default async function CategoriasSite({ searchParams }: { searchParams: P
   if (!ehGestao(u)) redirect("/produtos");
   const f = await searchParams;
   const todos = await comUsuario(u.id, async (c) => (await c.query(
-    `select id, codigo, nome, marca, tipo::text as tipo, foto, grupo, site_categorias, site_subcategoria
+    `select id, codigo, nome, marca, tipo::text as tipo, foto, grupo, site_categorias, site_subcategoria, site_topo, unidades_caixa, mostrar_no_site
        from app.produtos where ativo and mostrar_no_site order by nome`)).rows as Linha[]);
+  const SUBS = await comUsuario(u.id, async (c) => sublinhasEfetivas((await c.query("select * from app.subcategorias_publicas()")).rows as SubLinhaDb[]));
+  const nomeSub = nomeSubDe(SUBS);
   const linhas = todos.map((p) => {
     const x = categoriasDe(p.nome, p.marca, p.tipo, p.site_categorias);
-    const sub = p.site_subcategoria && SUBLINHAS[x.linha]?.some((s) => s.chave === p.site_subcategoria) ? p.site_subcategoria : subLinhaDe(x.linha, p.grupo ?? p.nome);
-    return { ...p, cat: x.linha, extras: x.extras, sub, manual: Boolean(p.site_categorias?.length || p.site_subcategoria) };
+    const sub = p.site_subcategoria && SUBS[x.linha]?.some((s) => s.chave === p.site_subcategoria) ? p.site_subcategoria : subLinhaDe(x.linha, p.grupo ?? p.nome, SUBS);
+    const manual = Boolean(p.site_categorias?.length || p.site_subcategoria);
+    return { ...p, cat: x.linha, extras: x.extras, sub, manual, sugestao: x.linha === "outros" && !manual ? sugerirCategoria(p.nome) : null };
   });
   const marcas = [...new Set(todos.map((p) => p.marca).filter(Boolean) as string[])].sort();
   const busca = (f.q ?? "").trim().toUpperCase();
@@ -130,13 +173,16 @@ export default async function CategoriasSite({ searchParams }: { searchParams: P
                   <option value="definir">Mudar para a categoria…</option>
                   <option value="auto">Voltar ao automático (pelo nome)</option>
                   <option value="marca">Trocar a marca para…</option>
+                  <option value="topo">Fixar no topo da categoria</option>
+                  <option value="tirar_topo">Tirar do topo</option>
+                  <option value="kit">Criar kit com os marcados…</option>
                 </select>
                 <select name="categoria" defaultValue={f.cat ?? ""} aria-label="Categoria">
                   <option value="">Categoria…</option>
                   {LINHAS.map((l) => (
                     <optgroup key={l.chave} label={l.nome}>
                       <option value={l.chave}>{l.nome}</option>
-                      {(SUBLINHAS[l.chave] ?? []).map((s) => <option key={s.chave} value={`${l.chave}|${s.chave}`}>{l.nome} › {s.nome}</option>)}
+                      {(SUBS[l.chave] ?? []).map((s) => <option key={s.chave} value={`${l.chave}|${s.chave}`}>{l.nome} › {s.nome}</option>)}
                     </optgroup>
                   ))}
                 </select>
@@ -144,17 +190,32 @@ export default async function CategoriasSite({ searchParams }: { searchParams: P
                 <datalist id="marcas-cat">{marcas.map((m) => <option key={m} value={m} />)}</datalist>
                 <button className="principal">Aplicar</button>
               </div>
+              <div className="bs-linha">
+                <span className="pequeno suave">Para <b>Criar kit</b>:</span>
+                <input name="kit_nome" placeholder="Nome do kit (ex.: KIT MATIZADOR PLATINUM - MAYCRENE)" style={{ flex: "1 1 280px" }} aria-label="Nome do kit" />
+                <input name="kit_codigo" placeholder="Código (opcional)" style={{ width: 150 }} aria-label="Código do kit" />
+                <label className="pequeno" style={{ display: "flex", gap: 6, alignItems: "center", flexDirection: "row" }}>
+                  <input type="checkbox" name="kit_esconder" value="1" defaultChecked style={{ width: "auto" }} /> itens soltos fora do site
+                </label>
+              </div>
             </div>
           </div>
           <p className="bs-nota"><b>Mostrar também em</b> mantém onde já está e soma a nova categoria (ex.: kit matizador em Kits e em Matizadores).
-            <b> Mudar para</b> deixa só a categoria escolhida (com a subcategoria, se escolher uma). <b>Voltar ao automático</b> desfaz.</p>
+            <b> Mudar para</b> deixa só a categoria escolhida (com a subcategoria, se escolher uma). <b>Voltar ao automático</b> desfaz.
+            <b> Criar kit</b> junta os marcados num kit (1 de cada), ligado ao estoque deles. Subcategorias: <Link href="/produtos/subcategorias">criar e renomear</Link> · Marcas: <Link href="/produtos/marcas">juntar marcas repetidas</Link>.</p>
         </section>
 
+        {f.cat === "outros" && vistos.some((p) => p.sugestao) && (
+          <div className="painel linha" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+            <span>O site não soube classificar estes produtos. A coluna <b>Sugestão</b> mostra onde eu colocaria cada um: marque os que concordar (ou todos) e confirme.</span>
+            <button className="principal" formAction={aplicarSugestoes}>Aplicar a sugestão nos marcados</button>
+          </div>
+        )}
         <section className="painel" style={{ padding: 0 }}>
           <div className="tabela"><table>
             <thead><tr>
               <th style={{ width: 32 }}><MarcarTodos /></th>
-              <th>Produto</th><th>Marca</th><th>Categoria no site</th><th>Subcategoria</th>
+              <th>Produto</th><th>Marca</th><th>Categoria no site</th><th>Subcategoria</th>{f.cat === "outros" && <th>Sugestão</th>}
             </tr></thead>
             <tbody>{vistos.slice(0, 600).map((p) => (
               <tr key={p.id}>
@@ -169,9 +230,10 @@ export default async function CategoriasSite({ searchParams }: { searchParams: P
                 <td>{p.marca ?? <span className="suave">—</span>}</td>
                 <td>
                   <b>{nomeLinha(p.cat)}</b>{p.extras.length > 0 && <span className="pequeno"> + {p.extras.map(nomeLinha).join(", ")}</span>}
-                  <div>{p.manual ? <Selo cor="marca">à mão</Selo> : <span className="pequeno suave">automática</span>}</div>
+                  <div>{p.manual ? <Selo cor="marca">à mão</Selo> : <span className="pequeno suave">automática</span>}{p.site_topo && <> <Selo cor="ok">no topo</Selo></>}</div>
                 </td>
                 <td className="pequeno">{nomeSub(p.cat, p.sub) ?? "—"}</td>
+                {f.cat === "outros" && <td>{p.sugestao ? <b>{nomeLinha(p.sugestao)}</b> : <span className="pequeno suave">—</span>}</td>}
               </tr>
             ))}</tbody>
           </table></div>

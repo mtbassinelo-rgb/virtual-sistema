@@ -2,7 +2,7 @@ import Link from "next/link";
 import { pool } from "@/lib/db";
 import { clienteAtual, sha256, tokenCliente } from "@/lib/portal";
 import { dinheiro, data, type Moeda } from "@/lib/formato";
-import { LINHAS, SUBLINHAS, categoriasDe, corRotulo, interno, linhasExtras, marcaDe, nomeCurto, subLinhaDe } from "@/lib/vitrine";
+import { LINHAS, categoriasDe, corRotulo, interno, linhasExtras, marcaDe, nomeCurto, subLinhaDe, sublinhasEfetivas, type SubLinhaDb } from "@/lib/vitrine";
 import { Quantidade, SeletorVariantes } from "./carrinho";
 import { QueroProduto } from "./quero-produto";
 import { TEXTOS, idiomaAtual, type Textos } from "@/lib/idioma";
@@ -66,6 +66,9 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
   const manuais = new Map<string, { categorias: string[] | null; subcategoria: string | null }>(
     ((await pool.query("select * from app.vitrine_categorias()").catch(() => ({ rows: [] }))).rows as { produto_id: string; categorias: string[] | null; subcategoria: string | null }[])
       .map((r) => [r.produto_id, r]));
+  // subcategorias criadas/renomeadas pela equipe e produtos fixados no topo
+  const SUBS = sublinhasEfetivas((await pool.query("select * from app.subcategorias_publicas()").catch(() => ({ rows: [] }))).rows as SubLinhaDb[]);
+  const topo = new Set(((await pool.query("select app.vitrine_topo() as id").catch(() => ({ rows: [] }))).rows as { id: string }[]).map((r) => r.id));
   let todos: Produto[] = publicos.filter((p) => !interno(p.nome) && temPreco(p.produto_id)).map((p) => ({
     ...p, grupo: grupos.get(p.produto_id)?.grupo ?? null, variante: grupos.get(p.produto_id)?.variante ?? null, linha: categoriasDe(p.nome, p.marca, p.tipo, manuais.get(p.produto_id)?.categorias).linha,
     catManual: manuais.get(p.produto_id)?.categorias ?? null, subManual: manuais.get(p.produto_id)?.subcategoria ?? null, marcaNome: marcaDe(p.nome, p.marca), p: precos.get(p.produto_id), x: extras.get(p.produto_id),
@@ -93,8 +96,8 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
   // subcategorias da linha (ex.: Cabelo → Ativador de cachos, Shampoos…)
   const contagemSub = new Map<string, number>();
   // subcategoria fixada à mão vale na categoria principal do produto
-  const subDe = (p: Produto, l: string) => (p.subManual && p.linha === l && SUBLINHAS[l]?.some((s) => s.chave === p.subManual) ? p.subManual : subLinhaDe(l, p.grupo ?? p.nome) ?? "outros");
-  if (linha && SUBLINHAS[linha]) for (const p of todos) { const k = subDe(p, linha); contagemSub.set(k, (contagemSub.get(k) ?? 0) + 1); }
+  const subDe = (p: Produto, l: string) => (p.subManual && p.linha === l && SUBS[l]?.some((s) => s.chave === p.subManual) ? p.subManual : subLinhaDe(l, p.grupo ?? p.nome, SUBS) ?? "outros");
+  if (linha && SUBS[linha]) for (const p of todos) { const k = subDe(p, linha); contagemSub.set(k, (contagemSub.get(k) ?? 0) + 1); }
   const sub = linha && f.sub && (contagemSub.has(f.sub)) ? f.sub : null;
   if (sub && linha) todos = todos.filter((p) => subDe(p, linha) === sub);
   if (marca) todos = todos.filter((p) => p.marcaNome === marca);
@@ -106,7 +109,8 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
   }
   // Cliente: promoções e o que ele costuma comprar primeiro. Visitante: o que tem estoque primeiro.
   const peso = (p: Produto) => p.p?.destaque === "promocao" ? 0 : p.p?.destaque === "recompra" ? 1 : (p.p ? p.p.disponibilidade !== "indisponivel" : p.tem_estoque) ? 2 : 3;
-  todos.sort((a, b) => peso(a) - peso(b) || a.nome.localeCompare(b.nome, "pt-BR"));
+  // fixados no topo (Produtos → Categorias do site) vêm primeiro
+  todos.sort((a, b) => Number(topo.has(b.produto_id)) - Number(topo.has(a.produto_id)) || peso(a) - peso(b) || a.nome.localeCompare(b.nome, "pt-BR"));
 
   // fragrâncias do mesmo produto viram um cartão só (o cliente abre e escolhe cada uma)
   const exibidos: Produto[] = [];
@@ -144,7 +148,7 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
 
   const n = (x: number) => `${x.toLocaleString(idioma === "es" ? "es-PY" : "pt-BR")} ${x === 1 ? t.produto : t.produtos}`;
   const cartao = (p: Produto) => <Cartao key={p.produto_id} p={p} moeda={moeda} cliente={Boolean(cliente)} t={t} vendeUnidade={vendeUnidade} />;
-  const nomeSub = sub ? [...(SUBLINHAS[linha ?? ""] ?? []), { chave: "outros", nome: "Outros", es: "Otros" }].find((s) => s.chave === sub) : null;
+  const nomeSub = sub ? [...(SUBS[linha ?? ""] ?? []), { chave: "outros", nome: "Outros", es: "Otros" }].find((s) => s.chave === sub) : null;
   const titulo = marca ?? (soPromo ? t.promocoes : soNovidade ? t.novidades : linha ? (nomeSub ? (idioma === "es" ? nomeSub.es : nomeSub.nome) : t.linhas[linha]) : q ? t.resultados(q) : t.catalogo);
 
   return (
@@ -262,11 +266,11 @@ export default async function Vitrine({ searchParams }: { searchParams: Promise<
               <Link key={l.chave} href={url({ linha: l.chave })} className={linha === l.chave ? "ativa" : ""}>{t.linhas[l.chave] ?? l.nome} <small>{contagem.get(l.chave)}</small></Link>
             ))}
           </nav>
-          {linha && SUBLINHAS[linha] && contagemSub.size > 1 && (
+          {linha && SUBS[linha] && contagemSub.size > 1 && (
             <nav className="linhas sublinhas" aria-label={t.linhas[linha]}>
               <b className="filtros-titulo">{t.linhas[linha]}</b>
               <Link href={url({ sub: null })} className={!sub ? "ativa" : ""}>{t.tudo}</Link>
-              {[...SUBLINHAS[linha], { chave: "outros", nome: "Outros", es: "Otros" }].filter((s) => contagemSub.get(s.chave)).map((s) => (
+              {[...SUBS[linha], { chave: "outros", nome: "Outros", es: "Otros" }].filter((s) => contagemSub.get(s.chave)).map((s) => (
                 <Link key={s.chave} href={url({ sub: s.chave })} className={sub === s.chave ? "ativa" : ""}>
                   {idioma === "es" ? s.es : s.nome} <small>{contagemSub.get(s.chave)}</small>
                 </Link>
