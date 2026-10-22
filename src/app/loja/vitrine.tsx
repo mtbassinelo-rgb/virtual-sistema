@@ -432,7 +432,7 @@ function CartaoGrupo({ p, moeda, cliente, t, vendeUnidade, linha }: { p: Produto
             return (
               <div key={v.produto_id} className={`var-linha ${esg ? "esgotada" : ""}`}>
                 <div className="var-foto" style={{ background: corRotulo(v.variante ?? v.nome, p.linha).fundo }}>
-                  {v.foto && v.foto !== p.foto ? <img src={v.foto} alt="" loading="lazy" /> : null}
+                  {v.foto ? <img src={v.foto} alt="" loading="lazy" /> : null}
                 </div>
                 <div className="var-info">
                   <div className="var-nome">
