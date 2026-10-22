@@ -198,8 +198,8 @@ export default async function Financeiro({ searchParams }: { searchParams: Promi
           <p className="pequeno suave" style={{ margin: 0 }}>Compras de mercadoria não entram no resultado: viram custo quando o produto é vendido. Comissões entram quando lançadas em Contas a pagar.</p>
         </section>
         <div className="duas-colunas">
-          <Ranking titulo="Marcas que mais dão lucro" linhas={d.marcas} chave="marca" nome={(x) => x.marca} max={8} link={href({ aba: "marcas" })} />
-          <Ranking titulo="Clientes que mais dão lucro" linhas={d.clientes} chave="cliente_id" nome={(x) => x.nome} max={8} link={href({ aba: "clientes" })} />
+          <Ranking titulo="Marcas que mais dão lucro" linhas={d.marcas} chave="marca" nome={(x) => String(x.marca)} max={8} link={href({ aba: "marcas" })} />
+          <Ranking titulo="Clientes que mais dão lucro" linhas={d.clientes} chave="cliente_id" nome={(x) => String(x.nome)} max={8} link={href({ aba: "clientes" })} />
         </div>
       </>)}
 
@@ -213,7 +213,7 @@ export default async function Financeiro({ searchParams }: { searchParams: Promi
         const piores = ls.filter((x) => x.rc > 0).sort((a, b) => a.lucro / a.rc - b.lucro / b.rc).slice(0, 8);
         return (<>
           <div className="duas-colunas">
-            <Ranking titulo={`Maior lucro · ${per.t.toLowerCase()}`} linhas={ls} chave="marca" nome={(x) => x.marca} max={10} />
+            <Ranking titulo={`Maior lucro · ${per.t.toLowerCase()}`} linhas={ls} chave="marca" nome={(x) => String(x.marca)} max={10} />
             <section className="painel">
               <h2>Menor margem</h2>
               <div className="tabela"><table><thead><tr><th>Marca</th><th>Margem</th><th>Lucro</th></tr></thead>
