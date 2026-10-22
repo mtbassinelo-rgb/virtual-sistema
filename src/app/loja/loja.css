@@ -598,3 +598,14 @@
 .boas-vindas ul { margin: 0 0 12px; padding-left: 18px; display: grid; gap: 8px; color: var(--roxo-tinta); }
 .boas-vindas .bv-final { font-weight: 700; font-size: 1.05rem; }
 .boas-vindas .adicionar { width: 100%; padding: 12px; font-size: 1rem; }
+
+/* ---------- SEO: título da página inicial, cabeçalho de marca/categoria e texto no fim da página ---------- */
+.seo-topo { padding-top: 18px; }
+.seo-topo h1 { font-size: clamp(1.15rem, 2.2vw, 1.5rem); font-weight: 700; margin: 0; }
+.seo-cabecalho { padding-top: 26px; max-width: 1180px; }
+.seo-cabecalho h1 { font-size: clamp(1.5rem, 3.2vw, 2.2rem); margin: 0 0 8px; }
+.seo-cabecalho p { margin: 0 0 6px; color: var(--apagado); max-width: 75ch; }
+.seo-cabecalho + .catalogo { padding-top: 14px; }
+.seo-texto { padding-top: 48px; }
+.seo-texto h2 { font-size: clamp(1.15rem, 2vw, 1.4rem); margin-bottom: 10px; }
+.seo-texto p { color: var(--apagado); max-width: 80ch; margin: 0 0 10px; }

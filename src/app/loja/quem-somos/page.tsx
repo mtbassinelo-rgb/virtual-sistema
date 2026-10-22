@@ -4,6 +4,7 @@ import { clienteAtual } from "@/lib/portal";
 import { linkWhatsApp } from "@/lib/formato";
 import { TEXTOS, idiomaAtual } from "@/lib/idioma";
 import { LINHAS, interno, linhaDe, marcaDe } from "@/lib/vitrine";
+import { urlCategoria } from "@/lib/seo";
 
 export const metadata = {
   title: "Quem somos",
@@ -94,7 +95,7 @@ export default async function QuemSomos() {
       <section className="in sobre-bloco">
         <h2>{x.linhasTitulo}</h2>
         <div className="linhas">
-          {listaLinhas.map((l) => <Link key={l.chave} href={`/loja?linha=${l.chave}#catalogo`}>{t.linhas[l.chave]}</Link>)}
+          {listaLinhas.map((l) => <Link key={l.chave} href={urlCategoria(l.chave)}>{t.linhas[l.chave]}</Link>)}
           <Link href="/loja/marcas">{t.verTodasMarcas}</Link>
         </div>
       </section>

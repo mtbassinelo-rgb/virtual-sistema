@@ -2,8 +2,12 @@ import Link from "next/link";
 import { pool } from "@/lib/db";
 import { interno, marcaDe } from "@/lib/vitrine";
 import { TEXTOS, idiomaAtual } from "@/lib/idioma";
+import { SEO, urlMarca } from "@/lib/seo";
 
-export const metadata = { title: "Marcas" };
+export async function generateMetadata() {
+  const seo = SEO[await idiomaAtual()];
+  return { title: { absolute: seo.tituloMarcas }, description: seo.descricaoMarcas, alternates: { canonical: "/loja/marcas" } };
+}
 
 export default async function Marcas() {
   const idioma = await idiomaAtual();
@@ -23,7 +27,7 @@ export default async function Marcas() {
       <div className="marcas">
         {lista.map(([m, n]) => {
           return (
-            <Link key={m} href={`/loja?marca=${encodeURIComponent(m)}#catalogo`} className="marca-bloco">
+            <Link key={m} href={urlMarca(m)} className="marca-bloco">
               <b>{m}</b><span>{n}</span>
             </Link>
           );

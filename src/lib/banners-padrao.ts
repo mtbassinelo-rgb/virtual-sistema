@@ -6,7 +6,7 @@ export type Banner = { id: string; titulo: string; subtitulo: string | null; ima
 export function bannersPadrao(idioma: Idioma, cliente: boolean): Banner[] {
   const es = idioma === "es";
   const lista: Banner[] = [
-    { id: "p-maycrene", imagem: "/banners/kits-maycrene.webp", link: "/loja?marca=Maycrene",
+    { id: "p-maycrene", imagem: "/banners/kits-maycrene.webp", link: "/loja/marcas/maycrene",
       titulo: es ? "Kits capilares Maycrene" : "Kits capilares Maycrene",
       subtitulo: es ? "Champú, acondicionador y máscara. Caja cerrada con 12 kits." : "Shampoo, condicionador e máscara. Caixa fechada com 12 kits." },
     { id: "p-atacado", imagem: "/banners/atacado-caixa.webp", link: cliente ? "/loja#catalogo" : "/loja/cadastro",
@@ -17,7 +17,7 @@ export function bannersPadrao(idioma: Idioma, cliente: boolean): Banner[] {
     { id: "p-marylife", imagem: "/banners/mary-life-paises.webp", link: "/loja?q=mary%20life",
       titulo: es ? "Body Splash Mary Life" : "Body Splash Mary Life",
       subtitulo: es ? "Dubái, Madrid, París, Río, Las Vegas y Tokio. Cabello y cuerpo." : "Dubai, Madri, Paris, Rio, Las Vegas e Tóquio. Cabelo e corpo." },
-    { id: "p-rhenuks", imagem: "/banners/rhenuks.webp", link: "/loja?marca=Rhenuks",
+    { id: "p-rhenuks", imagem: "/banners/rhenuks.webp", link: "/loja/marcas/rhenuks",
       titulo: es ? "Rhenuks: kits y perfumería árabe" : "Rhenuks: kits e perfumaria árabe",
       subtitulo: es ? "Argan Oils, Babosa y los body splash inspirados en grandes perfumes." : "Argan Oils, Babosa e os body splash inspirados em grandes perfumes." },
   ];

@@ -11,27 +11,25 @@ import { BotaoCarrinho, Carrinho } from "./carrinho";
 import { ehPrincipal, unidadeLoja } from "@/lib/unidade";
 import { vendedoraDoLink } from "@/lib/vendedora-link";
 import { FecharMenus, MenuSite } from "./menu-site";
+import { DADOS_EMPRESA as EMPRESA, SITE, urlCategoria, urlMarca } from "@/lib/seo";
 import "./loja.css";
 
 export const metadata = {
-  title: { default: "Virtual Cosméticos · Distribuidora direto de fábrica em Foz do Iguaçu", template: "%s · Virtual Cosméticos" },
+  // endereço base: imagem de compartilhamento e canonical sempre com o domínio oficial (antes saía "localhost")
+  metadataBase: new URL(SITE),
+  title: { default: "Distribuidora de Cosméticos em Foz do Iguaçu | Virtual Cosméticos", template: "%s · Virtual Cosméticos" },
   description: "Distribuidora de cosméticos direto de fábrica em Foz do Iguaçu. Atacado para salões, perfumarias e revendedores: matizadores, kits capilares, corpo e banho, maquiagem e unhas.",
   robots: { index: true, follow: true },
   openGraph: {
     title: "Virtual Cosméticos · Distribuidora de cosméticos em Foz do Iguaçu",
     description: "Atacado de cosméticos para salões, perfumarias e revendedores: matizadores, kits capilares, corpo e banho, maquiagem e unhas.",
-    images: [{ url: "/marca/logo.png" }], type: "website", locale: "pt_BR",
+    images: [{ url: "/marca/og-banner.jpg", width: 1200, height: 630, alt: "Virtual Cosméticos, distribuidora de cosméticos em Foz do Iguaçu" }], type: "website", locale: "pt_BR", siteName: "Virtual Cosméticos",
   },
+  twitter: { card: "summary_large_image" },
 };
 
-// Dados da empresa para o Google (aparece com nome, logo, cidade e redes sociais)
-const DADOS_EMPRESA = JSON.stringify({
-  "@context": "https://schema.org", "@type": "Store", name: "Virtual Cosméticos", url: "https://distribuidoravirtualcosmeticos.com/loja",
-  logo: "https://distribuidoravirtualcosmeticos.com/marca/logo.png", image: "https://distribuidoravirtualcosmeticos.com/marca/logo.png",
-  description: "Distribuidora de cosméticos direto de fábrica em Foz do Iguaçu. Atacado para salões, perfumarias e revendedores.",
-  address: { "@type": "PostalAddress", addressLocality: "Foz do Iguaçu", addressRegion: "PR", addressCountry: "BR" },
-  sameAs: ["https://www.instagram.com/distribuidoravirtualcosmeticos", "https://www.facebook.com/share/1BHjxdgnRH/"],
-});
+// Dados da empresa para o Google (empresa atacadista em Foz do Iguaçu, com telefone e redes sociais)
+const DADOS_EMPRESA = JSON.stringify(EMPRESA);
 
 const INSTAGRAM = "https://www.instagram.com/distribuidoravirtualcosmeticos";
 const FACEBOOK = "https://www.facebook.com/share/1BHjxdgnRH/";
@@ -102,8 +100,8 @@ export default async function LayoutLoja({ children }: { children: React.ReactNo
                 { href: "/loja#mais-vendidos", texto: t.maisVendidos },
                 { href: "/loja/quem-somos", texto: t.quemSomos },
               ] },
-              { titulo: t.categorias, links: CATS.lista.filter((l) => porLinha.get(l.chave)).map((l) => ({ href: `/loja?linha=${l.chave}#catalogo`, texto: t.linhas[l.chave], qtd: porLinha.get(l.chave) })) },
-              { titulo: t.marcas, links: [...marcas.slice().sort((a, b) => b[1] - a[1]).slice(0, 12).map(([m, n]) => ({ href: `/loja?marca=${encodeURIComponent(m)}#catalogo`, texto: m, qtd: n })),
+              { titulo: t.categorias, links: CATS.lista.filter((l) => porLinha.get(l.chave)).map((l) => ({ href: urlCategoria(l.chave), texto: t.linhas[l.chave], qtd: porLinha.get(l.chave) })) },
+              { titulo: t.marcas, links: [...marcas.slice().sort((a, b) => b[1] - a[1]).slice(0, 12).map(([m, n]) => ({ href: urlMarca(m), texto: m, qtd: n })),
                 { href: "/loja/marcas", texto: t.verTodasMarcas }] },
               { titulo: c ? c.nome : t.clientes, links: c
                 ? [{ href: "/loja/conta", texto: t.minhaConta }, { href: "/loja/reposicao", texto: t.reposicao }, { href: "/loja/pedidos", texto: t.meusPedidos }, { href: "/loja/sair", texto: t.sair }]
@@ -140,14 +138,14 @@ export default async function LayoutLoja({ children }: { children: React.ReactNo
               <summary>{t.categorias}</summary>
               <div className="menu-painel">
                 {CATS.lista.filter((l) => porLinha.get(l.chave)).map((l) => (
-                  <a key={l.chave} href={`/loja?linha=${l.chave}#catalogo`}>{t.linhas[l.chave]}<span>{porLinha.get(l.chave)}</span></a>
+                  <a key={l.chave} href={urlCategoria(l.chave)}>{t.linhas[l.chave]}<span>{porLinha.get(l.chave)}</span></a>
                 ))}
               </div>
             </details>
             <details className="menu-cair">
               <summary>{t.marcas}</summary>
               <div className="menu-painel" style={{ ["--colunas" as string]: marcas.length > 10 ? 2 : 1 }}>
-                {marcas.map(([m, n]) => <a key={m} href={`/loja?marca=${encodeURIComponent(m)}#catalogo`}>{m}<span>{n}</span></a>)}
+                {marcas.map(([m, n]) => <a key={m} href={urlMarca(m)}>{m}<span>{n}</span></a>)}
                 <a className="todas" href="/loja/marcas">{t.verTodasMarcas}</a>
               </div>
             </details>
@@ -155,7 +153,7 @@ export default async function LayoutLoja({ children }: { children: React.ReactNo
               <Link href="/loja?promocao=1#catalogo" className="promo">{t.promocoes}</Link>
               <Link href="/loja?novidade=1#catalogo">{t.novidades}</Link>
               <Link href="/loja#mais-vendidos">{t.maisVendidos}</Link>
-              <Link href="/loja?linha=kits#catalogo">{t.linhas.kits}</Link>
+              <Link href={urlCategoria("kits")}>{t.linhas.kits}</Link>
               <Link href="/loja/quem-somos">{t.quemSomos}</Link>
             </div>
           </div>

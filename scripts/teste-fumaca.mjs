@@ -130,6 +130,15 @@ ok((await abrir("/loja?linha=kits")).status === 200 && (await abrir("/loja?q=sha
 ok((await abrir("/loja/marcas")).status === 200 && (await abrir("/loja?promocao=1")).status === 200 && (await abrir("/loja?marca=Soul")).status === 200,
   "Marcas, promoções e filtro por marca abrem");
 ok((await abrir("/loja/cadastro")).html.includes("Quero ser cliente"), "Cadastro de novo cliente abre");
+// SEO: páginas limpas de marca e categoria, título com a palavra-chave, imagem de compartilhamento no domínio oficial, sitemap
+ok(vitrine.html.includes("Distribuidora de Cosméticos em Foz do Iguaçu") && !vitrine.html.includes("localhost:3000/marca"), "Página inicial com título de SEO e imagem de compartilhamento no domínio oficial");
+const pagMarca = await abrir("/loja/marcas/rhenuks");
+ok(pagMarca.status === 200 && pagMarca.html.includes("Rhenuks no atacado") && pagMarca.html.includes('rel="canonical"'), "Página da marca (/loja/marcas/rhenuks) abre com H1 e canonical");
+ok((await abrir("/loja/marcas/marca-que-nao-existe")).status === 404, "Marca inexistente dá 404");
+const pagCat = await abrir("/loja/categorias/corpo");
+ok(pagCat.status === 200 && !pagCat.html.includes("Application error"), "Página de categoria (/loja/categorias/corpo) abre");
+const mapa = await abrir("/sitemap.xml");
+ok(mapa.status === 200 && mapa.html.includes("/loja/marcas/rhenuks") && !mapa.html.includes("sexshop"), "Sitemap lista as páginas limpas e deixa o sex shop de fora");
 const es = await fetch(base + "/loja", { headers: { cookie: "vc_idioma=es" } });
 const htmlEs = await es.text();
 ok(htmlEs.includes("Distribuidora de cosméticos directo de fábrica") && !htmlEs.includes("Paraguai"), "Site em espanhol e sem citar Paraguai");
