@@ -85,29 +85,33 @@ export default async function Precificacao({ searchParams }: { searchParams: Pro
           Em <b>Preço para quem</b>: “Desconto p/ clientes locais” = o cliente local que retira em Foz ganha o desconto por caixa nessa marca; “Mesmo preço para todos” = sem desconto local (ex.: Rhenuks). É a mesma escolha da aba Retire em Foz.</p>
         <div className="tabela"><table style={{ minWidth: 0 }}>
           <thead><tr><th>Marca</th><th>Produtos</th><th>No motor</th><th>Papel</th><th>Alvo Normal %</th><th>Alvo VIP %</th><th>Preço para quem</th><th></th></tr></thead>
-          <tbody>{d.marcas.map((m) => (
-            <tr key={m.marca}>
-              <td>{m.marca}</td><td className="num">{m.n}</td>
-              <td colSpan={6}>
-                <form action={salvarMarcaInteligencia} className="linha" style={{ gap: 8 }}>
-                  <input type="hidden" name="marca" value={m.marca} />
-                  <input type="hidden" name="volta" value="precificacao" />
-                  <label className="pequeno" style={{ width: 70 }}><input type="checkbox" name="gatilho" value="1" defaultChecked={m.gatilho} /> sim</label>
-                  <select name="papel" defaultValue={m.papel} aria-label={`Papel de ${m.marca}`} style={{ width: 140 }}>
-                    {Object.entries(PAPEIS).map(([k, t]) => <option key={k} value={k}>{t}</option>)}
-                  </select>
-                  <input name="margem_normal" inputMode="decimal" style={{ width: 70 }} placeholder={String(an)} aria-label={`Alvo Normal de ${m.marca}`}
-                    defaultValue={m.margem_alvo_normal == null ? "" : Number(m.margem_alvo_normal).toLocaleString("pt-BR")} />
-                  <input name="margem_vip" inputMode="decimal" style={{ width: 70 }} placeholder={String(av)} aria-label={`Alvo VIP de ${m.marca}`}
-                    defaultValue={m.margem_alvo_vip == null ? "" : Number(m.margem_alvo_vip).toLocaleString("pt-BR")} />
-                  <select name="retirada" defaultValue={m.desconto_local ? "local" : "todos"} aria-label={`Preço de ${m.marca} para clientes locais`} style={{ width: 230 }}>
-                    <option value="local">Desconto p/ clientes locais (retirando em Foz)</option>
-                    <option value="todos">Mesmo preço para todos</option>
-                  </select>
-                  <button>Salvar</button>
-                </form>
-              </td>
-            </tr>))}</tbody>
+          <tbody>{d.marcas.map((m, i) => {
+            const f = `marca-${i}`;
+            return (
+              <tr key={m.marca}>
+                <td><b>{m.marca}</b>
+                  <form id={f} action={salvarMarcaInteligencia}>
+                    <input type="hidden" name="marca" value={m.marca} />
+                    <input type="hidden" name="volta" value="precificacao" />
+                  </form>
+                </td>
+                <td className="num">{m.n}</td>
+                <td><label className="pequeno" style={{ display: "flex", gap: 4, alignItems: "center", flexDirection: "row" }}><input form={f} type="checkbox" name="gatilho" value="1" defaultChecked={m.gatilho} style={{ width: "auto" }} /> sim</label></td>
+                <td><select form={f} name="papel" defaultValue={m.papel} aria-label={`Papel de ${m.marca}`} style={{ width: 140 }}>
+                  {Object.entries(PAPEIS).map(([k, t]) => <option key={k} value={k}>{t}</option>)}
+                </select></td>
+                <td><input form={f} name="margem_normal" inputMode="decimal" style={{ width: 70 }} placeholder={String(an)} aria-label={`Alvo Normal de ${m.marca}`}
+                  defaultValue={m.margem_alvo_normal == null ? "" : Number(m.margem_alvo_normal).toLocaleString("pt-BR")} /></td>
+                <td><input form={f} name="margem_vip" inputMode="decimal" style={{ width: 70 }} placeholder={String(av)} aria-label={`Alvo VIP de ${m.marca}`}
+                  defaultValue={m.margem_alvo_vip == null ? "" : Number(m.margem_alvo_vip).toLocaleString("pt-BR")} /></td>
+                <td><select form={f} name="retirada" defaultValue={m.desconto_local ? "local" : "todos"} aria-label={`Preço de ${m.marca} para clientes locais`} style={{ width: 240 }}>
+                  <option value="local">Desconto p/ locais (retirando em Foz)</option>
+                  <option value="todos">Mesmo preço para todos</option>
+                </select></td>
+                <td><button form={f}>Salvar</button></td>
+              </tr>
+            );
+          })}</tbody>
         </table></div>
       </details>
 
