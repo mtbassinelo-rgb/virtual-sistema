@@ -28,6 +28,7 @@ alter table app.transferencia_itens
 
 -- Quem pode aprovar o envio além do gerente/dono (ex.: vendedora encarregada do estoquista)
 alter table app.usuarios add column aprova_transferencias boolean not null default false;
+grant select (aprova_transferencias) on app.usuarios to vc_app;
 
 create or replace function app.pode_aprovar_transferencia() returns boolean
 language sql stable security definer set search_path = app, pg_temp as $$
