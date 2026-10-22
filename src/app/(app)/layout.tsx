@@ -43,6 +43,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
           { href: "/", texto: "Painel do dia", dica: "Pedidos, pagamentos, envios e pendências de hoje" },
           { href: "/saude-financeira", texto: "Saúde financeira", dica: "Vendas, compras, despesas, margens e plano de ação (área do dono)" },
           { href: "/relatorios?aba=resultado", texto: "Resultado do mês" },
+          { href: "/inteligencia/fornecedores", texto: "Comparativo de fornecedores", dica: "Cílios e unhas: onde comprar mais barato (Dafu, Zhang, Fonte da Beleza, Nexxo e outros), com a planilha" },
         ] }
       : { id: "inicio", titulo: "Início", icone: "inicio", itens: [{ href: "/", texto: "Meu dia" }] },
     { id: "vendas", titulo: "Vendas", icone: "vendas", itens: [

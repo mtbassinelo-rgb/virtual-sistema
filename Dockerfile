@@ -15,6 +15,7 @@ COPY --from=compilacao /app/.next/standalone ./
 COPY --from=compilacao /app/.next/static ./.next/static
 COPY --from=compilacao /app/public ./public
 COPY --from=compilacao /app/scripts ./scripts
+COPY --from=compilacao /app/arquivos ./arquivos
 COPY --from=dependencias /app/node_modules/@node-rs ./node_modules/@node-rs
 COPY --from=dependencias /app/node_modules/pg ./node_modules/pg
 RUN mkdir -p /dados/comprovantes && chown -R node:node /dados
