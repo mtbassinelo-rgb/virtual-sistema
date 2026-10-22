@@ -132,6 +132,8 @@ ok((await abrir("/loja/marcas")).status === 200 && (await abrir("/loja?promocao=
   "Marcas, promoções e filtro por marca abrem");
 ok((await abrir("/loja/cadastro")).html.includes("Quero ser cliente"), "Cadastro de novo cliente abre");
 // SEO: páginas limpas de marca e categoria, título com a palavra-chave, imagem de compartilhamento no domínio oficial, sitemap
+// os produtos de exemplo vêm só com o fornecedor; a marca Rhenuks entra aqui para testar a página da marca
+await db.query("update app.produtos set marca = 'Rhenuks' where fornecedor = 'Rhenuks' and marca is null");
 ok(vitrine.html.includes("Distribuidora de Cosméticos em Foz do Iguaçu") && !vitrine.html.includes("localhost:3000/marca"), "Página inicial com título de SEO e imagem de compartilhamento no domínio oficial");
 const pagMarca = await abrir("/loja/marcas/rhenuks");
 ok(pagMarca.status === 200 && pagMarca.html.includes("Rhenuks no atacado") && pagMarca.html.includes('rel="canonical"'), "Página da marca (/loja/marcas/rhenuks) abre com H1 e canonical");
