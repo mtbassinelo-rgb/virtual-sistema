@@ -6,6 +6,7 @@ import { exigirUsuario, ehGestao } from "@/lib/auth";
 import { comUsuario, mensagemErro } from "@/lib/db";
 import { numero, texto } from "@/lib/formato";
 import { casarProduto, lerDesconto, lerItens, lerNumeroPedido } from "@/lib/nota";
+import { lerNfe, UNIDADE_PECA } from "@/lib/nfe";
 
 const ir = (url: string, erro: string | null, ok: string) => {
   revalidatePath("/estoque/notas");
@@ -71,4 +72,69 @@ export async function receberNota(fd: FormData) {
   }
   revalidatePath("/estoque");
   ir(`/estoque/notas/${id}`, erro, ok);
+}
+
+/**
+ * Importa um ou mais XML de NF-e do fornecedor: lança como "a caminho", liga os itens aos produtos
+ * (EAN, código já usado com o fornecedor, nome dentro da marca) e cria as contas a pagar das duplicatas.
+ */
+export async function importarXml(fd: FormData) {
+  const u = await exigirUsuario();
+  const ok: string[] = [], erros: string[] = [];
+  let ultimo = "";
+  if (!ehGestao(u)) ir("/estoque/notas", "Só gerente ou dono importa notas.", "");
+  const arquivos = fd.getAll("xml").filter((f): f is File => typeof f === "object" && "text" in f && f.size > 0);
+  if (!arquivos.length) ir("/estoque/notas", "Escolha o arquivo XML da nota.", "");
+  for (const arq of arquivos.slice(0, 20)) {
+    try {
+      if (arq.size > 3_000_000) throw new Error("arquivo grande demais");
+      const n = lerNfe(await arq.text());
+      if (!n.itens.length) throw new Error("a nota não tem itens");
+      ultimo = await comUsuario(u.id, async (c) => {
+        const prods = (await c.query("select id::text, nome, marca, gtin, unidades_caixa from app.produtos order by ativo desc")).rows as
+          { id: string; nome: string; marca: string | null; gtin: string | null; unidades_caixa: number | null }[];
+        const porId = new Map(prods.map((p) => [p.id, p]));
+        const porEan = new Map(prods.filter((p) => p.gtin).map((p) => [p.gtin!, p]));
+        // marca: a escolhida; senão a das notas anteriores do fornecedor; senão a mais comum entre os EAN achados
+        let marca = texto(fd, "marca");
+        if (!marca && n.fornecedor.cnpj) {
+          marca = (await c.query(`select c.marca from app.compras c join app.fornecedores f on f.id = c.fornecedor_id
+              where f.cnpj = $1 and c.marca is not null group by c.marca order by count(*) desc limit 1`, [n.fornecedor.cnpj.replace(/\D/g, "")])).rows[0]?.marca ?? "";
+        }
+        if (!marca) {
+          const cont = new Map<string, number>();
+          for (const i of n.itens) { const m = i.ean ? porEan.get(i.ean)?.marca : null; if (m) cont.set(m, (cont.get(m) ?? 0) + 1); }
+          marca = [...cont.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "";
+        }
+        if (!marca) throw new Error("não consegui descobrir a marca: escolha a marca e importe de novo");
+        const daMarca = prods.filter((p) => p.marca === marca);
+        const itens = n.itens.map((i) => {
+          const produto_id = (i.ean ? porEan.get(i.ean)?.id : null) ?? casarProduto(i.descricao, daMarca)?.id ?? null;
+          // nota em caixa/fardo: converte para unidades pela quantidade por caixa do produto (o estoque é em unidades)
+          const porCaixa = produto_id ? Number(porId.get(produto_id)?.unidades_caixa ?? 0) : 0;
+          const emPeca = UNIDADE_PECA.test(i.unidade) || !i.unidade;
+          const converte = !emPeca && porCaixa > 1;
+          const descricao = emPeca ? i.descricao : converte ? `${i.descricao} [${i.quantidade} ${i.unidade} × ${porCaixa} un]`
+            : `${i.descricao} [nota em ${i.unidade}: confira a quantidade]`;
+          return {
+            codigo: i.codigo, ean: i.ean, unidade: i.unidade, produto_id, descricao: descricao.slice(0, 200),
+            quantidade: converte ? i.quantidade * porCaixa : i.quantidade,
+            valor_unit: converte ? Math.round((i.valor_unit / porCaixa) * 10000) / 10000 : i.valor_unit,
+          };
+        });
+        return (await c.query("select app.importar_nfe($1::jsonb) id", [JSON.stringify({
+          fornecedor: n.fornecedor, numero: n.numero, chave: n.chave, data: n.data, marca,
+          frete: n.frete, desconto: n.desconto, valor_produtos: n.itens.reduce((s, i) => s + i.total, 0), valor_nota: n.valor_nota,
+          cambio: numero(fd, "cambio"), itens, duplicatas: n.duplicatas,
+          gerar_contas: fd.get("gerar_contas") === "1", prazo_dias: numero(fd, "prazo") ?? 30,
+        })])).rows[0].id as string;
+      });
+      ok.push(`NF ${n.numero ?? "?"} (${n.fornecedor.nome}, ${n.itens.length} itens${n.duplicatas.length ? `, ${n.duplicatas.length} parcela(s)` : ""})`);
+    } catch (e) {
+      erros.push(`${arq.name}: ${mensagemErro(e)}`);
+    }
+  }
+  const msgOk = ok.length ? `Importada(s): ${ok.join("; ")}. Confira os produtos ligados e confirme a chegada para subir o estoque.` : "";
+  if (ok.length === 1 && !erros.length) ir(`/estoque/notas/${ultimo}`, null, msgOk);
+  ir("/estoque/notas", erros.length ? erros.join(" · ") + (msgOk ? " · " + msgOk : "") : null, msgOk);
 }

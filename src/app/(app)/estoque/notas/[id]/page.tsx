@@ -19,10 +19,13 @@ export default async function Nota({ params, searchParams }: { params: Promise<{
     if (!nota) return null;
     const itens = (await c.query(`select i.*, p.nome produto, p.codigo produto_codigo, p.custo_unitario_brl custo_atual from app.compra_itens i
       left join app.produtos p on p.id = i.produto_id where i.compra_id = $1 order by i.ordem`, [id])).rows;
-    const produtos = (await c.query(`select id, nome, codigo, ativo from app.produtos where marca = $1 order by ativo desc, nome`, [nota.marca])).rows as
+    const produtos = (await c.query(`select id, nome, codigo, ativo from app.produtos
+        where marca = $1 or id in (select produto_id from app.compra_itens where compra_id = $2 and produto_id is not null)
+        order by ativo desc, nome`, [nota.marca, id])).rows as
       { id: string; nome: string; codigo: string; ativo: boolean }[];
     const depositos = (await c.query("select id, nome from app.depositos where ativo order by tipo, nome")).rows as { id: string; nome: string }[];
-    return { nota, itens, produtos, depositos };
+    const contas = (await c.query(`select id, descricao, valor, moeda, vencimento, pago_em, situacao from app.v_despesas where compra_id = $1 order by vencimento`, [id])).rows;
+    return { nota, itens, produtos, depositos, contas };
   });
   if (!d) return <div className="painel">Nota não encontrada.</div>;
   const n = d.nota;
@@ -56,7 +59,7 @@ export default async function Nota({ params, searchParams }: { params: Promise<{
             <thead><tr><th>Cód. nota</th><th>Descrição na nota</th><th>Qtd</th><th>Valor unit.</th><th>Custo c/ desconto</th><th>Custo atual</th><th>Produto do sistema</th></tr></thead>
             <tbody>{d.itens.map((i) => (
               <tr key={i.id}>
-                <td>{i.codigo_nota}</td><td>{i.descricao}</td><td className="num">{Number(i.quantidade).toLocaleString("pt-BR")}</td>
+                <td>{i.codigo_nota}{i.ean && <div className="pequeno suave">{i.ean}</div>}</td><td>{i.descricao}{i.unidade_nota && <span className="pequeno suave"> · {i.unidade_nota}</span>}</td><td className="num">{Number(i.quantidade).toLocaleString("pt-BR")}</td>
                 <td className="num">{i.valor_unit != null ? dinheiro(i.valor_unit, "BRL") : "—"}</td>
                 <td className="num">{i.custo_unit != null ? dinheiro(i.custo_unit, "BRL") : "—"}</td>
                 <td className="num">{i.custo_atual != null ? dinheiro(i.custo_atual, "BRL") : "—"}</td>
@@ -70,6 +73,21 @@ export default async function Nota({ params, searchParams }: { params: Promise<{
           {aCaminho && <button style={{ marginTop: 8 }}>Salvar produtos ligados</button>}
         </form>
       </section>
+
+      {(d.contas.length > 0 || n.valor_nota) && (
+        <section className="painel">
+          <div className="linha entre"><h2>Contas a pagar desta nota</h2>{n.valor_nota && <span className="suave">Valor total da nota: <b>{dinheiro(n.valor_nota, "BRL")}</b></span>}</div>
+          {d.contas.length === 0 ? <p className="suave" style={{ margin: 0 }}>Nenhuma conta lançada para esta nota.</p> : (
+            <div className="tabela"><table>
+              <thead><tr><th>Vencimento</th><th>Parcela</th><th>Valor</th><th>Situação</th></tr></thead>
+              <tbody>{d.contas.map((x) => (
+                <tr key={x.id}><td>{data(x.vencimento)}</td><td>{x.descricao}</td><td className="num">{dinheiro(x.valor, x.moeda)}</td>
+                  <td>{x.pago_em ? <Selo cor="ok">Paga em {data(x.pago_em)}</Selo> : x.situacao === "vencida" ? <Selo cor="erro">Vencida</Selo> : <Selo cor="aviso">A pagar</Selo>}</td></tr>))}</tbody>
+            </table></div>
+          )}
+          <Link href="/despesas?ver=abertas&categoria=mercadoria">Ver no contas a pagar →</Link>
+        </section>
+      )}
 
       {aCaminho && (
         <section className="painel">

@@ -383,3 +383,14 @@ button.discreto:hover { color: var(--erro); border-color: transparent; }
 .indicador.destaque-aviso { border-color: var(--aviso); background: var(--aviso-suave); }
 .indicador.destaque-erro { border-color: var(--erro); background: var(--erro-suave); }
 @media (max-width: 640px) { .ficha-acoes { width: 100%; } .ficha-acoes .botao { flex: 1; text-align: center; } }
+
+/* Painel financeiro */
+.fin-metas { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+.fin-meta { display: flex; flex-direction: column; gap: 6px; }
+.fin-rank { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.fin-rank li { display: flex; flex-direction: column; gap: 3px; }
+.fin-rank-barra { height: 6px; border-radius: 999px; background: var(--afundado); overflow: hidden; }
+.fin-rank-barra span { display: block; height: 100%; background: var(--marca); border-radius: 999px; }
+table.dre td, table.dre th { white-space: nowrap; }
+table.dre tr.atual td { background: var(--marca-suave); }
+table.dre tfoot th { border-top: 2px solid var(--linha); }

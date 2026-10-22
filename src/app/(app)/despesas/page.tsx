@@ -4,9 +4,9 @@ import { exigirUsuario, ehGestao } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
 import { dinheiro, data, hojeISO, nomeMes, SITUACAO_DESPESA, type Moeda } from "@/lib/formato";
 import { Avisos, Selo } from "../avisos";
-import { apagarDespesa, desfazerPagamento, lancarDespesa, pagarDespesa } from "./acoes";
+import { alterarValorRecorrente, apagarDespesa, desfazerPagamento, encerrarRecorrente, lancarDespesa, pagarDespesa, salvarRecorrente } from "./acoes";
 
-export const metadata = { title: "Despesas e contas a pagar" };
+export const metadata = { title: "Contas a pagar" };
 
 const VISOES = [
   { k: "abertas", t: "A pagar", w: "pago_em is null" },
@@ -30,6 +30,11 @@ export default async function Despesas({ searchParams }: {
   const gerir = u.perfil === "dono" || u.perfil === "gerente";
 
   const d = await comUsuario(u.id, async (c) => {
+    // contas fixas: lança a do mês atual e a do próximo (não duplica)
+    if (gerir) {
+      await c.query("select app.gerar_despesas_recorrentes(current_date)");
+      await c.query("select app.gerar_despesas_recorrentes((current_date + interval '1 month')::date)");
+    }
     const filtros: string[] = [visao.w];
     const vals: unknown[] = [];
     if (porMes) {
@@ -46,15 +51,17 @@ export default async function Despesas({ searchParams }: {
         coalesce(sum(valor) filter (where pago_em is null), 0) a_pagar,
         coalesce(sum(valor_pago) filter (where date_trunc('month', pago_em) = date_trunc('month', current_date)), 0) pago_mes
       from app.v_despesas group by moeda order by moeda desc`)).rows;
-    const categorias = (await c.query("select codigo, nome from app.despesa_categorias where ativo order by ordem, nome")).rows;
-    return { lista, resumo, categorias };
+    const categorias = (await c.query("select codigo, nome, tipo from app.despesa_categorias where ativo order by ordem, nome")).rows;
+    const recorrentes = (await c.query(`select r.*, c.nome categoria_nome, c.tipo from app.despesas_recorrentes r
+        join app.despesa_categorias c on c.codigo = r.categoria where r.ativo order by r.dia_vencimento, r.descricao`)).rows;
+    return { lista, resumo, categorias, recorrentes };
   });
 
   return (
     <>
       <section className="cabecalho-pagina">
         <div>
-          <h1>Despesas e contas a pagar</h1>
+          <h1>Contas a pagar</h1>
           <p>Compras das marcas, aluguel, salários, transportadoras, passeiro e o que mais vencer. Lance a conta e marque quando pagar.</p>
         </div>
         <Link className="botao" href="/relatorios?aba=resultado">Ver resultado do mês</Link>
@@ -98,7 +105,7 @@ export default async function Despesas({ searchParams }: {
               return (
                 <tr key={x.id}>
                   <td className="num">{x.vencimento ? data(x.vencimento) : "—"}</td>
-                  <td>{x.descricao}<div className="pequeno suave">{[x.fornecedor, x.documento, `ref. ${nomeMes(x.competencia)}`].filter(Boolean).join(" · ")}</div>
+                  <td>{x.descricao}{x.recorrente_id && <> <Selo>fixa</Selo></>}{x.compra_id && <> <Link className="pequeno" href={`/estoque/notas/${x.compra_id}`}>ver nota</Link></>}<div className="pequeno suave">{[x.fornecedor, x.documento, `ref. ${nomeMes(x.competencia)}`].filter(Boolean).join(" · ")}</div>
                     {x.observacao && <div className="pequeno suave">{x.observacao}</div>}</td>
                   <td>{x.categoria_nome}</td>
                   <td className="num">{dinheiro(x.valor, x.moeda as Moeda)}
@@ -137,7 +144,7 @@ export default async function Despesas({ searchParams }: {
             <label>Categoria
               <select name="categoria" required defaultValue={f.categoria ?? ""}>
                 <option value="">Escolha…</option>
-                {d.categorias.map((c) => <option key={c.codigo} value={c.codigo}>{c.nome}</option>)}
+                {d.categorias.map((c) => <option key={c.codigo} value={c.codigo}>{c.nome}{c.tipo === "fixa" ? " (fixa)" : " (variável)"}</option>)}
               </select>
             </label>
             <label className="largo">Descrição<input name="descricao" required maxLength={200} placeholder="Ex.: Pedido 2303 Fonte da Beleza, aluguel do CD de Foz" /></label>
@@ -159,6 +166,50 @@ export default async function Despesas({ searchParams }: {
           </form>
           <p className="suave pequeno" style={{ margin: 0 }}>Aluguel e salários: use "Repetir todo mês" para lançar as próximas contas de uma vez.
             Compras de mercadoria aparecem aqui como conta a pagar, mas no resultado do mês o que conta é o custo do que foi vendido.</p>
+        </section>
+      )}
+      {gerir && (
+        <section className="painel">
+          <h2>Contas fixas (todo mês)</h2>
+          <p className="pequeno suave" style={{ margin: 0 }}>Aluguel, salários, internet, contador… Cadastre uma vez: a conta de cada mês aparece sozinha em "A pagar" (o mês atual e o próximo).
+            Elas entram como custo fixo no ponto de equilíbrio do painel financeiro.</p>
+          {d.recorrentes.length > 0 && (
+            <div className="tabela"><table>
+              <thead><tr><th>Dia</th><th>Conta</th><th>Categoria</th><th>Valor</th><th></th></tr></thead>
+              <tbody>{d.recorrentes.map((r) => (
+                <tr key={r.id}>
+                  <td className="num">{r.dia_vencimento}</td>
+                  <td>{r.descricao}{r.fornecedor && <div className="pequeno suave">{r.fornecedor}</div>}</td>
+                  <td>{r.categoria_nome} <span className="pequeno suave">({r.tipo === "fixa" ? "fixa" : "variável"})</span></td>
+                  <td>
+                    <form action={alterarValorRecorrente} className="linha" style={{ gap: 6 }}>
+                      <input type="hidden" name="id" value={r.id} /><input type="hidden" name="volta" value={volta} />
+                      <span className="pequeno suave">{r.moeda === "GS" ? "Gs" : "R$"}</span>
+                      <input name="valor" inputMode="decimal" defaultValue={String(Number(r.valor))} style={{ width: 110 }} aria-label="Valor" />
+                      <button className="pequeno">Salvar</button>
+                    </form>
+                  </td>
+                  <td><form action={encerrarRecorrente}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="volta" value={volta} />
+                    <button className="discreto pequeno">Encerrar</button></form></td>
+                </tr>))}</tbody>
+            </table></div>
+          )}
+          <form action={salvarRecorrente} className="campos">
+            <input type="hidden" name="volta" value={volta} />
+            <label>Categoria
+              <select name="categoria" required defaultValue="">
+                <option value="">Escolha…</option>
+                {d.categorias.filter((c) => c.codigo !== "mercadoria").map((c) => <option key={c.codigo} value={c.codigo}>{c.nome}</option>)}
+              </select>
+            </label>
+            <label className="largo">Descrição<input name="descricao" required maxLength={200} placeholder="Ex.: Aluguel do CD de Foz" /></label>
+            <label>A quem pagar<input name="fornecedor" maxLength={120} /></label>
+            <label>Moeda<select name="moeda" defaultValue="BRL"><option value="BRL">R$</option><option value="GS">Gs</option></select></label>
+            <label>Valor<input name="valor" inputMode="decimal" required /></label>
+            <label>Dia do vencimento<input name="dia" type="number" min={1} max={28} required defaultValue={10} /></label>
+            <label>A partir de<input name="inicio" type="month" defaultValue={hojeISO().slice(0, 7)} /></label>
+            <button className="principal">Cadastrar conta fixa</button>
+          </form>
         </section>
       )}
     </>

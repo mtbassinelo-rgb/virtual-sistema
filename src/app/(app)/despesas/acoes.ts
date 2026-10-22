@@ -74,3 +74,42 @@ export async function apagarDespesa(fd: FormData) {
     if (r.rowCount === 0) throw new Error("Só é possível apagar conta ainda não paga.");
   });
 }
+
+/** Conta fixa: o sistema lança a conta de cada mês sozinho (a do mês atual já sai na hora). */
+export async function salvarRecorrente(fd: FormData) {
+  await executar(texto(fd, "volta"), "Conta fixa salva: a conta deste mês e as próximas são lançadas sozinhas.", async (uid) => {
+    const valor = numero(fd, "valor");
+    if (!valor || valor <= 0) throw new Error("Informe o valor.");
+    const dia = Math.trunc(numero(fd, "dia") ?? 0);
+    if (dia < 1 || dia > 28) throw new Error("Dia do vencimento entre 1 e 28.");
+    const inicio = /^\d{4}-\d{2}$/.test(texto(fd, "inicio")) ? `${texto(fd, "inicio")}-01` : null;
+    await comUsuario(uid, async (c) => {
+      await c.query(`insert into app.despesas_recorrentes (categoria, descricao, fornecedor, moeda, valor, dia_vencimento, inicio, criado_por)
+                     values ($1, $2, nullif($3, ''), $4, $5, $6, coalesce($7::date, date_trunc('month', current_date)::date), app.uid())`,
+        [texto(fd, "categoria"), texto(fd, "descricao"), texto(fd, "fornecedor"), texto(fd, "moeda") === "BRL" ? "BRL" : "GS", valor, dia, inicio]);
+      await c.query("select app.gerar_despesas_recorrentes(current_date)");
+    });
+  });
+}
+
+export async function encerrarRecorrente(fd: FormData) {
+  await executar(texto(fd, "volta"), "Conta fixa encerrada: não será mais lançada (as já lançadas continuam).", async (uid) => {
+    const r = await comUsuario(uid, (c) => c.query(
+      "update app.despesas_recorrentes set ativo = false, fim = date_trunc('month', current_date)::date where id = $1 and ativo", [texto(fd, "id")]));
+    if (r.rowCount === 0) throw new Error("Conta fixa não encontrada.");
+    // a do próximo mês, se já tinha sido lançada e não foi paga, sai
+    await comUsuario(uid, (c) => c.query(
+      "delete from app.despesas where recorrente_id = $1 and pago_em is null and competencia > date_trunc('month', current_date)", [texto(fd, "id")]));
+  });
+}
+
+export async function alterarValorRecorrente(fd: FormData) {
+  await executar(texto(fd, "volta"), "Valor da conta fixa atualizado (vale para os próximos meses).", async (uid) => {
+    const valor = numero(fd, "valor");
+    if (!valor || valor <= 0) throw new Error("Informe o valor.");
+    const r = await comUsuario(uid, (c) => c.query("update app.despesas_recorrentes set valor = $2 where id = $1 and ativo", [texto(fd, "id"), valor]));
+    if (r.rowCount === 0) throw new Error("Conta fixa não encontrada.");
+    await comUsuario(uid, (c) => c.query(
+      "update app.despesas set valor = $2 where recorrente_id = $1 and pago_em is null and competencia > date_trunc('month', current_date)", [texto(fd, "id"), valor]));
+  });
+}

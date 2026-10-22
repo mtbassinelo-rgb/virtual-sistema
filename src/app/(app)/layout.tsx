@@ -107,7 +107,10 @@ export default async function AreaInterna({ children }: { children: React.ReactN
     ] },
     gestao
       ? { id: "financeiro", titulo: "Financeiro", icone: "financeiro", itens: [
-          { href: "/despesas", texto: "Despesas e contas", contador: n.contas_vencidas, dica: "Contas vencidas" },
+          { href: "/financeiro", texto: "Painel financeiro", dica: "DRE, ponto de equilíbrio, lucro por marca e cliente, metas" },
+          { href: "/despesas", texto: "Contas a pagar", contador: n.contas_vencidas, dica: "Contas vencidas" },
+          { href: "/financeiro/receber", texto: "Contas a receber" },
+          { href: "/estoque/notas", texto: "Notas de entrada (XML)" },
           { href: "/comissoes", texto: "Comissões" },
         ] }
       : { id: "financeiro", titulo: "Comissão", icone: "financeiro", itens: [{ href: "/comissoes", texto: "Minha comissão" }] },

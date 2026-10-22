@@ -3,7 +3,7 @@ import { ehGestao, exigirUsuario } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
 import { data, dinheiro } from "@/lib/formato";
 import { Avisos, Selo } from "../../avisos";
-import { lancarNota } from "./acoes";
+import { importarXml, lancarNota } from "./acoes";
 
 export const metadata = { title: "Notas a chegar" };
 
@@ -33,7 +33,23 @@ export default async function Notas({ searchParams }: { searchParams: Promise<{ 
       <Avisos ok={f.ok} erro={f.erro} />
 
       <section className="painel">
-        <h2>Lançar nota</h2>
+        <h2>Importar XML da NF-e</h2>
+        <p className="pequeno suave" style={{ margin: 0 }}>Envie o arquivo .xml que o fornecedor manda por e-mail (pode mandar vários de uma vez). O sistema lê o fornecedor (CNPJ), os itens,
+          o frete, o desconto e as parcelas; liga cada item ao produto pelo código de barras, pelo código já usado com esse fornecedor ou pelo nome;
+          e lança as parcelas no contas a pagar. O estoque só sobe quando você confirmar a chegada.</p>
+        <form action={importarXml} className="linha" style={{ flexWrap: "wrap", alignItems: "end", gap: 10 }}>
+          <label>Arquivo(s) XML<input type="file" name="xml" accept=".xml,text/xml,application/xml" multiple required /></label>
+          <label>Marca<select name="marca" defaultValue=""><option value="">Descobrir sozinho</option>
+            {d.marcas.map((m) => <option key={m} value={m}>{m}</option>)}</select></label>
+          <label>Câmbio (Gs/R$)<input name="cambio" inputMode="decimal" style={{ width: 90 }} /></label>
+          <label className="linha" style={{ alignItems: "center", gap: 6 }}><input type="checkbox" name="gerar_contas" value="1" defaultChecked style={{ width: "auto" }} /> Lançar no contas a pagar</label>
+          <label>Prazo se não tiver parcela (dias)<input name="prazo" type="number" min={0} max={180} defaultValue={30} style={{ width: 80 }} /></label>
+          <button className="principal">Importar</button>
+        </form>
+      </section>
+
+      <section className="painel">
+        <h2>Lançar nota colando o texto</h2>
         <form action={lancarNota} style={{ display: "grid", gap: 10 }}>
           <div className="linha" style={{ flexWrap: "wrap", alignItems: "end" }}>
             <label>Fornecedor<select name="fornecedor" required defaultValue=""><option value="" disabled>Escolha</option>
