@@ -9,6 +9,7 @@ import { bannersPadrao, type Banner } from "@/lib/banners-padrao";
 import { FaixaBanners } from "./banners";
 import { ehPrincipal, unidadeLoja } from "@/lib/unidade";
 import { SEO, urlMarca } from "@/lib/seo";
+import { filtroBusca } from "@/lib/busca";
 
 /** Filtros da vitrine (vêm da URL). */
 export type Filtros = { q?: string; linha?: string; sub?: string; marca?: string; promocao?: string; novidade?: string; vista?: string; pagina?: string; erro?: string };
@@ -110,8 +111,9 @@ export async function Vitrine({ f, cabecalho }: { f: Filtros; cabecalho?: Cabeca
   if (soPromo) todos = todos.filter((p) => pct(p) > 0);
   if (soNovidade) todos = todos.filter((p) => p.novidade);
   if (q) {
-    const termos = sem(q).split(/\s+/).filter(Boolean);
-    todos = todos.filter((p) => { const t = sem(`${p.nome} ${p.marcaNome ?? ""} ${p.codigo}`); return termos.every((x) => t.includes(x)); });
+    // busca nos dois idiomas: "jabón" acha "Sabonete", "champú" acha "Shampoo"
+    const casa = filtroBusca(q);
+    todos = todos.filter((p) => casa(`${p.nome} ${p.marcaNome ?? ""} ${p.codigo} ${p.grupo ?? ""}`));
   }
   // Cliente: promoções e o que ele costuma comprar primeiro. Visitante: o que tem estoque primeiro.
   const peso = (p: Produto) => p.p?.destaque === "promocao" ? 0 : p.p?.destaque === "recompra" ? 1 : (p.p ? p.p.disponibilidade !== "indisponivel" : p.tem_estoque) ? 2 : 3;

@@ -14,6 +14,12 @@ function campos(fd: FormData) {
   ];
 }
 
+/** Volta para a ficha do cliente na mesma aba em que o formulário estava. */
+function voltaCli(fd: FormData, id: string) {
+  const aba = String(fd.get("aba") ?? "");
+  return `/clientes/${id}?${/^[a-z]{3,12}$/.test(aba) ? `aba=${aba}&` : ""}`;
+}
+
 export async function criarCliente(fd: FormData) {
   const u = await exigirUsuario();
   let erro: string | null = null;
@@ -42,7 +48,7 @@ export async function criarCliente(fd: FormData) {
   }
   if (erro) redirect(`/clientes?erro=${encodeURIComponent(erro)}`);
   revalidatePath("/clientes");
-  redirect(`/clientes/${id}?ok=${encodeURIComponent("Cliente cadastrado." + extra)}`);
+  redirect(`${voltaCli(fd, id)}ok=${encodeURIComponent("Cliente cadastrado." + extra)}`);
 }
 
 /** Gerente ou dono troca a vendedora responsável; pedidos em andamento podem passar junto. */
@@ -60,7 +66,7 @@ export async function trocarVendedoraCliente(fd: FormData) {
   revalidatePath(`/clientes/${id}`);
   revalidatePath("/clientes");
   const volta = texto(fd, "volta");
-  const destino = volta.startsWith("/clientes?") ? volta + "&" : `/clientes/${id}?`;
+  const destino = volta.startsWith("/clientes?") ? volta + "&" : `${voltaCli(fd, id)}`;
   redirect(`${destino}${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Vendedora do cliente trocada." + (n ? ` ${n} pedido(s) em andamento passaram para ela.` : ""))}`);
 }
 
@@ -81,7 +87,7 @@ export async function salvarCliente(fd: FormData) {
     erro = mensagemErro(e);
   }
   revalidatePath(`/clientes/${id}`);
-  redirect(`/clientes/${id}?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Cadastro salvo.")}`);
+  redirect(`${voltaCli(fd, id)}${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Cadastro salvo.")}`);
 }
 
 export async function atendimentoCliente(fd: FormData) {
@@ -97,7 +103,7 @@ export async function atendimentoCliente(fd: FormData) {
     erro = mensagemErro(e);
   }
   revalidatePath(`/clientes/${id}`);
-  redirect(`/clientes/${id}?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Atendimento registrado.")}`);
+  redirect(`${voltaCli(fd, id)}${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Atendimento registrado.")}`);
 }
 
 export async function convidarCliente(fd: FormData) {
@@ -115,8 +121,8 @@ export async function convidarCliente(fd: FormData) {
   } catch (e) {
     erro = mensagemErro(e);
   }
-  if (erro) redirect(`/clientes/${id}?erro=${encodeURIComponent(erro)}`);
-  redirect(`/clientes/${id}?convite=${encodeURIComponent(link)}`);
+  if (erro) redirect(`${voltaCli(fd, id)}erro=${encodeURIComponent(erro)}`);
+  redirect(`${voltaCli(fd, id)}convite=${encodeURIComponent(link)}`);
 }
 
 export async function bloquearCliente(fd: FormData) {
@@ -129,7 +135,7 @@ export async function bloquearCliente(fd: FormData) {
     erro = mensagemErro(e);
   }
   revalidatePath(`/clientes/${id}`);
-  redirect(`/clientes/${id}?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Acesso à área do cliente bloqueado.")}`);
+  redirect(`${voltaCli(fd, id)}${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Acesso à área do cliente bloqueado.")}`);
 }
 
 export async function depositoCliente(fd: FormData) {
@@ -142,7 +148,7 @@ export async function depositoCliente(fd: FormData) {
     erro = mensagemErro(e);
   }
   revalidatePath(`/clientes/${id}`);
-  redirect(`/clientes/${id}?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Depósito do cliente atualizado.")}`);
+  redirect(`${voltaCli(fd, id)}${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Depósito do cliente atualizado.")}`);
 }
 
 /** Compra por unidade no site: a vendedora pede ao gerente; gerente ou dono libera direto. Só cliente de preço Normal (BR ou PY). */
@@ -157,7 +163,7 @@ export async function pedirCompraUnidade(fd: FormData) {
   }
   revalidatePath(`/clientes/${id}`);
   revalidatePath("/clientes");
-  redirect(`/clientes/${id}?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent(r === "sugerido" ? "Pedido enviado ao gerente: ele aprova a compra por unidade." : "Cliente liberado para comprar por unidade no site.")}`);
+  redirect(`${voltaCli(fd, id)}${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent(r === "sugerido" ? "Pedido enviado ao gerente: ele aprova a compra por unidade." : "Cliente liberado para comprar por unidade no site.")}`);
 }
 
 /** Gestão aprova ou recusa o pedido da vendedora, ou volta o cliente para só caixa fechada. */
@@ -173,7 +179,7 @@ export async function decidirCompraUnidade(fd: FormData) {
   }
   revalidatePath(`/clientes/${id}`);
   revalidatePath("/clientes");
-  const destino = texto(fd, "volta") === "lista" ? "/clientes?compra=aguardando&" : `/clientes/${id}?`;
+  const destino = texto(fd, "volta") === "lista" ? "/clientes?compra=aguardando&" : `${voltaCli(fd, id)}`;
   redirect(`${destino}${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent(liberar ? "Compra por unidade liberada." : "Cliente compra só caixa fechada.")}`);
 }
 
@@ -188,7 +194,7 @@ export async function sugerirClienteLocal(fd: FormData) {
     erro = mensagemErro(e);
   }
   revalidatePath(`/clientes/${id}`);
-  redirect(`/clientes/${id}?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent(r === "sugerido" ? "Sugestão enviada ao gerente." : "Cliente marcado como local: pode retirar em Foz.")}`);
+  redirect(`${voltaCli(fd, id)}${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent(r === "sugerido" ? "Sugestão enviada ao gerente." : "Cliente marcado como local: pode retirar em Foz.")}`);
 }
 
 /** Gestão aprova ou recusa a sugestão de cliente local, ou desmarca. */
@@ -205,7 +211,7 @@ export async function decidirClienteLocal(fd: FormData) {
   const volta = texto(fd, "volta");
   revalidatePath(`/clientes/${id}`);
   revalidatePath("/inteligencia");
-  const destino = volta === "inteligencia" ? "/inteligencia?aba=retirada&" : `/clientes/${id}?`;
+  const destino = volta === "inteligencia" ? "/inteligencia?aba=retirada&" : `${voltaCli(fd, id)}`;
   redirect(`${destino}${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent(local ? "Cliente marcado como local." : "Cliente não é mais local.")}`);
 }
 
@@ -258,7 +264,7 @@ export async function definirCredito(fd: FormData) {
     erro = mensagemErro(e);
   }
   revalidatePath(`/clientes/${id}`);
-  redirect(`/clientes/${id}?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Linha de crédito atualizada.")}`);
+  redirect(`${voltaCli(fd, id)}${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Linha de crédito atualizada.")}`);
 }
 
 /** Vendedora sugere a linha de crédito; o gerente/dono decide. */
@@ -273,7 +279,7 @@ export async function sugerirCredito(fd: FormData) {
     erro = mensagemErro(e);
   }
   revalidatePath(`/clientes/${id}`);
-  redirect(`/clientes/${id}?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Sugestão de crédito enviada para o gerente aprovar.")}`);
+  redirect(`${voltaCli(fd, id)}${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Sugestão de crédito enviada para o gerente aprovar.")}`);
 }
 
 export async function recusarSugestaoCredito(fd: FormData) {
@@ -286,7 +292,7 @@ export async function recusarSugestaoCredito(fd: FormData) {
     erro = mensagemErro(e);
   }
   revalidatePath(`/clientes/${id}`);
-  redirect(`/clientes/${id}?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Sugestão de crédito recusada.")}`);
+  redirect(`${voltaCli(fd, id)}${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Sugestão de crédito recusada.")}`);
 }
 
 /** Recompra: registra que a vendedora chamou o cliente (vira um atendimento por WhatsApp). */
@@ -319,5 +325,5 @@ export async function ativarCliente(fd: FormData) {
   }
   revalidatePath(`/clientes/${id}`);
   revalidatePath("/clientes");
-  redirect(`/clientes/${id}?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent(ativo ? "Cliente ativado: volta a aparecer nas listas." : "Cliente desativado: sai das listas do dia a dia, mas continua no sistema e sendo atualizado.")}`);
+  redirect(`${voltaCli(fd, id)}${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent(ativo ? "Cliente ativado: volta a aparecer nas listas." : "Cliente desativado: sai das listas do dia a dia, mas continua no sistema e sendo atualizado.")}`);
 }
