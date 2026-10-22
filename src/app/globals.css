@@ -352,3 +352,13 @@ button.discreto:hover { color: var(--erro); border-color: transparent; }
 .barra-selecao .bs-perigo:hover { background: var(--erro, #b0303a); color: #fff; }
 .barra-selecao .bs-nota { margin: 0; font-size: .78rem; color: var(--suave, #6e5a7a); }
 @media (max-width: 900px) { .barra-selecao { position: static; } .barra-selecao .bs-remover { margin-left: 0; } .barra-selecao .bs-grupo { flex: 1 1 100%; } }
+
+/* Editor da mensagem ao cliente (Site) */
+.mensagem-editor { display: grid; gap: 10px; }
+.mensagem-colunas { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.mensagem-colunas fieldset { border: 1px solid var(--linha); border-radius: 12px; padding: 10px 12px; display: grid; gap: 8px; margin: 0; }
+.mensagem-colunas legend { font-weight: 700; font-size: .85rem; padding: 0 4px; }
+.mensagem-colunas textarea { font: inherit; resize: vertical; }
+.boas-vindas-previa { max-width: 460px; margin-top: 10px; border: 1px solid var(--linha); border-radius: 16px; padding: 18px; background: var(--superficie); }
+.boas-vindas-previa h3 { margin: 0 0 6px; color: var(--marca); }
+.boas-vindas-previa ul { padding-left: 18px; }

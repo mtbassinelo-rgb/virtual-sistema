@@ -100,3 +100,19 @@ export async function aprovarCadastro(fd: FormData) {
   if (erro) redirect(`/site?erro=${encodeURIComponent(erro)}#cadastros`);
   redirect(`/clientes/${cli}?ok=${encodeURIComponent("Cliente criado a partir do cadastro do site. Confira os dados e crie o acesso dele à loja.")}`);
 }
+
+/** Mensagem que o cliente vê ao abrir a loja. "Mostrar de novo" faz todos os clientes verem a mensagem nova. */
+export async function salvarMensagemCliente(fd: FormData) {
+  const u = await exigirUsuario();
+  let erro: string | null = null;
+  const g = (k: string) => String(fd.get(k) ?? "");
+  try {
+    if (!ehGestao(u)) throw new Error("Só gerente ou dono muda a mensagem dos clientes.");
+    await comUsuario(u.id, (c) => c.query("select app.salvar_mensagem_cliente($1, $2, $3, $4, $5, $6, $7, $8)",
+      [fd.get("ativo") === "1", g("titulo_pt"), g("texto_pt"), g("botao_pt"), g("titulo_es"), g("texto_es"), g("botao_es"), fd.get("de_novo") === "1"]));
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  revalidatePath("/site"); revalidatePath("/loja", "layout");
+  redirect(`/site?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent(fd.get("de_novo") === "1" ? "Mensagem salva: todos os clientes vão ver na próxima vez que abrirem a loja." : "Mensagem salva.")}#mensagem`);
+}

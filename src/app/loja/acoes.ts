@@ -266,12 +266,16 @@ export async function itensReposicao(): Promise<{ id: string; nome: string; marc
 /** O cliente fechou a mensagem de boas-vindas: não mostra mais. */
 export async function marcarBoasVindas(): Promise<void> {
   const t = await tokenCliente();
-  if (t) await pool.query("select app.portal_marcar_boas_vindas($1)", [sha256(t)]).catch(() => undefined);
+  if (t) await pool.query("select app.portal_marcar_mensagem($1)", [sha256(t)]).catch(() => undefined);
 }
 
-/** Mostrar boas-vindas? Só na primeira entrada do cliente. */
-export async function precisaBoasVindas(): Promise<boolean> {
+/** Mensagem ao abrir a loja (editável no sistema): só se o cliente ainda não viu a versão atual. */
+export async function mensagemDoCliente(es: boolean, nome: string, vendedora: string): Promise<{ titulo: string; texto: string; botao: string } | null> {
   const t = await tokenCliente();
-  if (!t) return false;
-  return Boolean((await pool.query("select app.portal_boas_vindas($1) as b", [sha256(t)]).catch(() => ({ rows: [] }))).rows[0]?.b);
+  if (!t) return null;
+  const m = (await pool.query("select * from app.portal_mensagem($1)", [sha256(t)]).catch(() => ({ rows: [] }))).rows[0];
+  if (!m) return null;
+  const primeiro = nome.split(" ")[0] ?? nome;
+  const troca = (s: string) => s.replace(/\{(nome|nombre)\}/gi, primeiro).replace(/\{vendedora\}/gi, vendedora || "");
+  return es ? { titulo: troca(m.titulo_es), texto: troca(m.texto_es), botao: m.botao_es } : { titulo: troca(m.titulo_pt), texto: troca(m.texto_pt), botao: m.botao_pt };
 }

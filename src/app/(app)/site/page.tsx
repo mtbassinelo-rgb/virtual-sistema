@@ -3,7 +3,8 @@ import { ehGestao, exigirUsuario } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
 import { dataHora, linkWhatsApp, telefone } from "@/lib/formato";
 import { Avisos, Selo } from "../avisos";
-import { alternarBanner, apagarBanner, aprovarCadastro, atenderCadastro, criarBanner, ordemBanner } from "./acoes";
+import { alternarBanner, apagarBanner, aprovarCadastro, atenderCadastro, criarBanner, ordemBanner, salvarMensagemCliente } from "./acoes";
+import { TextoMensagem } from "@/app/loja/boas-vindas";
 
 export const metadata = { title: "Site" };
 
@@ -22,6 +23,8 @@ export default async function Site({ searchParams }: { searchParams: Promise<{ o
          left join app.vendedoras vv on vv.id = s.vendedora_id
         order by (s.cliente_id is null and s.atendido_em is null) desc, (s.cliente_id is null) desc, s.criado_em desc limit 150`)).rows,
     vendedoras: (await c.query("select id, nome from app.vendedoras where ativo order by nome")).rows as { id: string; nome: string }[],
+    mensagem: (await c.query(`select m.*, (select count(*) from app.clientes c where c.mensagem_versao_vista >= m.versao)::int vistos from app.mensagem_cliente m where id = 1`)).rows[0] as
+      { ativo: boolean; titulo_pt: string; texto_pt: string; botao_pt: string; titulo_es: string; texto_es: string; botao_es: string; versao: number; vistos: number; atualizado_em: string } | undefined,
   }));
 
   return (
@@ -31,6 +34,40 @@ export default async function Site({ searchParams }: { searchParams: Promise<{ o
         <div className="suave pequeno">Banners do início do site e cadastros de quem quer ser cliente. O site: <a href="https://distribuidoravirtualcosmeticos.com" target="_blank" rel="noopener noreferrer">distribuidoravirtualcosmeticos.com</a></div>
       </section>
       <Avisos ok={f.ok} erro={f.erro} />
+
+      {d.mensagem && gestao && (
+        <section className="painel" id="mensagem">
+          <h2 style={{ margin: 0 }}>Mensagem ao cliente ao abrir a loja</h2>
+          <p className="pequeno suave" style={{ margin: 0 }}>Aparece numa janela quando o cliente entra na loja, uma vez só. Para avisar algo novo (promoção, feriado, mudança), mude o texto e marque
+            <b> “mostrar de novo para todos”</b>. Use <b>{"{nome}"}</b> para o nome do cliente e <b>{"{vendedora}"}</b> para a vendedora dele; linha começando com <b>-</b> vira lista; <b>**texto**</b> fica em negrito.
+            {" "}Já viram a mensagem atual: <b>{d.mensagem.vistos}</b> cliente(s).</p>
+          <form action={salvarMensagemCliente} className="mensagem-editor">
+            <div className="mensagem-colunas">
+              <fieldset>
+                <legend>Português (clientes do Brasil)</legend>
+                <label>Título<input name="titulo_pt" defaultValue={d.mensagem.titulo_pt} maxLength={120} /></label>
+                <label>Mensagem<textarea name="texto_pt" defaultValue={d.mensagem.texto_pt} rows={9} maxLength={3000} required /></label>
+                <label>Botão<input name="botao_pt" defaultValue={d.mensagem.botao_pt} maxLength={40} /></label>
+              </fieldset>
+              <fieldset>
+                <legend>Espanhol (clientes do Paraguai)</legend>
+                <label>Título<input name="titulo_es" defaultValue={d.mensagem.titulo_es} maxLength={120} /></label>
+                <label>Mensaje<textarea name="texto_es" defaultValue={d.mensagem.texto_es} rows={9} maxLength={3000} required /></label>
+                <label>Botón<input name="botao_es" defaultValue={d.mensagem.botao_es} maxLength={40} /></label>
+              </fieldset>
+            </div>
+            <div className="linha" style={{ gap: 14, flexWrap: "wrap", alignItems: "center" }}>
+              <label className="pequeno" style={{ display: "flex", gap: 6, alignItems: "center", flexDirection: "row" }}><input type="checkbox" name="ativo" value="1" defaultChecked={d.mensagem.ativo} style={{ width: "auto" }} /> Mostrar mensagem na loja</label>
+              <label className="pequeno" style={{ display: "flex", gap: 6, alignItems: "center", flexDirection: "row" }}><input type="checkbox" name="de_novo" value="1" style={{ width: "auto" }} /> Mostrar de novo para todos os clientes</label>
+              <button className="principal">Salvar mensagem</button>
+            </div>
+          </form>
+          <details>
+            <summary className="pequeno">Ver como o cliente vê (espanhol)</summary>
+            <div className="boas-vindas-previa"><h3>{d.mensagem.titulo_es.replace(/\{(nome|nombre)\}/gi, "María")}</h3><TextoMensagem texto={d.mensagem.texto_es.replace(/\{(nome|nombre)\}/gi, "María").replace(/\{vendedora\}/gi, "Crislaine")} /><span className="botao principal">{d.mensagem.botao_es}</span></div>
+          </details>
+        </section>
+      )}
 
       <section className="painel" id="cadastros">
         <h2>Quero ser cliente</h2>
