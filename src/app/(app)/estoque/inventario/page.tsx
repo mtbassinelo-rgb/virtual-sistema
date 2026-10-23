@@ -29,7 +29,7 @@ export default async function Inventario({ searchParams }: { searchParams: Promi
         <div>
           <div className="trilha"><Link href="/estoque">Estoque</Link> / Inventário</div>
           <h1>Inventário · {d.dep.nome}</h1>
-          <p>Conte as peças da prateleira: bipe cada uma com o leitor ou digite a quantidade. Caixa fechada: digite 2cx (vira 2 × peças da caixa). A contagem fica guardada neste aparelho até salvar. Venda feita enquanto você conta não é desfeita: vale o que você contou naquele momento.</p>
+          <p>Escolha se conta em <b>unidades</b> ou em <b>caixas</b>, e se o que contar vai <b>somar ao estoque</b> (para carregar a loja aos poucos) ou <b>substituir</b> o estoque (para conferir a prateleira). Bipe cada item com o leitor ou digite a quantidade. A contagem fica guardada neste aparelho até salvar.</p>
         </div>
         {d.podem.length > 1 && (
           <nav className="troca-unidade" aria-label="Unidade">
