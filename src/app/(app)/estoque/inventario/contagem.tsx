@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { salvarInventario } from "./acoes";
 
-export type ItemInventario = { id: string; codigo: string; nome: string; marca: string | null; gtin: string | null; foto: string | null; saldo: number; caixa: number | null; codigos: string[] };
+export type ItemInventario = { id: string; codigo: string; nome: string; marca: string | null; gtin: string | null; foto: string | null; kits?: string | null; saldo: number; caixa: number | null; codigos: string[] };
 
 type Modo = "unidade" | "caixa";
 
@@ -141,7 +141,7 @@ export function Contagem({ deposito, itens }: { deposito: string; itens: ItemInv
                   {i.foto
                     ? <a href={i.foto} target="_blank" rel="noopener noreferrer" style={{ flex: "none" }}><img src={i.foto} alt="" width={56} height={56} loading="lazy" style={{ objectFit: "contain", background: "#fff", borderRadius: 8, border: "1px solid var(--linha)", display: "block" }} /></a>
                     : <div style={{ width: 56, height: 56, flex: "none", borderRadius: 8, background: "var(--afundado)", display: "grid", placeItems: "center", fontSize: 10, textAlign: "center" }} className="suave">sem foto</div>}
-                  <div>{i.nome}<div className="pequeno suave">{i.codigo}{i.marca ? ` · ${i.marca}` : ""}{i.caixa ? ` · caixa com ${i.caixa}` : ""}</div></div>
+                  <div>{i.nome}<div className="pequeno suave">{i.codigo}{i.marca ? ` · ${i.marca}` : ""}{i.caixa ? ` · caixa com ${i.caixa}` : ""}</div>{i.kits && <div className="pequeno" title={i.kits}>🧩 Peça de kit: {i.kits.length > 70 ? i.kits.slice(0, 70) + "…" : i.kits}</div>}</div>
                 </div>
               </td>
               <td className="num">{i.saldo.toLocaleString("pt-BR")} pç{i.caixa && i.caixa > 1 ? <div className="pequeno suave">{Math.floor(i.saldo / i.caixa)} cx{i.saldo % i.caixa ? ` + ${i.saldo % i.caixa} pç` : ""}</div> : null}</td>

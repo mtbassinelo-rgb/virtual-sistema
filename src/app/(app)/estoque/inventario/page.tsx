@@ -14,10 +14,15 @@ export default async function Inventario({ searchParams }: { searchParams: Promi
     const podem = (await c.query("select id, nome from app.depositos where ativo and app.pode_operar_deposito(id) order by tipo, nome")).rows as { id: string; nome: string }[];
     const dep = podem.find((x) => x.id === f.u) ?? podem.find((x) => x.id === atual?.id) ?? podem[0];
     if (!dep) return { podem, dep: null, itens: [] as ItemInventario[] };
-    const itens = (await c.query(`select p.id, p.codigo, p.nome, p.marca, p.gtin, p.foto, p.unidades_caixa::float as caixa,
+    const itens = (await c.query(`select p.id, p.codigo, p.nome, p.marca, p.gtin, p.foto,
+        (select string_agg(kp.nome, ' · ' order by kp.nome) from app.kit_componentes k join app.produtos kp on kp.id = k.kit_id
+          where k.componente_id = p.id and kp.ativo) as kits, p.unidades_caixa::float as caixa,
         coalesce((select array_agg(pc.codigo) from app.produto_codigos pc where pc.produto_id = p.id), '{}') as codigos,
         coalesce((select quantidade from app.estoque_saldos s where s.deposito_id = $1 and s.produto_id = p.id), 0)::float as saldo
-      from app.produtos p where p.tipo <> 'kit' and (p.ativo or exists (select 1 from app.estoque_saldos s where s.deposito_id = $1 and s.produto_id = p.id and s.quantidade <> 0))
+      from app.produtos p where p.tipo <> 'kit' and (p.ativo
+        or exists (select 1 from app.estoque_saldos s where s.deposito_id = $1 and s.produto_id = p.id and s.quantidade <> 0)
+        -- shampoo, condicionador e máscara que só saem em kit: contam por unidade e o kit se forma sozinho
+        or exists (select 1 from app.kit_componentes k join app.produtos kp on kp.id = k.kit_id where k.componente_id = p.id and kp.ativo))
       order by p.marca nulls last, p.nome`, [dep.id])).rows as ItemInventario[];
     return { podem, dep, itens };
   });
