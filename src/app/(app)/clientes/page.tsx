@@ -35,7 +35,7 @@ export default async function Clientes({ searchParams }: { searchParams: Promise
            select count(*) pedidos, sum(valor_total) total, max(data_pedido) ultima, sum(saldo) saldo
              from app.v_pedidos p where p.cliente_id = c.id and p.status_comercial <> 'cancelado') x on true
         where ${cond.join(" and ")}
-        order by x.total desc nulls last, c.nome limit 500`, par)).rows,
+        order by (c.compra_unidade_sugerido_em is not null and not c.compra_unidade and c.categoria_preco = 'normal') desc, lower(c.nome), c.nome limit 500`, par)).rows,
     vendedoras: (await c.query("select id, nome from app.vendedoras where ativo order by nome")).rows,
     // cadastros do site ("Quero ser cliente") esperando virar cliente
     leads: (await c.query(`select s.id, s.nome, s.contato, s.whatsapp, s.cidade, s.documento, s.criado_em, s.vendedora_id

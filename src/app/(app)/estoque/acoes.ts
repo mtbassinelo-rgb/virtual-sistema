@@ -92,3 +92,17 @@ export async function definirKit(fd: FormData) {
       return c.query("select app.definir_kit($1, $2)", [kit, JSON.stringify(comps)]);
     }));
 }
+
+/** Pendências "sem estoque" de marketplace: dá a saída agora nas que já têm saldo. */
+export async function reprocessarPendencias() {
+  const u = await exigirUsuario();
+  let erro: string | null = null, ok = "";
+  try {
+    const r = (await comUsuario(u.id, (c) => c.query("select app.reprocessar_pendencias_estoque() r"))).rows[0].r as { baixadas: number; sem_estoque: number };
+    ok = `${r.baixadas} pendência(s) baixada(s) no estoque.` + (r.sem_estoque ? ` ${r.sem_estoque} continuam sem estoque suficiente.` : "");
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  revalidatePath("/estoque");
+  redirect(`/estoque?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent(ok)}#pendencias`);
+}

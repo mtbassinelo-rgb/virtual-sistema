@@ -4,7 +4,7 @@ import { comUsuario } from "@/lib/db";
 import { dataHora, STATUS_TRANSFERENCIA } from "@/lib/formato";
 import { Avisos, Selo } from "../avisos";
 import {
-  ajustarEstoque, cancelarTransferencia, criarTransferencia, definirKit, entradaCompra, enviarTransferencia, receberTransferencia,
+  ajustarEstoque, cancelarTransferencia, criarTransferencia, definirKit, entradaCompra, enviarTransferencia, receberTransferencia, reprocessarPendencias,
 } from "./acoes";
 
 export const metadata = { title: "Estoque" };
@@ -189,7 +189,12 @@ export default async function Estoque({ searchParams }: { searchParams: Promise<
       {d.pendencias.length > 0 && (
         <section className="painel" id="pendencias">
           <h2>Pendências de estoque</h2>
-          <p className="pequeno suave">Pedidos de marketplace que não deram saída completa no sistema. O estoque oficial ainda é o do Bling: confira e ajuste.</p>
+          <p className="pequeno suave">Pedidos de marketplace que não deram saída completa no sistema. Depois que a mercadoria entrar (ou o código for ligado ao produto certo), dê a baixa aqui.</p>
+          {d.pendencias.some((e) => e.tipo === "sem_estoque") && (
+            <form action={reprocessarPendencias} style={{ margin: "8px 0" }}>
+              <button className="principal">Dar baixa agora nas que já têm estoque</button>
+            </form>
+          )}
           <div className="tabela"><table>
             <thead><tr><th>Quando</th><th>Pedido</th><th>Problema</th><th>Produto / código</th><th>Qtd</th></tr></thead>
             <tbody>{d.pendencias.map((e) => (
