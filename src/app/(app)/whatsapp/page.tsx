@@ -14,6 +14,7 @@ type Conv = {
   conexao: string; pais: string; ultima_enviada: boolean; ultimo_tipo: string; ultimo_texto: string | null; ultima_em: string;
   cliente_id: string | null; cliente: string | null; moeda: Moeda; vendedora_cliente: string | null;
   pedidos: number; valor: string; ultima_compra: string | null;
+  quem_iniciou: boolean | null; chamadas_nossas: number; chamadas_cliente: number;
 };
 type Tempo = { conexao_id: string | null; mediana_min: number | null; respondidas: number };
 type Dia = { dia: string; enviadas: number; recebidas: number };
@@ -23,7 +24,8 @@ const PERIODOS: Record<string, { t: string; dias: number }> = {
   hoje: { t: "Hoje", dias: 0 }, "7": { t: "7 dias", dias: 6 }, "30": { t: "30 dias", dias: 29 }, "90": { t: "90 dias", dias: 89 },
 };
 const FILTROS: Record<string, string> = {
-  todas: "Todas", aguardando: "Esperando resposta", clientes: "Clientes", leads: "Não cadastrados (leads)", com_pedido: "Com pedido no período", novos: "Contatos novos",
+  todas: "Todas", aguardando: "Esperando resposta", ativo: "Vendedora chamou (ativo)", receptivo: "Cliente chamou (receptivo)",
+  sem_retorno: "Vendedora chamou e não teve retorno", clientes: "Clientes", leads: "Não cadastrados (leads)", com_pedido: "Com pedido no período", novos: "Contatos novos",
 };
 const ORDENS: Record<string, string> = {
   recente: "Mais recente", espera: "Esperando há mais tempo", msgs: "Mais mensagens", valor: "Maior valor em pedidos", nome: "Nome (A–Z)",
@@ -64,6 +66,16 @@ export default async function WhatsApp({ searchParams }: {
           from app.whatsapp_mensagens m, per
          where m.em >= per.ini and m.em < per.fim and ($3::uuid is null or m.conexao_id = $3)
          group by 1, 2),
+      cham as (
+        select x.conexao_id, x.contato, x.enviada, x.em
+          from (select y.conexao_id, y.contato, y.enviada, y.em, lag(y.em) over (partition by y.conexao_id, y.contato order by y.em) as ant
+                  from app.whatsapp_mensagens y join conv using (conexao_id, contato)) x, per
+         where (x.ant is null or x.em - x.ant > interval '12 hours') and x.em < per.fim),
+      quem as (
+        select ch.conexao_id, ch.contato, (array_agg(ch.enviada order by ch.em desc))[1] as quem_iniciou,
+               count(*) filter (where ch.enviada and ch.em >= per.ini)::int as chamadas_nossas,
+               count(*) filter (where not ch.enviada and ch.em >= per.ini)::int as chamadas_cliente
+          from cham ch, per group by 1, 2),
       ult as (
         select distinct on (m.conexao_id, m.contato) m.conexao_id, m.contato, m.enviada, m.tipo, m.texto, m.em
           from app.whatsapp_mensagens m join conv using (conexao_id, contato)
@@ -71,11 +83,13 @@ export default async function WhatsApp({ searchParams }: {
       select conv.*, k.nome as contato_nome, k.primeira_em, w.nome as conexao, w.pais,
              u.enviada as ultima_enviada, u.tipo as ultimo_tipo, u.texto as ultimo_texto, u.em as ultima_em,
              cli.id as cliente_id, cli.nome as cliente, coalesce(cli.moeda, case when w.pais = 'PY' then 'GS' else 'BRL' end::app.moeda) as moeda,
+             q.quem_iniciou, coalesce(q.chamadas_nossas, 0) as chamadas_nossas, coalesce(q.chamadas_cliente, 0) as chamadas_cliente,
              vd.nome as vendedora_cliente, coalesce(ped.pedidos, 0) as pedidos, coalesce(ped.valor, 0) as valor, ped.ultima_compra
         from conv
         join app.whatsapp_contatos k using (conexao_id, contato)
         join app.whatsapp_conexoes w on w.id = conv.conexao_id
         join ult u using (conexao_id, contato)
+        left join quem q using (conexao_id, contato)
         left join lateral (
           select c.id, c.nome, c.moeda, c.vendedora_id from app.clientes c
            where conv.contato not like 'lid:%' and c.mesclado_em is null
@@ -120,10 +134,13 @@ export default async function WhatsApp({ searchParams }: {
   const agora = Date.now();
   const esperaMin = (c: Conv) => (c.ultima_enviada ? 0 : (agora - new Date(c.ultima_em).getTime()) / 60000);
   const inicioPeriodo = new Date(`${de}T00:00:00-03:00`).getTime();
+  const semRetorno = (c: Conv) => c.quem_iniciou === true && c.recebidas === 0;
+  const somaN = (l: Conv[], k: "chamadas_nossas" | "chamadas_cliente") => l.reduce((s, c) => s + c[k], 0);
   const ehNovo = (c: Conv) => new Date(c.primeira_em).getTime() >= inicioPeriodo;
 
   const lista = convs
-    .filter((c) => filtro === "todas" || (filtro === "aguardando" && !c.ultima_enviada) || (filtro === "clientes" && c.cliente_id)
+    .filter((c) => filtro === "todas" || (filtro === "aguardando" && !c.ultima_enviada)
+      || (filtro === "ativo" && c.quem_iniciou === true) || (filtro === "receptivo" && c.quem_iniciou === false) || (filtro === "sem_retorno" && semRetorno(c)) || (filtro === "clientes" && c.cliente_id)
       || (filtro === "leads" && !c.cliente_id) || (filtro === "com_pedido" && c.pedidos > 0) || (filtro === "novos" && ehNovo(c)))
     .filter((c) => !busca || [c.cliente, c.contato_nome, c.contato, c.ultimo_texto].some((t) => (t ?? "").toLowerCase().includes(busca)))
     .sort((a, b) => {
@@ -191,6 +208,12 @@ export default async function WhatsApp({ searchParams }: {
             <div className="indicador"><span className="rotulo">Recebidas</span><span className="valor">{soma(convs, "recebidas").toLocaleString("pt-BR")}</span></div>
             <div className="indicador"><span className="rotulo">Conversas</span><span className="valor">{convs.length}</span>
               <span className="pequeno suave">{convs.filter(ehNovo).length} contato(s) novo(s)</span></div>
+            <a className="indicador" href={url({ f: "ativo" })} style={{ textDecoration: "none", color: "inherit" }}>
+              <span className="rotulo">Vendedora chamou</span><span className="valor">{somaN(convs, "chamadas_nossas")}</span>
+              <span className="pequeno suave">Contatos puxados por ela · {convs.filter(semRetorno).length} sem retorno</span></a>
+            <a className="indicador" href={url({ f: "receptivo" })} style={{ textDecoration: "none", color: "inherit" }}>
+              <span className="rotulo">Cliente chamou</span><span className="valor">{somaN(convs, "chamadas_cliente")}</span>
+              <span className="pequeno suave">Contatos que chegaram sozinhos</span></a>
             <a className="indicador" href={url({ f: "aguardando", o: "espera" })} style={{ textDecoration: "none", color: "inherit" }}>
               <span className="rotulo">Esperando resposta</span><span className="valor">{aguardando.length}</span>
               <span className="pequeno suave">Última mensagem foi do cliente</span></a>
@@ -206,13 +229,14 @@ export default async function WhatsApp({ searchParams }: {
             <section className="painel">
               <h2>Por número</h2>
               <div className="tabela"><table style={{ minWidth: 0 }}>
-                <thead><tr><th>Número</th><th>Enviadas</th><th>Recebidas</th><th>Conversas</th><th>Esperando</th><th>Tempo de resposta</th><th>Pedidos</th></tr></thead>
+                <thead><tr><th>Número</th><th>Enviadas</th><th>Recebidas</th><th>Conversas</th><th>Ela chamou</th><th>Cliente chamou</th><th>Esperando</th><th>Tempo de resposta</th><th>Pedidos</th></tr></thead>
                 <tbody>{conexoes.map((w) => {
                   const l = convs.filter((c) => c.conexao_id === w.id);
                   const t = tempos.find((x) => x.conexao_id === w.id);
                   return (
                     <tr key={w.id}><td><Link href={url({ w: w.id })}>{w.nome}</Link></td>
                       <td className="num">{soma(l, "enviadas")}</td><td className="num">{soma(l, "recebidas")}</td><td className="num">{l.length}</td>
+                      <td className="num">{somaN(l, "chamadas_nossas")}</td><td className="num">{somaN(l, "chamadas_cliente")}</td>
                       <td className="num">{l.filter((c) => !c.ultima_enviada).length}</td><td className="num">{minutos(t?.mediana_min)}</td>
                       <td className="num">{valorPor(l).map(([m, v]) => dinheiro(v, m as Moeda)).join(" + ") || "—"}</td></tr>);
                 })}</tbody>
@@ -261,7 +285,9 @@ export default async function WhatsApp({ searchParams }: {
                         <Link href={link}>{c.cliente ?? c.contato_nome ?? contatoLegivel(c.contato)}</Link>
                         <div className="pequeno suave">{contatoLegivel(c.contato)}{c.cliente && c.contato_nome && c.contato_nome !== c.cliente ? ` · "${c.contato_nome}"` : ""}</div>
                         {c.cliente_id ? <Selo cor="ok">Cliente{gestao && c.vendedora_cliente ? ` · ${c.vendedora_cliente}` : ""}</Selo> : <Selo cor="info">Lead</Selo>}{" "}
-                        {ehNovo(c) && <Selo cor="marca">Novo</Selo>}
+                        {ehNovo(c) && <Selo cor="marca">Novo</Selo>}{" "}
+                        {c.quem_iniciou === true && <Selo cor={semRetorno(c) ? "aviso" : undefined}>{semRetorno(c) ? "Ela chamou · sem retorno" : "Ela chamou"}</Selo>}
+                        {c.quem_iniciou === false && <Selo>Cliente chamou</Selo>}
                       </td>
                       {conexoes.length > 1 && <td className="pequeno">{c.conexao}</td>}
                       <td style={{ whiteSpace: "normal", minWidth: 220, maxWidth: 360 }}>
@@ -278,7 +304,8 @@ export default async function WhatsApp({ searchParams }: {
               </table></div>
             )}
             <p className="pequeno suave" style={{ margin: 0 }}>Tempo de resposta = mediana entre a primeira mensagem do cliente e a nossa resposta (no período).
-              Pedidos no período = pedidos do cliente (sem cancelados) com data dentro do período. Leads são números que ainda não estão no cadastro de clientes.</p>
+              Pedidos no período = pedidos do cliente (sem cancelados) com data dentro do período. Leads são números que ainda não estão no cadastro de clientes.
+              Quem chamou = quem mandou a primeira mensagem depois de 12 h ou mais sem conversa (vendedora = ativo, cliente = receptivo).</p>
           </section>
         </>
       )}
