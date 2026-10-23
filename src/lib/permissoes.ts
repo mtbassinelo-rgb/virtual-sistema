@@ -32,14 +32,16 @@ export const PERMISSOES: Permissao[] = [
   { chave: "site", nome: "Loja online (banners e destaques)", rotas: ["/site"] },
   { chave: "abertura", nome: "Abertura da loja", rotas: ["/abertura"], gestao: true },
   { chave: "equipe", nome: "Equipe e acessos", rotas: ["/equipe"], gestao: true },
+  { chave: "rh", nome: "RH: funcionários, salários, férias e aniversários", rotas: ["/rh"], gestao: true },
+  { chave: "calendario", nome: "Calendário comercial (datas e dicas de vendas)", rotas: ["/calendario"] },
 ];
 
 const TODAS = PERMISSOES.filter((p) => !p.soDono).map((p) => p.chave);
 const PADRAO: Record<Perfil, string[]> = {
   dono: TODAS,
   gerente: TODAS,
-  consulta: TODAS.filter((c) => c !== "caixa" && c !== "equipe"),
-  vendedora: ["pedidos", "caixa", "clientes", "metas", "promocoes", "catalogo", "procuras", "produtos", "estoque", "relatorios", "comissoes", "site"],
+  consulta: TODAS.filter((c) => c !== "caixa" && c !== "equipe" && c !== "rh"),
+  vendedora: ["pedidos", "caixa", "clientes", "metas", "promocoes", "catalogo", "procuras", "produtos", "estoque", "relatorios", "comissoes", "site", "calendario"],
   estoquista: ["pedidos", "produtos", "estoque", "relatorios", "procuras"],
 };
 

@@ -134,6 +134,15 @@ export default async function AreaInterna({ children }: { children: React.ReactN
           { href: "/comissoes", texto: "Comissões" },
         ] }
       : { id: "financeiro", titulo: "Comissão", icone: "financeiro", itens: [{ href: "/comissoes", texto: "Minha comissão" }] },
+    { id: "rh", titulo: gestao ? "RH e calendário" : "Calendário", icone: "rh", itens: [
+      ...(gestao ? [
+        { href: "/rh", texto: "Painel do RH", dica: "Férias, fim de experiência, aniversários e datas que estão chegando" },
+        { href: "/rh/funcionarios", texto: "Funcionários", dica: "Cadastro, salário, comissão, contrato e contatos" },
+        { href: "/rh/ferias", texto: "Férias", dica: "Saldo, prazo e férias programadas" },
+        { href: "/rh/aniversariantes", texto: "Aniversariantes do mês" },
+      ] : []),
+      { href: "/calendario", texto: "Calendário comercial", dica: "Datas do Brasil e do Paraguai com dicas de vendas e eventos do mês" },
+    ] },
     { id: "admin", titulo: "Configurações", icone: "admin", itens: [
       ...(gestao ? [
         { href: "/parametros", texto: "Parâmetros" },
