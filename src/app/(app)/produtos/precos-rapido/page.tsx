@@ -63,7 +63,7 @@ export default async function PrecosRapido({ searchParams }: {
   const mostrar = f.mostrar ?? "sem-preco";
   const pagina = Math.max(1, Number(f.pagina) || 1);
   const par: unknown[] = [];
-  const cond = ["p.ativo"];
+  const cond = ["p.ativo", "not p.marketplace"];
   if (f.q) { par.push(`%${f.q}%`); cond.push(`(p.nome ilike $${par.length} or p.codigo ilike $${par.length})`); }
   if (f.marca) { par.push(f.marca); cond.push(`p.marca = $${par.length}`); }
   if (mostrar === "sem-preco") cond.push("x.py_normal is null and x.br_normal is null");
@@ -76,7 +76,7 @@ export default async function PrecosRapido({ searchParams }: {
     const total = Number((await c.query(`select count(*) n ${base}`, par)).rows[0].n);
     const linhas = (await c.query(`select p.id, p.codigo, p.nome, p.marca, p.foto, p.unidades_caixa as caixa, x.* ${base}
       order by p.marca nulls last, p.nome limit ${POR_PAGINA} offset ${(pagina - 1) * POR_PAGINA}`, par)).rows as LinhaPreco[];
-    const marcas = (await c.query("select marca, count(*)::int n from app.produtos where ativo and marca is not null group by marca order by marca")).rows as { marca: string; n: number }[];
+    const marcas = (await c.query("select marca, count(*)::int n from app.produtos where ativo and not marketplace and marca is not null group by marca order by marca")).rows as { marca: string; n: number }[];
     return { total, linhas, marcas };
   });
   const paginas = Math.max(1, Math.ceil(d.total / POR_PAGINA));

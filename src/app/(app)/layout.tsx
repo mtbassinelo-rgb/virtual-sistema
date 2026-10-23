@@ -25,7 +25,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
            ${gestao ? `(select count(*) from app.v_despesas where situacao = 'vencida')::int` : "0"} as contas_vencidas,
            ${gestao ? `(select count(*) from app.procuras where visto_em is null)::int` : "0"} as procuras,
            ${gestao ? `(select count(*) from app.fotos_catalogo where status = 'pendente')::int` : "0"} as fotos,
-           (select count(*) from app.produtos p where p.ativo and not exists (select 1 from app.precos z where z.produto_id = p.id))::int as sem_preco,
+           (select count(*) from app.produtos p where p.ativo and not p.marketplace and not exists (select 1 from app.precos z where z.produto_id = p.id))::int as sem_preco,
            (select count(*) from app.produtos p where p.ativo and p.mostrar_no_site and (not exists (select 1 from app.precos z where z.produto_id = p.id and z.tabela = 'br_normal') or not exists (select 1 from app.precos z where z.produto_id = p.id and z.tabela = 'py_normal')))::int as fora_site,
            (select count(*) from app.carrinhos_parados() where avisado_em is null)::int as carrinhos,
            (select count(*) from app.procuras_chegaram())::int as chegaram,
@@ -55,6 +55,11 @@ export default async function AreaInterna({ children }: { children: React.ReactN
       { href: "/caixa/contas", texto: "Contas da unidade", dica: "Contas a pagar da unidade em que você trabalha (ex.: CDE)" },
       ...(gestao ? [{ href: "/pedidos?desconto=pendente", texto: "Descontos a liberar", contador: n.descontos, dica: "Pedidos do site que atingiram o desconto por quantidade: o gerente libera ou não" }] : []),
       ...(gestao ? [{ href: "/pedidos?remocao=pendente", texto: "Tirar produto: autorizar", contador: n.remocoes, dica: "Vendedora pediu para tirar um produto sem estoque do pedido (cliente não quis trocar)" }] : []),
+    ] },
+    { id: "marketplace", titulo: "Marketplace", icone: "marketplace", itens: [
+      { href: "/marketplace", texto: "Visão geral", dica: "Shopee, Mercado Livre, TikTok: vendas do mês e o que pede atenção" },
+      { href: "/marketplace?aba=anuncios", texto: "Anúncios e kits", dica: "Kits dos marketplaces, composição, quanto dá para montar e o que mais vende" },
+      { href: "/estoque/marketplace", texto: "Lançar vendas do dia", dica: "Relatório do dia: pedidos entram e o estoque sai" },
     ] },
     { id: "clientes", titulo: "Clientes", icone: "clientes", itens: [
       { href: "/clientes/recompra", texto: "Recompra (quem chamar)", dica: "Clientes que passaram do ritmo normal de compra, com WhatsApp pronto" },
@@ -91,7 +96,6 @@ export default async function AreaInterna({ children }: { children: React.ReactN
       { href: "/estoque/separacao", texto: "Área do estoquista", contador: n.a_separar, dica: "Pedidos e transferências a separar" },
       { href: "/estoque/transferencias", texto: "Pedidos entre unidades", contador: n.transf_acao, dica: "A aprovar ou a receber" },
       { href: "/estoque", texto: "Saldo e movimentos" },
-      { href: "/estoque/marketplace", texto: "Vendas Shopee / Mercado Livre", dica: "Lance o relatório do dia: pedidos entram e o estoque sai" },
       { href: "/estoque/inventario", texto: "Inventário (contagem)" },
       { href: "/relatorios?aba=estoque", texto: "Para comprar / estoque baixo" },
       { href: "/relatorios/compra", texto: "Planejar compra por marca", dica: "Escolha a marca: estoque, venda por mês, quando acaba e quanto comprar" },

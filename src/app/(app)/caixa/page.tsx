@@ -47,7 +47,7 @@ export default async function Caixa({ searchParams }: { searchParams: Promise<{ 
     const esp = (await c.query("select app.caixa_esperado($1, 'GS') gs, app.caixa_esperado($1, 'BRL') brl", [caixa.id])).rows[0];
     const produtos = (await c.query(`select p.id, p.codigo, p.nome, p.gtin, p.unidades_caixa as caixa,
          coalesce((select quantidade from app.estoque_saldos s where s.deposito_id = $1 and s.produto_id = p.id), 0)::float as saldo
-       from app.produtos p where p.ativo order by p.nome`, [unidade.id])).rows as ProdutoPdv[];
+       from app.produtos p where p.ativo and not p.marketplace order by p.nome`, [unidade.id])).rows as ProdutoPdv[];
     const clientes = (await c.query(`select id, nome, moeda from app.clientes where mesclado_em is null and ativo
        and app.deposito_do_cliente(id) = $1 order by nome`, [unidade.id])).rows as ClientePdv[];
     const pedidos = (await c.query(`select p.id, p.moeda, p.status_comercial::text as status, coalesce(cl.nome, 'Cliente avulso') as cliente, p.data_pedido,

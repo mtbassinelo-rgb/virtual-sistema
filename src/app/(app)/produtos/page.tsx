@@ -42,6 +42,8 @@ export default async function Produtos({ searchParams }: { searchParams: Promise
   else if (f.marca) { par.push(f.marca); cond.push(`p.marca = $${par.length}`); }
   if (f.tipo === "kit") cond.push("p.tipo = 'kit'");
   if (f.tipo === "simples") cond.push("p.tipo <> 'kit'");
+  // Kits e anúncios de marketplace têm área própria (Marketplace); aqui só aparecem se escolher esse tipo
+  cond.push(f.tipo === "marketplace" ? "p.marketplace" : "not p.marketplace");
   const filtros: Record<string, string> = {
     "abaixo-minimo": "p.estoque_minimo is not null and p.tipo <> 'kit' and s.saldo <= p.estoque_minimo",
     "sem-estoque": "p.tipo <> 'kit' and s.saldo <= 0",
@@ -77,7 +79,7 @@ export default async function Produtos({ searchParams }: { searchParams: Promise
         p.estoque_minimo, s.saldo, x.*, ${promo("PY", "py_normal", "GS")} as promo_py, ${promo("BR", "br_normal", "BRL")} as promo_br,
         (select max(pr.fim) from app.promocoes pr where pr.produto_id = p.id and pr.status = 'aprovada' and current_date between pr.inicio and pr.fim)::text as promo_fim
         ${base} order by ${ordem[1]} limit ${POR_PAGINA} offset ${(pagina - 1) * POR_PAGINA}`, par)).rows as LinhaProduto[];
-    const marcas = (await c.query("select marca, count(*)::int n from app.produtos where ativo and marca is not null group by marca order by marca")).rows as { marca: string; n: number }[];
+    const marcas = (await c.query("select marca, count(*)::int n from app.produtos where ativo and not marketplace and marca is not null group by marca order by marca")).rows as { marca: string; n: number }[];
     const abaixo = Number((await c.query("select count(*) n from app.v_abaixo_minimo")).rows[0].n);
     const fotosPendentes = gestao ? Number((await c.query("select count(*) n from app.fotos_catalogo where status = 'pendente'")).rows[0].n) : 0;
     return { total, lista, marcas, abaixo, fotosPendentes };
@@ -134,7 +136,7 @@ export default async function Produtos({ searchParams }: { searchParams: Promise
         </label>
         <label>Tipo
           <select name="tipo" defaultValue={f.tipo ?? ""}>
-            <option value="">Todos</option><option value="simples">Unidade</option><option value="kit">Kit</option>
+            <option value="">Todos</option><option value="simples">Unidade</option><option value="kit">Kit</option><option value="marketplace">Marketplace (Shopee, ML…)</option>
           </select>
         </label>
         <label>Ordenar por

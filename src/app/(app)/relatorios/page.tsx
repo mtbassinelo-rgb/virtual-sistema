@@ -99,11 +99,11 @@ export default async function Relatorios({ searchParams }: { searchParams: Promi
         count(*) filter (where ativo and mostrar_no_site and foto is null)::int sem_foto,
         count(*) filter (where ativo and unidades_caixa is null)::int sem_caixa,
         count(*) filter (where not ativo)::int inativos
-      from app.produtos p`)).rows[0];
+      from app.produtos p where not p.marketplace`)).rows[0];
     const marcas = (await c.query(`select coalesce(marca, 'Sem marca') marca, count(*)::int total,
         count(*) filter (where not exists (select 1 from app.precos z where z.produto_id = p.id))::int sem_preco,
         count(*) filter (where foto is null)::int sem_foto
-      from app.produtos p where ativo group by 1 order by sem_preco desc, total desc`)).rows;
+      from app.produtos p where ativo and not marketplace group by 1 order by sem_preco desc, total desc`)).rows;
     const fotos = ehGestao(u) ? Number((await c.query("select count(*) n from app.fotos_catalogo where status = 'pendente'")).rows[0].n) : 0;
     return { cat, marcas, fotos };
   });

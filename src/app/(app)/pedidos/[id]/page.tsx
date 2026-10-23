@@ -82,7 +82,7 @@ export default async function Pedido({ params, searchParams }: {
     const editavelItens = p.origem !== "bling" && !fluxo?.total_confirmado_em
       && ["aguardando_cliente", "aguardando_aprovacao", "em_separacao"].includes(p.status_comercial);
     const produtos = editavelItens
-      ? (await c.query("select codigo, nome from app.produtos where ativo and codigo is not null order by nome")).rows as { codigo: string; nome: string }[]
+      ? (await c.query("select codigo, nome from app.produtos where ativo and not marketplace and codigo is not null order by nome")).rows as { codigo: string; nome: string }[]
       : [];
     return { p, cliente, itens, fluxo, transf, bling, pagamentos, comprovantes, atendimentos, depositos, historico, indisponiveis,
              trocas, remocoes, editavelItens, produtos };

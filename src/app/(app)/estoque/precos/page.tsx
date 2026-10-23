@@ -70,7 +70,7 @@ export default async function Precos({ searchParams }: { searchParams: Promise<{
   if (!ehGestao(u)) return <div className="painel">Só gerente ou dono altera preços.</div>;
   const r = await comUsuario(u.id, async (c) => (await c.query(`
     select t.codigo, t.nome, count(distinct p.produto_id) as com_preco,
-           (select count(*) from app.produtos where ativo) as total
+           (select count(*) from app.produtos where ativo and not marketplace) as total
       from app.tabelas_preco t left join app.precos p on p.tabela = t.codigo
      group by t.codigo, t.nome order by t.pais desc, t.codigo`)).rows);
   return (

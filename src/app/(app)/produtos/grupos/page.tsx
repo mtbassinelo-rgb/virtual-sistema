@@ -12,7 +12,7 @@ type Ativo = ProdutoGrupo & { codigo: string; grupo: string | null };
 type Grupo = { grupo: string; marca: string | null; itens: { id: string; nome: string; codigo: string; variante: string | null }[] };
 
 const carregar = (uid: string) => comUsuario(uid, async (c) => {
-  const ativos = (await c.query("select id, codigo, nome, marca, tipo, grupo from app.produtos where ativo order by nome")).rows as Ativo[];
+  const ativos = (await c.query("select id, codigo, nome, marca, tipo, grupo from app.produtos where ativo and not marketplace order by nome")).rows as Ativo[];
   const grupos = (await c.query(`select grupo, min(marca) marca, json_agg(json_build_object('id', id, 'nome', nome, 'codigo', codigo, 'variante', variante) order by variante) itens
                                    from app.produtos where ativo and grupo is not null group by grupo order by min(marca), grupo`)).rows as Grupo[];
   return { ativos, livres: ativos.filter((p) => !p.grupo), grupos };

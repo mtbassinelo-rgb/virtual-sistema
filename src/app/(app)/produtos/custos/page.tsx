@@ -24,7 +24,7 @@ export default async function RevisarCustos({ searchParams }: { searchParams: Pr
         select p.id, p.codigo, p.nome, p.marca, app.custo_produto(p.id) custo, p.custo_origem origem, p.unidades_caixa,
                ${ultimo("py_normal")} py_normal, ${ultimo("br_normal")} br_normal,
                coalesce((select sum(quantidade) from app.estoque_saldos s where s.produto_id = p.id), 0)::float estoque
-          from app.produtos p where p.ativo and p.codigo is not null) x
+          from app.produtos p where p.ativo and not p.marketplace and p.codigo is not null) x
        where x.custo > 0 and ((x.py_normal > 0 and x.custo * $1 >= x.py_normal * 0.9) or (x.br_normal > 0 and x.custo >= x.br_normal * 0.9))
        order by x.marca nulls last, x.nome`, [cambio])).rows as L[];
     return { cambio, linhas };

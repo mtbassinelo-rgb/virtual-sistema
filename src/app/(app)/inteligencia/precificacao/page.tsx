@@ -18,7 +18,8 @@ export default async function Precificacao({ searchParams }: { searchParams: Pro
   const d = await comUsuario(u.id, async (c) => {
     // Produto vendido só em kit (shampoo, condicionador e máscara fora do site) não aparece solto: o preço é o do kit
     const linhas = (await c.query(`select * from app.precificacao_py() x
-      where not exists (select 1 from app.kit_componentes k join app.produtos c on c.id = k.componente_id join app.produtos kt on kt.id = k.kit_id
+      where not exists (select 1 from app.produtos mp where mp.id = x.produto_id and mp.marketplace)
+        and not exists (select 1 from app.kit_componentes k join app.produtos c on c.id = k.componente_id join app.produtos kt on kt.id = k.kit_id
                          where k.componente_id = x.produto_id and not c.mostrar_no_site and kt.ativo)`)).rows as LinhaPrec[];
     const params = Object.fromEntries((await c.query(`select chave, valor from app.parametros
       where chave in ('cambio_custo_gs','margem_minima_contribuicao','arredondamento_gs','margem_alvo_normal','margem_alvo_vip','frete_padrao_brl')`)).rows.map((r) => [r.chave as string, Number(r.valor)]));
@@ -27,7 +28,7 @@ export default async function Precificacao({ searchParams }: { searchParams: Pro
         coalesce(mi.gatilho, false) gatilho, coalesce(mi.papel, 'acompanhar') papel, mi.margem_alvo_normal, mi.margem_alvo_vip,
         app.retirada_foz_marca(coalesce(nullif(trim(p.marca), ''), 'Sem marca')) desconto_local
       from app.produtos p left join app.marcas_inteligencia mi on mi.marca = coalesce(nullif(trim(p.marca), ''), 'Sem marca')
-      where p.ativo group by 1, 3, 4, 5, 6 order by 3 desc, 2 desc`)).rows as
+      where p.ativo and not p.marketplace group by 1, 3, 4, 5, 6 order by 3 desc, 2 desc`)).rows as
       { marca: string; n: number; gatilho: boolean; papel: string; margem_alvo_normal: string | null; margem_alvo_vip: string | null; desconto_local: boolean }[];
     const cats = (await c.query("select * from app.categorias_publicas()")).rows as CategoriaDb[];
     const subs = (await c.query("select * from app.subcategorias_publicas()")).rows as SubLinhaDb[];

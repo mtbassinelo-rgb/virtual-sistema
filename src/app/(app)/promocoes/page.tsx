@@ -24,7 +24,7 @@ export default async function Promocoes({ searchParams }: { searchParams: Promis
         order by case pr.status when 'proposta' then 0 when 'aprovada' then 1 else 2 end, pr.fim`)).rows,
     giro: (await c.query(
       `select * from app.v_giro where situacao in ('parado','baixo') order by situacao, cobertura_dias desc nulls first limit 60`)).rows,
-    produtos: (await c.query("select id, codigo, nome from app.produtos where ativo order by nome")).rows,
+    produtos: (await c.query("select id, codigo, nome from app.produtos where ativo and not marketplace order by nome")).rows,
     parametros: (await c.query("select chave, valor from app.parametros")).rows as { chave: string; valor: string }[],
     descontos: (await c.query("select * from app.descontos_quantidade order by ativo desc, marca nulls first, min_qtd")).rows,
     marcas: (await c.query("select distinct marca from app.produtos where ativo and marca is not null order by 1")).rows.map((x) => x.marca as string),

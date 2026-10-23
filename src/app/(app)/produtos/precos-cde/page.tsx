@@ -18,7 +18,7 @@ export default async function PrecosCde({ searchParams }: { searchParams: Promis
     const linhas = (await c.query(`select p.id, p.codigo, p.nome, p.marca, app.custo_produto(p.id) custo,
         ${ultimo("py_normal")} py_normal, ${ultimo("py_vip")} py_vip, ${ultimo("cde_normal")} cde_normal, ${ultimo("cde_vip")} cde_vip,
         coalesce((select quantidade from app.estoque_saldos s join app.depositos dd on dd.id = s.deposito_id where dd.codigo = 'loja-cde' and s.produto_id = p.id), 0)::float estoque_cde
-      from app.produtos p where p.ativo and p.codigo is not null
+      from app.produtos p where p.ativo and not p.marketplace and p.codigo is not null
         and ($1::text is null or p.marca = $1) and ($2::text is null or p.nome ilike '%' || $2 || '%' or p.codigo ilike $2 || '%')
       order by p.marca nulls last, p.nome limit 600`, [f.marca || null, f.q || null])).rows;
     const marcas = (await c.query("select distinct marca from app.produtos where ativo and marca is not null order by marca")).rows.map((r) => r.marca as string);

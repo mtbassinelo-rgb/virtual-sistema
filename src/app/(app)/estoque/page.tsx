@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { exigirUsuario, ehGestao } from "@/lib/auth";
 import { unidadeSistema } from "@/lib/unidade-sistema";
 import { comUsuario } from "@/lib/db";
@@ -30,7 +31,8 @@ export default async function Estoque({ searchParams }: { searchParams: Promise<
     const kits = (await c.query(
       `select k.id, k.codigo, k.nome, string_agg(kc.quantidade::int || '× ' || c.nome, ' + ' order by c.nome) as composicao
          from app.produtos k join app.kit_componentes kc on kc.kit_id = k.id join app.produtos c on c.id = kc.componente_id
-        where k.tipo = 'kit' and k.ativo group by k.id order by k.nome`)).rows;
+        where k.tipo = 'kit' and k.ativo and not k.marketplace group by k.id order by k.nome`)).rows;
+    const kitsTodos = ehGestao(u) ? (await c.query("select codigo, nome from app.produtos where ativo and codigo is not null order by nome")).rows as { codigo: string; nome: string }[] : [];
     const transferencias = (await c.query(
       `select t.*, o.nome as origem, de.nome as destino, uc.nome as criada_nome,
               app.pode_operar_deposito(t.origem_id) as opera_origem, app.pode_operar_deposito(t.destino_id) as opera_destino,
@@ -44,8 +46,8 @@ export default async function Estoque({ searchParams }: { searchParams: Promise<
          left join app.produtos p on p.id = i.produto_id
         group by t.id, o.nome, de.nome, uc.nome
         order by case t.status when 'enviada' then 0 when 'rascunho' then 1 else 2 end, t.numero desc limit 50`)).rows;
-    const produtos = (await c.query("select id, codigo, nome from app.produtos where ativo order by nome")).rows;
-    return { depositos, saldos, transferencias, produtos, pendencias, kits };
+    const produtos = (await c.query("select id, codigo, nome from app.produtos where ativo and not marketplace order by nome")).rows;
+    return { depositos, saldos, transferencias, produtos, pendencias, kits, kitsTodos };
   });
 
   // Tabela: uma linha por produto, uma coluna por depósito
@@ -159,7 +161,8 @@ export default async function Estoque({ searchParams }: { searchParams: Promise<
       {(d.kits.length > 0 || ehGestao(u)) && (
         <section className="painel" id="kits">
           <h2>Kits</h2>
-          <p className="pequeno suave">Kit não tem estoque próprio: ao vender, saem os componentes. A disponibilidade é a do componente que acabar primeiro.</p>
+          <p className="pequeno suave">Kit não tem estoque próprio: ao vender, saem os componentes. A disponibilidade é a do componente que acabar primeiro.
+            Os kits dos marketplaces (Shopee, Mercado Livre…) ficam em <Link href="/marketplace?aba=anuncios">Marketplace → Anúncios e kits</Link>.</p>
           {d.kits.length === 0 ? <p className="suave">Nenhum kit montado ainda.</p> :
             <ul className="lista-simples">{d.kits.map((k) => <li key={k.id}><b>{k.nome}</b> <span className="suave">({k.codigo})</span>: {k.composicao}</li>)}</ul>}
           {ehGestao(u) && (
@@ -167,7 +170,8 @@ export default async function Estoque({ searchParams }: { searchParams: Promise<
               <summary>Montar ou alterar um kit</summary>
               <form action={definirKit} className="campos" style={{ marginTop: 10 }}>
                 <label className="largo">Produto que é o kit
-                  <input name="kit" list="lista-produtos" required placeholder="Ex.: MPLA-CM" autoComplete="off" />
+                  <input name="kit" list="lista-kits-todos" required placeholder="Ex.: MPLA-CM" autoComplete="off" />
+                  <datalist id="lista-kits-todos">{d.kitsTodos.map((p) => <option key={p.codigo} value={p.codigo}>{p.nome}</option>)}</datalist>
                 </label>
                 {[0, 1, 2, 3, 4, 5].map((i) => (
                   <div key={i} className="largo linha">

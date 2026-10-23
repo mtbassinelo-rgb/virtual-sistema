@@ -32,6 +32,7 @@ export const PERMISSOES: Permissao[] = [
   { chave: "site", nome: "Loja online (banners e destaques)", rotas: ["/site"] },
   { chave: "abertura", nome: "Abertura da loja", rotas: ["/abertura"], gestao: true },
   { chave: "equipe", nome: "Equipe e acessos", rotas: ["/equipe"], gestao: true },
+  { chave: "marketplace", nome: "Marketplace (Shopee, Mercado Livre, TikTok): anúncios, kits e vendas", rotas: ["/marketplace"] },
   { chave: "rh", nome: "RH: funcionários, salários, férias e aniversários", rotas: ["/rh"], gestao: true },
   { chave: "calendario", nome: "Calendário comercial (datas e dicas de vendas)", rotas: ["/calendario"] },
 ];

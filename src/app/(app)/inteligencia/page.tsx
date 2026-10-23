@@ -59,7 +59,7 @@ export default async function Inteligencia({ searchParams }: {
   const gerir = ehGestao(u);
 
   const d = await comUsuario(u.id, async (c) => ({
-    linhas: (await c.query("select * from app.rentabilidade_py() order by marca nulls last, nome")).rows as Linha[],
+    linhas: (await c.query(`select * from app.rentabilidade_py() r where not exists (select 1 from app.produtos mp where mp.id = r.produto_id and mp.marketplace) order by marca nulls last, nome`)).rows as Linha[],
     custos: (await c.query("select * from app.custos_variaveis_vigentes('PY') order by tipo, base")).rows as
       { tipo: string; base: string; percentual: string | null; valor: string | null; vigente_desde: string; observacao: string | null }[],
     historico: aba.k === "custos" ? (await c.query(`select c.*, us.nome as quem from app.custos_variaveis c left join app.usuarios us on us.id = c.definido_por
@@ -67,7 +67,7 @@ export default async function Inteligencia({ searchParams }: {
     fretes: aba.k === "custos" ? (await c.query(`select coalesce(p.marca, 'Sem marca') as marca, count(*)::int produtos,
         count(*) filter (where p.frete_unidade_brl is not null)::int excecoes, f.frete_unidade_brl, f.observacao
         from app.produtos p left join app.frete_marca f on f.marca = p.marca
-        where p.ativo group by 1, f.frete_unidade_brl, f.observacao order by (f.frete_unidade_brl is null) desc, produtos desc`)).rows : [],
+        where p.ativo and not p.marketplace group by 1, f.frete_unidade_brl, f.observacao order by (f.frete_unidade_brl is null) desc, produtos desc`)).rows : [],
     classes: aba.k === "classificacao" ? await (async () => {
       await c.query("select app.registrar_classificacao_py()");
       return (await c.query("select * from app.classificacao_py()")).rows as

@@ -21,7 +21,7 @@ export default async function NovoOrcamento({ searchParams }: { searchParams: Pr
     clientes: (await c.query(`select c.id, c.nome, c.tabela_preco, v.nome vendedora from app.clientes c join app.vendedoras v on v.id = c.vendedora_id
       where c.mesclado_em is null and c.ativo order by c.nome`)).rows,
     tabelas: (await c.query("select codigo, nome from app.tabelas_preco order by pais desc, codigo")).rows as { codigo: string; nome: string }[],
-    produtos: (await c.query("select codigo, nome, unidades_caixa from app.produtos where ativo and codigo is not null order by nome")).rows,
+    produtos: (await c.query("select codigo, nome, unidades_caixa from app.produtos where ativo and not marketplace and codigo is not null order by nome")).rows,
     depositos: (await c.query(ehGestao(u) ? "select id, nome, prefixo_tabela from app.depositos where ativo order by nome"
       : `select d.id, d.nome, d.prefixo_tabela from app.depositos d join app.vendedora_depositos vd on vd.deposito_id = d.id where vd.vendedora_id = $1 and d.ativo order by vd.padrao desc`,
       ehGestao(u) ? [] : [u.vendedora_id])).rows,

@@ -34,7 +34,7 @@ export default async function Procuras({ searchParams }: { searchParams: Promise
          left join app.clientes c on c.id = q.cliente_id left join app.usuarios u on u.id = q.criado_por
         order by q.criado_em desc limit 50`)).rows,
     chegaram: (await c.query("select * from app.procuras_chegaram()")).rows as { id: string; produto: string; quantidade: string | null; cliente: string | null; whatsapp: string | null; vendedora: string | null; criado_em: string; estoque: string }[],
-    produtos: (await c.query("select codigo, nome from app.produtos where ativo order by nome limit 3000")).rows,
+    produtos: (await c.query("select codigo, nome from app.produtos where ativo and not marketplace order by nome limit 3000")).rows,
     clientes: (await c.query("select id, nome from app.clientes where mesclado_em is null order by nome limit 2000")).rows,
   }));
 

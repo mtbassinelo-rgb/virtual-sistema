@@ -10,7 +10,7 @@ export async function GET() {
            ${["py_normal", "py_vip", "br_normal", "br_vip"].map((t) => `
            (select valor from app.precos x where x.produto_id = p.id and x.tabela = '${t}' and x.vigente_desde <= current_date
              order by vigente_desde desc limit 1) as ${t}`).join(",")}
-      from app.produtos p where p.ativo order by p.nome`)).rows);
+      from app.produtos p where p.ativo and not p.marketplace order by p.nome`)).rows);
   const br = (v: unknown) => (v == null ? "" : Number(v).toFixed(2).replace(".", ","));
   const gs = (v: unknown) => (v == null ? "" : String(Math.round(Number(v))));
   const q = (s: unknown) => `"${String(s ?? "").replace(/"/g, '""')}"`;
