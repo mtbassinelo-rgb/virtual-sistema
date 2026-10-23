@@ -6,15 +6,22 @@ import { salvarInventario } from "./acoes";
 
 export type ItemInventario = { id: string; codigo: string; nome: string; marca: string | null; gtin: string | null; saldo: number; caixa: number | null; codigos: string[] };
 
-/** "12" → 12 · "2cx" → 2 × peças da caixa · "2x12" → 24 */
-function quantidade(v: string, caixa: number | null): number | null {
+type Modo = "unidade" | "caixa";
+
+/** Por unidade: "12" → 12 peças. Por caixa: "2" → 2 caixas (× peças da caixa).
+ *  Nos dois modos: "2cx" → 2 caixas · "2x12" → 24 · "2cx+5" → 2 caixas e 5 peças soltas. */
+function quantidade(v: string, caixa: number | null, modo: Modo = "unidade"): number | null {
   const t = v.trim().toLowerCase().replace(",", ".");
   if (!t) return null;
-  let m = t.match(/^(\d+(?:\.\d+)?)\s*(cx|caixa|caixas|c)$/);
+  let m = t.match(/^(\d+)\s*(?:cx|caixa|caixas|c)\s*\+\s*(\d+)$/);
+  if (m) return caixa ? Number(m[1]) * caixa + Number(m[2]) : null;
+  m = t.match(/^(\d+(?:\.\d+)?)\s*(cx|caixa|caixas|c)$/);
   if (m) return caixa ? Math.round(Number(m[1]) * caixa) : null;
   m = t.match(/^(\d+)\s*[x*]\s*(\d+)$/);
   if (m) return Number(m[1]) * Number(m[2]);
-  return /^\d+$/.test(t) ? Number(t) : null;
+  if (!/^\d+$/.test(t)) return null;
+  if (modo === "caixa") return caixa ? Number(t) * caixa : Number(t); // produto sem caixa: conta em peças
+  return Number(t);
 }
 
 /**
@@ -25,6 +32,7 @@ export function Contagem({ deposito, itens }: { deposito: string; itens: ItemInv
   const router = useRouter();
   const chave = `vc_inventario_${deposito}`;
   const [contado, setContado] = useState<Record<string, string>>({});
+  const [modo, setModo] = useState<Modo>("unidade");
   // saldo do sistema quando cada produto começou a ser contado (venda no meio da contagem não é desfeita)
   const [bases, setBases] = useState<Record<string, number>>({});
   const [busca, setBusca] = useState("");
@@ -36,10 +44,10 @@ export function Contagem({ deposito, itens }: { deposito: string; itens: ItemInv
   const [salvando, iniciar] = useTransition();
   const campoBipe = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { try { setContado(JSON.parse(localStorage.getItem(chave) ?? "{}")); setBases(JSON.parse(localStorage.getItem(chave + "_base") ?? "{}")); } catch { /* sem armazenamento */ } }, [chave]);
-  useEffect(() => { try { localStorage.setItem(chave, JSON.stringify(contado)); localStorage.setItem(chave + "_base", JSON.stringify(bases)); } catch { /* sem armazenamento */ } }, [contado, bases, chave]);
+  useEffect(() => { try { setContado(JSON.parse(localStorage.getItem(chave) ?? "{}")); setBases(JSON.parse(localStorage.getItem(chave + "_base") ?? "{}")); setModo(localStorage.getItem(chave + "_modo") === "caixa" ? "caixa" : "unidade"); } catch { /* sem armazenamento */ } }, [chave]);
+  useEffect(() => { try { localStorage.setItem(chave, JSON.stringify(contado)); localStorage.setItem(chave + "_base", JSON.stringify(bases)); localStorage.setItem(chave + "_modo", modo); } catch { /* sem armazenamento */ } }, [contado, bases, modo, chave]);
   const marcarBase = (id: string) => setBases((b) => b[id] !== undefined ? b : { ...b, [id]: itens.find((i) => i.id === id)?.saldo ?? 0 });
-  const valor = (i: ItemInventario) => contado[i.id] !== undefined && contado[i.id] !== "" ? quantidade(contado[i.id], i.caixa) : null;
+  const valor = (i: ItemInventario) => contado[i.id] !== undefined && contado[i.id] !== "" ? quantidade(contado[i.id], i.caixa, modo) : null;
 
   const marcas = useMemo(() => [...new Set(itens.map((i) => i.marca ?? ""))].sort(), [itens]);
   const lista = useMemo(() => {
@@ -47,16 +55,17 @@ export function Contagem({ deposito, itens }: { deposito: string; itens: ItemInv
     return itens.filter((i) => (!marca || (i.marca ?? "") === marca)
       && (!q || i.nome.toLowerCase().includes(q) || i.codigo.toLowerCase().includes(q) || i.gtin === q)
       && (so === "todos" || (so === "contados" ? contado[i.id] !== undefined && contado[i.id] !== "" : so === "faltam" ? !contado[i.id] : valor(i) != null && valor(i) !== (bases[i.id] ?? i.saldo))));
-  }, [itens, busca, marca, so, contado]);
+  }, [itens, busca, marca, so, contado, modo]); // eslint-disable-line react-hooks/exhaustive-deps
   const feitos = Object.values(contado).filter((v) => v !== "").length;
-  const resumo = useMemo(() => { let mais = 0, menos = 0; for (const i of itens) { const q = valor(i); if (q == null) continue; const d = q - (bases[i.id] ?? i.saldo); if (d > 0) mais += d; else menos -= d; } return { mais, menos }; }, [itens, contado, bases]); // eslint-disable-line react-hooks/exhaustive-deps
+  const resumo = useMemo(() => { let mais = 0, menos = 0; for (const i of itens) { const q = valor(i); if (q == null) continue; const d = q - (bases[i.id] ?? i.saldo); if (d > 0) mais += d; else menos -= d; } return { mais, menos }; }, [itens, contado, bases, modo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function bipar(codigo: string) {
     const c = codigo.trim();
     const p = itens.find((i) => i.gtin === c || i.codigo.toLowerCase() === c.toLowerCase() || i.codigos?.some((x) => x.toLowerCase() === c.toLowerCase()));
     if (!p) { setMsg({ erro: `Código ${c} não encontrado. Procure pelo nome e digite a quantidade.` }); return; }
     marcarBase(p.id);
-    setContado((m) => ({ ...m, [p.id]: String((quantidade(m[p.id] ?? "", p.caixa) ?? 0) + 1) }));
+    // bipe soma 1 no modo escolhido: 1 peça (por unidade) ou 1 caixa (por caixa)
+    setContado((m) => ({ ...m, [p.id]: /^\d*$/.test((m[p.id] ?? "").trim()) ? String(Number(m[p.id] || 0) + 1) : m[p.id] }));
     setUltimo(p.id); setMsg({}); setBipe("");
   }
 
@@ -76,7 +85,18 @@ export function Contagem({ deposito, itens }: { deposito: string; itens: ItemInv
   return (
     <>
       <section className="painel">
-        <label>Leitor de código de barras: bipe cada peça (soma 1)
+        <div className="linha" role="group" aria-label="Contar em" style={{ alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+          <b>Contar em:</b>
+          <button type="button" className={modo === "unidade" ? "principal" : ""} aria-pressed={modo === "unidade"} disabled={feitos > 0 && modo !== "unidade"}
+                  onClick={() => setModo("unidade")}>Unidades (peças)</button>
+          <button type="button" className={modo === "caixa" ? "principal" : ""} aria-pressed={modo === "caixa"} disabled={feitos > 0 && modo !== "caixa"}
+                  onClick={() => setModo("caixa")}>Caixas fechadas</button>
+          <span className="pequeno suave">{modo === "unidade"
+            ? <>Digite quantas <b>peças</b> contou (ex.: 30). Também aceita 2cx ou 2cx+5.</>
+            : <>Digite quantas <b>caixas</b> contou (ex.: 2). Para caixas e peças soltas: 2+5 vira 2cx+5. Produto sem caixa conta em peças.</>}
+            {feitos > 0 ? " Para trocar o modo, salve ou recomece a contagem." : ""}</span>
+        </div>
+        <label>Leitor de código de barras: bipe cada {modo === "unidade" ? "peça" : "caixa"} (soma 1)
           <input ref={campoBipe} value={bipe} autoFocus onChange={(e) => setBipe(e.target.value)} placeholder="Bipe aqui"
                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (bipe.trim()) bipar(bipe); } }} />
         </label>
@@ -99,9 +119,9 @@ export function Contagem({ deposito, itens }: { deposito: string; itens: ItemInv
           return (
             <tr key={i.id} className={i.id === ultimo ? "linha-destaque" : ""}>
               <td>{i.nome}<div className="pequeno suave">{i.codigo}{i.marca ? ` · ${i.marca}` : ""}{i.caixa ? ` · caixa com ${i.caixa}` : ""}</div></td>
-              <td className="num">{i.saldo.toLocaleString("pt-BR")}</td>
-              <td className="num"><input value={v ?? ""} style={{ width: 80 }} aria-label={`Contado de ${i.nome}`} placeholder={i.caixa ? "ex.: 2cx" : ""}
-                    onChange={(e) => { marcarBase(i.id); setContado((m) => ({ ...m, [i.id]: e.target.value.replace(/[^\dcxaiCXAI.,*\s]/g, "") })); }} />
+              <td className="num">{i.saldo.toLocaleString("pt-BR")} pç{i.caixa && i.caixa > 1 ? <div className="pequeno suave">{Math.floor(i.saldo / i.caixa)} cx{i.saldo % i.caixa ? ` + ${i.saldo % i.caixa} pç` : ""}</div> : null}</td>
+              <td className="num"><input value={v ?? ""} style={{ width: 80 }} aria-label={`Contado de ${i.nome}`} placeholder={modo === "caixa" && i.caixa ? "caixas" : "peças"}
+                    onChange={(e) => { marcarBase(i.id); setContado((m) => ({ ...m, [i.id]: e.target.value.replace(/[^\dcxaiCXAI.,*+\s]/g, "").replace(/^(\d+)\+/, modo === "caixa" ? "$1cx+" : "$1+") })); }} />
                 {v && q != null && String(q) !== v.trim() && <div className="pequeno suave">= {q} pç</div>}
                 {v && q == null && <div className="pequeno texto-erro">inválido</div>}</td>
               <td className={`num ${dif ? "texto-erro" : ""}`}>{dif == null ? "" : dif > 0 ? `+${dif}` : dif}</td>
