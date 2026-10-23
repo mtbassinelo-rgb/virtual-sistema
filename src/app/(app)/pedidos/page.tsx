@@ -9,13 +9,97 @@ export const metadata = { title: "Pedidos" };
 
 type Filtros = {
   q?: string; vendedora?: string; de?: string; ate?: string; comercial?: string;
-  pagamento?: string; modalidade?: string; canal?: string; deposito?: string; desconto?: string;
+  pagamento?: string; modalidade?: string; canal?: string; deposito?: string; desconto?: string; origem?: string;
 };
 
 const ATALHOS: [string, string][] = [
   ["", "Todos"], ["pago", "Pagos"], ["aguardando", "Aguardando pagamento"], ["a_credito", "A crédito"],
   ["parcial", "Parcialmente pagos"], ["atrasado", "Atrasados"], ["cancelado", "Cancelados"],
 ];
+
+type Resumo = {
+  hoje: string; site: { moeda: Moeda; n: number; t: string }[]; siteSolic: number;
+  mk: { dia: string; canal: string; nome: string; n: number; t: string; taxa: string }[];
+  geral: { grupo: string; moeda: Moeda; n: number; t: string }[];
+};
+
+function ResumoVendas({ r }: { r: Resumo }) {
+  const brl = (v: number) => dinheiro(v, "BRL");
+  const hojeMk = r.mk.filter((x) => x.dia === r.hoje);
+  const canaisMk = [...new Map(r.mk.map((x) => [x.canal, x.nome])).entries()];
+  if (!canaisMk.some(([c]) => c === "shopee")) canaisMk.push(["shopee", "Shopee"]);
+  if (!canaisMk.some(([c]) => c === "mercado_livre")) canaisMk.push(["mercado_livre", "Mercado Livre"]);
+  const dias = [...new Set(r.mk.map((x) => x.dia))];
+  const grupos = [...new Set(r.geral.map((g) => g.grupo))];
+  const soma = (m: Moeda) => r.geral.filter((g) => g.moeda === m).reduce((s, g) => s + Number(g.t), 0);
+  return (
+    <>
+      <section className="painel" style={{ borderLeft: "4px solid var(--marca, #7b2d5b)" }}>
+        <div className="linha entre" style={{ flexWrap: "wrap" }}>
+          <h2 style={{ margin: 0 }}>Vendas do nosso site · hoje</h2>
+          <Link href={`/pedidos?origem=portal&de=${r.hoje}`}>ver pedidos do site</Link>
+        </div>
+        <div className="indicadores" style={{ marginTop: 8 }}>
+          {r.site.length === 0 && <div className="indicador"><span className="rotulo">Pedidos pela loja online</span><span className="valor num">0</span></div>}
+          {r.site.map((x) => (
+            <div key={x.moeda} className="indicador destaque">
+              <span className="rotulo">Pedidos pela loja online ({x.moeda === "GS" ? "Gs" : "R$"})</span>
+              <span className="valor num">{dinheiro(x.t, x.moeda)}</span>
+              <span className="pequeno suave">{x.n} pedido(s)</span>
+            </div>))}
+          <div className="indicador"><span className="rotulo">Pedidos rápidos do site (sem login)</span><span className="valor num">{r.siteSolic}</span>
+            <span className="pequeno suave"><Link href="/">atender no painel</Link></span></div>
+        </div>
+      </section>
+
+      <section className="painel">
+        <h2 style={{ marginTop: 0 }}>Marketplaces · resumo do corte das 14h</h2>
+        <div className="indicadores">
+          {canaisMk.map(([c, nome]) => {
+            const x = hojeMk.find((m) => m.canal === c);
+            return (
+              <div key={c} className="indicador">
+                <span className="rotulo">{nome} hoje</span>
+                <span className="valor num">{brl(Number(x?.t ?? 0))}</span>
+                <span className="pequeno suave">{x?.n ?? 0} pedido(s) · taxas {brl(Number(x?.taxa ?? 0))} · líquido {brl(Number(x?.t ?? 0) - Number(x?.taxa ?? 0))}</span>
+                <span className="pequeno"><Link href={`/pedidos?canal=${c}`}>ver pedidos</Link></span>
+              </div>);
+          })}
+        </div>
+        {dias.length > 0 && (
+          <div className="tabela"><table>
+            <thead><tr><th>Dia (corte 14h)</th>{canaisMk.map(([c, nome]) => <th key={c} className="num">{nome}</th>)}<th className="num">Total</th></tr></thead>
+            <tbody>{dias.map((dia) => {
+              const linha = canaisMk.map(([c]) => r.mk.find((m) => m.dia === dia && m.canal === c));
+              const tot = linha.reduce((s, x) => s + Number(x?.t ?? 0), 0);
+              return (
+                <tr key={dia}><td className="num">{data(dia)}</td>
+                  {linha.map((x, i) => <td key={i} className="num">{x ? <>{brl(Number(x.t))}<div className="pequeno suave">{x.n} pedido(s)</div></> : "—"}</td>)}
+                  <td className="num"><b>{brl(tot)}</b></td></tr>);
+            })}</tbody>
+          </table></div>
+        )}
+        <p className="pequeno suave" style={{ margin: 0 }}>Os pedidos da Shopee e do Mercado Livre entram uma vez por dia, às 14h, e dão baixa no estoque. Eles não aparecem um a um na lista abaixo.</p>
+      </section>
+
+      <section className="painel">
+        <h2 style={{ marginTop: 0 }}>Resumo de todas as vendas de hoje</h2>
+        <div className="tabela"><table>
+          <thead><tr><th>Canal</th><th className="num">Pedidos</th><th className="num">Gs</th><th className="num">R$</th></tr></thead>
+          <tbody>
+            {grupos.map((g) => {
+              const gs = r.geral.find((x) => x.grupo === g && x.moeda === "GS"), br = r.geral.find((x) => x.grupo === g && x.moeda === "BRL");
+              return <tr key={g}><td>{g}</td><td className="num">{(gs?.n ?? 0) + (br?.n ?? 0)}</td>
+                <td className="num">{gs ? dinheiro(gs.t, "GS") : "—"}</td><td className="num">{br ? dinheiro(br.t, "BRL") : "—"}</td></tr>;
+            })}
+            <tr><td><b>Total</b></td><td className="num"><b>{r.geral.reduce((s, g) => s + g.n, 0)}</b></td>
+              <td className="num"><b>{dinheiro(soma("GS"), "GS")}</b></td><td className="num"><b>{dinheiro(soma("BRL"), "BRL")}</b></td></tr>
+          </tbody>
+        </table></div>
+      </section>
+    </>
+  );
+}
 
 export default async function Pedidos({ searchParams }: { searchParams: Promise<Filtros> }) {
   const u = await exigirUsuario();
@@ -36,6 +120,9 @@ export default async function Pedidos({ searchParams }: { searchParams: Promise<
   if (f.comercial) add("p.status_comercial = ?::app.status_comercial", f.comercial);
   if (f.pagamento) add("p.status_pagamento = ?", f.pagamento);
   if (f.canal) add("p.canal = ?", f.canal);
+  // Shopee e Mercado Livre não aparecem pedido a pedido: ficam no resumo diário (corte das 14h). Filtrando o canal, aparecem.
+  else cond.push("not exists (select 1 from app.canais k where k.codigo = p.canal and k.marketplace)");
+  if (f.origem === "portal") cond.push("p.origem = 'portal'");
   if (f.deposito) add("p.deposito_id = ?::uuid", f.deposito);
   if (f.desconto === "pendente") cond.push("p.desconto_qtd_status = 'pendente'");
   if (f.modalidade) add("exists (select 1 from app.pagamentos g where g.pedido_id = p.id and g.modalidade = ?::app.modalidade_pagamento)", f.modalidade);
@@ -51,7 +138,25 @@ export default async function Pedidos({ searchParams }: { searchParams: Promise<
     const vendedoras = (await c.query("select id, nome from app.vendedoras where ativo order by nome")).rows;
     const canais = (await c.query("select codigo, nome from app.canais order by nome")).rows;
     const depositos = (await c.query("select id, nome from app.depositos where ativo order by nome")).rows;
-    return { pedidos, vendedoras, canais, depositos };
+    let resumo: Resumo | null = null;
+    if (ehGestao(u)) {
+      const hoje = (await c.query("select (now() at time zone 'America/Sao_Paulo')::date::text h")).rows[0].h as string;
+      const site = (await c.query(`select moeda, count(*)::int n, sum(valor_total) t from app.pedidos
+          where origem = 'portal' and status_comercial <> 'cancelado' and (criado_em at time zone 'America/Sao_Paulo')::date = $1::date group by 1`, [hoje])).rows;
+      const siteSolic = Number((await c.query(`select count(*) n from app.pedidos_site where (criado_em at time zone 'America/Sao_Paulo')::date = $1::date`, [hoje])).rows[0].n);
+      const mk = (await c.query(`select app.dia_corte_marketplace(p.criado_em)::text dia, p.canal, k.nome, count(*)::int n, sum(p.valor_total) t, sum(coalesce(p.taxa_marketplace, 0)) taxa
+          from app.pedidos p join app.canais k on k.codigo = p.canal and k.marketplace
+         where p.status_comercial <> 'cancelado' and app.dia_corte_marketplace(p.criado_em) >= $1::date - 6
+         group by 1, 2, 3 order by 1 desc, 3`, [hoje])).rows;
+      const geral = (await c.query(`select case when p.origem = 'portal' then 'Site (loja online)' when k.marketplace then k.nome else 'Vendedoras' end grupo,
+             p.moeda, count(*)::int n, sum(p.valor_total) t
+          from app.pedidos p left join app.canais k on k.codigo = p.canal
+         where p.status_comercial <> 'cancelado'
+           and case when coalesce(k.marketplace, false) then app.dia_corte_marketplace(p.criado_em) else (p.criado_em at time zone 'America/Sao_Paulo')::date end = $1::date
+         group by 1, 2 order by 1`, [hoje])).rows;
+      resumo = { hoje, site, siteSolic, mk, geral };
+    }
+    return { pedidos, vendedoras, canais, depositos, resumo };
   });
 
   const totais = new Map<string, { vendido: number; recebido: number; saldo: number }>();
@@ -76,6 +181,8 @@ export default async function Pedidos({ searchParams }: { searchParams: Promise<
         </div>
         {podeEscrever(u) && <Link className="botao principal" href="/pedidos/novo">Novo pedido</Link>}
       </section>
+
+      {d.resumo && <ResumoVendas r={d.resumo} />}
 
       <nav className="filtros" aria-label="Situação de pagamento">
         {ATALHOS.map(([s, rot]) => (
