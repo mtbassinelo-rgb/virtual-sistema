@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { salvarInventario } from "./acoes";
 
-export type ItemInventario = { id: string; codigo: string; nome: string; marca: string | null; gtin: string | null; saldo: number; caixa: number | null; codigos: string[] };
+export type ItemInventario = { id: string; codigo: string; nome: string; marca: string | null; gtin: string | null; foto: string | null; saldo: number; caixa: number | null; codigos: string[] };
 
 type Modo = "unidade" | "caixa";
 
@@ -117,7 +117,7 @@ export function Contagem({ deposito, itens }: { deposito: string; itens: ItemInv
           <input ref={campoBipe} value={bipe} autoFocus onChange={(e) => setBipe(e.target.value)} placeholder="Bipe aqui"
                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (bipe.trim()) bipar(bipe); } }} />
         </label>
-        {ult && <div className="aviso-caixa ok">+1 {ult.nome} · contado: <b>{contado[ult.id]}</b></div>}
+        {ult && <div className="aviso-caixa ok" style={{ display: "flex", gap: 10, alignItems: "center" }}>{ult.foto && <img src={ult.foto} alt="" width={44} height={44} style={{ objectFit: "contain", background: "#fff", borderRadius: 6 }} />}<span>+1 {ult.nome} · contado: <b>{contado[ult.id]}</b></span></div>}
         <div className="painel filtros" style={{ padding: 0, border: 0 }}>
           <label className="filtro-busca">Procurar<input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Nome, código ou código de barras" /></label>
           <label>Marca<select value={marca} onChange={(e) => setMarca(e.target.value)}><option value="">Todas</option>{marcas.map((m) => <option key={m} value={m}>{m || "(sem marca)"}</option>)}</select></label>
@@ -135,7 +135,15 @@ export function Contagem({ deposito, itens }: { deposito: string; itens: ItemInv
           const dif = q != null ? mudanca(i, q) : null;
           return (
             <tr key={i.id} className={i.id === ultimo ? "linha-destaque" : ""}>
-              <td>{i.nome}<div className="pequeno suave">{i.codigo}{i.marca ? ` · ${i.marca}` : ""}{i.caixa ? ` · caixa com ${i.caixa}` : ""}</div></td>
+              <td>
+                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  {/* foto para reconhecer o produto na prateleira (clique para ver grande) */}
+                  {i.foto
+                    ? <a href={i.foto} target="_blank" rel="noopener noreferrer" style={{ flex: "none" }}><img src={i.foto} alt="" width={56} height={56} loading="lazy" style={{ objectFit: "contain", background: "#fff", borderRadius: 8, border: "1px solid var(--linha)", display: "block" }} /></a>
+                    : <div style={{ width: 56, height: 56, flex: "none", borderRadius: 8, background: "var(--afundado)", display: "grid", placeItems: "center", fontSize: 10, textAlign: "center" }} className="suave">sem foto</div>}
+                  <div>{i.nome}<div className="pequeno suave">{i.codigo}{i.marca ? ` · ${i.marca}` : ""}{i.caixa ? ` · caixa com ${i.caixa}` : ""}</div></div>
+                </div>
+              </td>
               <td className="num">{i.saldo.toLocaleString("pt-BR")} pç{i.caixa && i.caixa > 1 ? <div className="pequeno suave">{Math.floor(i.saldo / i.caixa)} cx{i.saldo % i.caixa ? ` + ${i.saldo % i.caixa} pç` : ""}</div> : null}</td>
               <td className="num"><input value={v ?? ""} style={{ width: 80 }} aria-label={`Contado de ${i.nome}`} placeholder={modo === "caixa" && i.caixa ? "caixas" : "peças"}
                     onChange={(e) => { marcarBase(i.id); setContado((m) => ({ ...m, [i.id]: e.target.value.replace(/[^\dcxaiCXAI.,*+\s]/g, "").replace(/^(\d+)\+/, modo === "caixa" ? "$1cx+" : "$1+") })); }} />
