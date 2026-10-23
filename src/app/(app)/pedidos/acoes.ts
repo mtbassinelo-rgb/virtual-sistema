@@ -9,6 +9,7 @@ import { exigirUsuario } from "@/lib/auth";
 import { comUsuario, mensagemErro } from "@/lib/db";
 import { numero, texto } from "@/lib/formato";
 import { pastaArquivos } from "@/lib/arquivos";
+import type { PoolClient } from "pg";
 
 const TIPOS_COMPROVANTE: Record<string, string> = {
   "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "application/pdf": "pdf",
@@ -258,5 +259,57 @@ export async function decidirDescontoQuantidade(fd: FormData) {
   const liberar = texto(fd, "liberar") === "1";
   await executar(pedido, liberar ? "Desconto liberado: os preços do pedido já estão com o desconto." : "Desconto não liberado: o pedido segue com o preço normal.", async (uid) => {
     await comUsuario(uid, (c) => c.query("select app.decidir_desconto_quantidade($1, $2)", [pedido, liberar]));
+  });
+}
+
+/** Código digitado na lista ("CÓDIGO · nome" ou só o código) → id do produto. */
+async function produtoPorCodigo(c: PoolClient, valor: string) {
+  const codigo = valor.split(" · ")[0].trim();
+  if (!codigo) throw new Error("Escolha o produto substituto na lista.");
+  const r = await c.query(
+    `select id from app.produtos where codigo = $1
+     union all select produto_id from app.produto_codigos where codigo = $1 limit 1`, [codigo]);
+  if (!r.rows[0]) throw new Error(`Produto "${codigo}" não encontrado. Escolha um item da lista.`);
+  return String(r.rows[0].id);
+}
+
+/** Produto sem estoque: troca por outro produto/aroma com o print da conversa com o cliente (obrigatório). */
+export async function trocarItem(fd: FormData) {
+  const pedido = texto(fd, "pedido_id");
+  await executar(pedido, "Produto trocado. O total do pedido foi recalculado.", async (uid) => {
+    const arquivo = fd.get("print");
+    if (!(arquivo instanceof File) || arquivo.size === 0) throw new Error("Anexe o print da conversa em que o cliente aceitou a troca.");
+    const ext = TIPOS_COMPROVANTE[arquivo.type];
+    if (!ext) throw new Error("O print deve ser foto (JPG, PNG, WEBP) ou PDF.");
+    if (arquivo.size > MAX_COMPROVANTE) throw new Error("Arquivo maior que 10 MB.");
+    const bytes = Buffer.from(await arquivo.arrayBuffer());
+    const sha = createHash("sha256").update(bytes).digest("hex");
+    const nome = `${sha}.${ext}`;
+    await mkdir(pastaArquivos(), { recursive: true });
+    await writeFile(path.join(pastaArquivos(), nome), bytes);
+    const qtd = numero(fd, "quantidade");
+    await comUsuario(uid, async (c) => {
+      const produto = await produtoPorCodigo(c, texto(fd, "produto"));
+      await c.query("select app.trocar_item_pedido($1, $2, $3, $4, $5, $6, $7, $8, nullif($9,''))",
+        [texto(fd, "item_id"), produto, qtd, nome, arquivo.name, arquivo.type, arquivo.size, sha, texto(fd, "observacao")]);
+    });
+  });
+}
+
+/** Cliente não quis trocar: pede à gerência para tirar o item (vai para os procurados sem estoque). */
+export async function pedirRemocao(fd: FormData) {
+  const pedido = texto(fd, "pedido_id");
+  await executar(pedido, "Pedido de remoção enviado. Aguardando o gerente ou o dono autorizar.", async (uid) => {
+    await comUsuario(uid, (c) => c.query("select app.pedir_remocao_item($1, $2)", [texto(fd, "item_id"), texto(fd, "motivo")]));
+  });
+}
+
+/** Gerente/dono autoriza (item sai e vai para os procurados) ou recusa a remoção. */
+export async function decidirRemocao(fd: FormData) {
+  const pedido = texto(fd, "pedido_id");
+  const aprovar = texto(fd, "decisao") === "aprovar";
+  await executar(pedido, aprovar ? "Remoção autorizada: o item saiu do pedido e foi para a lista de procurados sem estoque." : "Remoção recusada.", async (uid) => {
+    await comUsuario(uid, (c) => c.query("select app.decidir_remocao_item($1, $2, nullif($3,''))",
+      [texto(fd, "remocao_id"), aprovar, texto(fd, "motivo_decisao")]));
   });
 }

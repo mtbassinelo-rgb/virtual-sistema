@@ -12,6 +12,7 @@ import { Avisos, Selo } from "../../avisos";
 import {
   anexarComprovante, atualizarPedido, avancarEntrega, conferirPagamento, conferirSeparacao, confirmarTotal, decidirPedidoPortal,
   reconhecerBling, recusarPagamento, registrarAtendimento, registrarPagamento, gerarLinkPedido, definirVolumes, decidirDescontoQuantidade,
+  trocarItem, pedirRemocao, decidirRemocao,
 } from "../acoes";
 
 export const metadata = { title: "Pedido" };
@@ -69,7 +70,22 @@ export default async function Pedido({ params, searchParams }: {
         where (a.tabela = 'pedidos' and a.registro_id = $1)
            or (a.tabela = 'pagamentos' and a.registro_id in (select id::text from app.pagamentos where pedido_id = $1::uuid))
         order by a.em desc limit 50`, [id])).rows;
-    return { p, cliente, itens, fluxo, transf, bling, pagamentos, comprovantes, atendimentos, depositos, historico, indisponiveis };
+    const trocas = (await c.query(
+      `select t.id, t.descricao_antes, t.quantidade_antes, t.descricao_depois, t.quantidade, t.preco_depois, t.observacao, t.feito_em, u.nome
+         from app.pedido_trocas t left join app.usuarios u on u.id = t.feito_por
+        where t.pedido_id = $1 order by t.feito_em`, [id])).rows;
+    const remocoes = (await c.query(
+      `select r.id, r.item_id, r.descricao, r.quantidade, r.motivo, r.status, r.pedido_em, r.decidido_em, r.motivo_decisao,
+              up.nome as pedido_nome, ud.nome as decidido_nome
+         from app.pedido_remocoes r left join app.usuarios up on up.id = r.pedido_por left join app.usuarios ud on ud.id = r.decidido_por
+        where r.pedido_id = $1 order by r.pedido_em`, [id])).rows;
+    const editavelItens = p.origem !== "bling" && !fluxo?.total_confirmado_em
+      && ["aguardando_cliente", "aguardando_aprovacao", "em_separacao"].includes(p.status_comercial);
+    const produtos = editavelItens
+      ? (await c.query("select codigo, nome from app.produtos where ativo and codigo is not null order by nome")).rows as { codigo: string; nome: string }[]
+      : [];
+    return { p, cliente, itens, fluxo, transf, bling, pagamentos, comprovantes, atendimentos, depositos, historico, indisponiveis,
+             trocas, remocoes, editavelItens, produtos };
   });
   if (!d) notFound();
   const { p, cliente } = d;
@@ -202,6 +218,86 @@ export default async function Pedido({ params, searchParams }: {
       )}
       {p.status_comercial === "em_separacao" && p.origem !== "bling" && !fluxo?.separacao_conferida_em && !(gestao || fluxo?.opera) && (
         <div className="aviso-caixa">Aguardando a expedição conferir a separação.</div>
+      )}
+
+      {d.remocoes.some((r) => r.status === "pendente") && (
+        <section className="painel" id="remocoes" style={{ borderColor: "#e0b04a", background: "#fffaf0" }}>
+          <h2 style={{ margin: 0 }}>Tirar produto do pedido: aguardando autorização</h2>
+          <p className="suave pequeno" style={{ margin: 0 }}>O cliente não aceitou trocar. Ao autorizar, o item sai do pedido, o total é recalculado,
+            o cliente vê que ele não estava disponível e o produto vai para a lista de <Link href="/procuras">procurados sem estoque</Link>.</p>
+          {d.remocoes.filter((r) => r.status === "pendente").map((r) => (
+            <div key={r.id} className="aviso-caixa campos">
+              <span className="largo"><b>{Number(r.quantidade)}× {r.descricao}</b> · pedido por {r.pedido_nome ?? "—"} em {dataHora(r.pedido_em)}
+                <br /><span className="pequeno">Motivo: {r.motivo}</span></span>
+              {gestao ? (
+                <form action={decidirRemocao} className="linha largo">
+                  <input type="hidden" name="pedido_id" value={p.id} />
+                  <input type="hidden" name="remocao_id" value={r.id} />
+                  <input name="motivo_decisao" placeholder="Observação (opcional)" style={{ flex: 1, minWidth: 160 }} />
+                  <button className="principal" name="decisao" value="aprovar">Autorizar e mandar para procurados</button>
+                  <button name="decisao" value="recusar">Recusar</button>
+                </form>
+              ) : <span className="pequeno suave largo">Aguardando o gerente ou o dono autorizar.</span>}
+            </div>
+          ))}
+        </section>
+      )}
+
+      {escrever && d.editavelItens && d.itens.length > 0 && (
+        <section className="painel" id="sem-estoque">
+          <h2>Produto sem estoque? Trocar ou tirar do pedido</h2>
+          <p className="suave pequeno">Fale com o cliente antes. <b>Trocar</b>: escolha o substituto (outro produto ou aroma) e anexe o print da conversa
+            em que o cliente aceitou; o preço é o da tabela dele. <b>Tirar do pedido</b>: se o cliente não quiser outro, peça a autorização;
+            o gerente ou o dono aprova e o produto vai para a lista de procurados sem estoque (para comprarmos quando juntar volume).</p>
+          <datalist id="lista-substitutos">
+            {d.produtos.map((x) => <option key={x.codigo} value={`${x.codigo} · ${x.nome}`} />)}
+          </datalist>
+          {d.itens.map((i) => {
+            const pendente = d.remocoes.some((r) => r.status === "pendente" && r.item_id === i.id);
+            return (
+              <details key={i.id} className="aviso-caixa" style={{ marginBottom: 8 }}>
+                <summary><b>{Number(i.quantidade)}× {i.descricao}</b> <span className="suave pequeno">({i.codigo})</span>
+                  {pendente && <span className="pequeno"> · remoção aguardando autorização</span>}</summary>
+                <form action={trocarItem} className="campos" style={{ marginTop: 8 }}>
+                  <input type="hidden" name="pedido_id" value={p.id} />
+                  <input type="hidden" name="item_id" value={i.id} />
+                  <label className="largo">Trocar por (produto ou aroma)
+                    <input name="produto" list="lista-substitutos" required placeholder="Digite o código ou o nome" autoComplete="off" /></label>
+                  <label>Quantidade<input name="quantidade" inputMode="decimal" defaultValue={Number(i.quantidade)} required /></label>
+                  <label>Print da conversa com o cliente (obrigatório)<input type="file" name="print" accept="image/jpeg,image/png,image/webp,application/pdf" required /></label>
+                  <label className="largo">Observação<input name="observacao" placeholder="Ex.: cliente preferiu o aroma morango" /></label>
+                  <button className="principal">Trocar produto</button>
+                </form>
+                {!pendente && (
+                  <form action={pedirRemocao} className="linha" style={{ marginTop: 8 }}>
+                    <input type="hidden" name="pedido_id" value={p.id} />
+                    <input type="hidden" name="item_id" value={i.id} />
+                    <input name="motivo" required placeholder="Por que tirar? (ex.: cliente não quis outro aroma)" style={{ flex: 1, minWidth: 200 }} />
+                    <button className="perigo">Pedir para tirar do pedido</button>
+                  </form>
+                )}
+              </details>
+            );
+          })}
+        </section>
+      )}
+
+      {(d.trocas.length > 0 || d.remocoes.some((r) => r.status !== "pendente")) && (
+        <section className="painel">
+          <h2>Trocas e remoções</h2>
+          <ul className="pequeno">
+            {d.trocas.map((t) => (
+              <li key={t.id}>{dataHora(t.feito_em)} · {t.nome ?? "—"} trocou <b>{Number(t.quantidade_antes)}× {t.descricao_antes}</b> por{" "}
+                <b>{Number(t.quantidade)}× {t.descricao_depois}</b> ({dinheiro(t.preco_depois, moeda)} cada)
+                {t.observacao && <> · {t.observacao}</>} · <a href={`/trocas/${t.id}`} target="_blank" rel="noopener noreferrer">ver print</a></li>
+            ))}
+            {d.remocoes.filter((r) => r.status !== "pendente").map((r) => (
+              <li key={r.id}>{dataHora(r.decidido_em)} · remoção de <b>{Number(r.quantidade)}× {r.descricao}</b>{" "}
+                {r.status === "aprovada" ? "autorizada" : "recusada"} por {r.decidido_nome ?? "—"} (pedida por {r.pedido_nome ?? "—"}: {r.motivo})
+                {r.motivo_decisao && <> · {r.motivo_decisao}</>}</li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {escrever && (p.status_comercial === "cancelado" || p.status_comercial === "em_separacao") && (

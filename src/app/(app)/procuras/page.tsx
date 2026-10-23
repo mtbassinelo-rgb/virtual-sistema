@@ -8,7 +8,7 @@ import { linkWhatsApp } from "@/lib/formato";
 
 export const metadata = { title: "Procurados sem estoque" };
 
-const ORIGEM: Record<string, string> = { site: "Site (visitante)", portal: "Cliente na loja", vendedora: "Vendedora" };
+const ORIGEM: Record<string, string> = { site: "Site (visitante)", portal: "Cliente na loja", vendedora: "Vendedora", pedido: "Tirado do pedido" };
 
 export default async function Procuras({ searchParams }: { searchParams: Promise<{ ok?: string; erro?: string; dias?: string }> }) {
   const u = await exigirUsuario();
@@ -16,6 +16,15 @@ export default async function Procuras({ searchParams }: { searchParams: Promise
   const gestao = ehGestao(u);
   const dias = [30, 90, 365].includes(Number(f.dias)) ? Number(f.dias) : 90;
   const d = await comUsuario(u.id, async (c) => ({
+    marcas: gestao ? (await c.query(
+      `select coalesce(nullif(p.marca, ''), 'Sem marca / não cadastrado') as marca,
+              count(*)::int as pedidos,
+              count(distinct coalesce(q.cliente_id::text, q.contato_whatsapp, q.criado_por::text, q.id::text))::int as interessados,
+              coalesce(sum(q.quantidade), count(*))::numeric as unidades,
+              string_agg(distinct coalesce(p.nome, q.descricao), ' · ') as produtos
+         from app.procuras q left join app.produtos p on p.id = q.produto_id
+        where q.criado_em >= now() - interval '7 days'
+        group by 1 order by unidades desc, pedidos desc`)).rows as { marca: string; pedidos: number; interessados: number; unidades: string; produtos: string }[] : [],
     resumo: gestao ? (await c.query(
       `select r.* from app.v_procuras_resumo r where r.ultima >= now() - make_interval(days => $1)
         order by r.novos > 0 desc, r.interessados desc, r.quantidade desc nulls last, r.ultima desc limit 300`, [dias])).rows : [],
@@ -87,6 +96,27 @@ export default async function Procuras({ searchParams }: { searchParams: Promise
           <button className="principal">Registrar</button>
         </form>
       </section>
+
+      {gestao && (
+        <section className="painel">
+          <h2>Por marca · últimos 7 dias (para a compra de quarta/quinta)</h2>
+          <p className="suave pequeno">Soma o que os clientes pediram e não tínhamos: registros das vendedoras, itens tirados de pedidos e pedidos do site.
+            Quando uma marca juntar volume suficiente, vale incluir na compra da semana.</p>
+          {d.marcas.length === 0 ? <div className="vazio">Nenhum pedido nos últimos 7 dias.</div> : (
+            <div className="tabela"><table>
+              <thead><tr><th>Marca</th><th className="num">Unidades</th><th className="num">Clientes</th><th className="num">Pedidos</th><th>Produtos</th></tr></thead>
+              <tbody>{d.marcas.map((m) => (
+                <tr key={m.marca}>
+                  <td><b>{m.marca}</b></td>
+                  <td className="num">{Number(m.unidades).toLocaleString("pt-BR")}</td>
+                  <td className="num">{m.interessados}</td>
+                  <td className="num">{m.pedidos}</td>
+                  <td className="pequeno">{m.produtos}</td>
+                </tr>))}</tbody>
+            </table></div>
+          )}
+        </section>
+      )}
 
       {gestao && (
         <section className="painel">

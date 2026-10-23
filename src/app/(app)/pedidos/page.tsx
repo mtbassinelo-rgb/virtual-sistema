@@ -9,7 +9,7 @@ export const metadata = { title: "Pedidos" };
 
 type Filtros = {
   q?: string; vendedora?: string; de?: string; ate?: string; comercial?: string;
-  pagamento?: string; modalidade?: string; canal?: string; deposito?: string; desconto?: string; origem?: string;
+  pagamento?: string; modalidade?: string; canal?: string; deposito?: string; desconto?: string; remocao?: string; origem?: string;
 };
 
 const ATALHOS: [string, string][] = [
@@ -125,6 +125,7 @@ export default async function Pedidos({ searchParams }: { searchParams: Promise<
   if (f.origem === "portal") cond.push("p.origem = 'portal'");
   if (f.deposito) add("p.deposito_id = ?::uuid", f.deposito);
   if (f.desconto === "pendente") cond.push("p.desconto_qtd_status = 'pendente'");
+  if (f.remocao === "pendente") cond.push("exists (select 1 from app.pedido_remocoes r where r.pedido_id = p.id and r.status = 'pendente')");
   if (f.modalidade) add("exists (select 1 from app.pagamentos g where g.pedido_id = p.id and g.modalidade = ?::app.modalidade_pagamento)", f.modalidade);
   const where = cond.length ? `where ${cond.join(" and ")}` : "";
 
