@@ -47,6 +47,16 @@ de ir para o ar.
 - **Escrita em sistemas externos** (Bling, marketplaces): só por proposta aprovada
   pelo dono. A execução será feita na etapa de escrita.
 
+## WhatsApp por QR Code
+
+- Servidor interno de WhatsApp (Evolution API, serviço `whatsapp` no `infra/docker-compose.yml`), só em produção e
+  sem porta aberta para a internet. Sobe junto com `./atualizar.sh producao`, que também cria as senhas que faltarem no `.env`.
+- Tela **WhatsApp → Conexões**: o gerente cria a conexão e escaneia o QR Code com o celular do número. O número segue
+  funcionando no celular; o sistema não marca como lido nem envia nada.
+- As mensagens chegam por `/api/whatsapp/webhook` (com chave secreta) e ficam em `app.whatsapp_mensagens`.
+- Tela **WhatsApp → Acompanhamento**: enviadas, recebidas, tempo de resposta, esperando resposta, cliente ou lead
+  (casado pelo número do cadastro) e pedidos do período. Vendedora vê só o número dela, se o gerente liberar a área.
+
 ## Rodar os testes
 
 ```bash

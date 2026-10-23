@@ -41,6 +41,10 @@ services:
       SMTP_USUARIO: ${SMTP_USUARIO:-}
       SMTP_SENHA: ${SMTP_SENHA:-}
       EMAIL_AVISOS: ${EMAIL_AVISOS:-}
+      # WhatsApp por QR Code (servidor interno, sem acesso pela internet)
+      WHATSAPP_API_URL: http://vc-whatsapp:8080
+      WHATSAPP_API_KEY: ${WHATSAPP_API_KEY:-}
+      WHATSAPP_WEBHOOK_SEGREDO: ${WHATSAPP_WEBHOOK_SEGREDO:-}
     volumes:
       - arquivos_producao:/dados
     depends_on: [db-producao]
@@ -75,6 +79,80 @@ services:
       - /opt/caddy-extra:/etc/caddy/extra:ro   # sites de outros sistemas da VPS (Instituto Supremo)
     networks: [interna, supremo]
 
+  # WhatsApp por QR Code (Evolution API), só para produção. Não tem porta aberta para a internet:
+  # só a aplicação conversa com ele, pela rede interna. Cada número conectado fica salvo no volume whatsapp_sessoes.
+  whatsapp:
+    image: evoapicloud/evolution-api:v2.3.7
+    restart: unless-stopped
+    environment:
+      SERVER_TYPE: http
+      SERVER_PORT: "8080"
+      SERVER_URL: http://vc-whatsapp:8080
+      LANGUAGE: pt-BR
+      LOG_LEVEL: ERROR,WARN
+      DEL_INSTANCE: "false"
+      AUTHENTICATION_API_KEY: ${WHATSAPP_API_KEY:-trocar-no-env}
+      AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES: "true"
+      CONFIG_SESSION_PHONE_CLIENT: Virtual Cosmeticos
+      CONFIG_SESSION_PHONE_NAME: Chrome
+      QRCODE_LIMIT: "30"
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://evolution:${WHATSAPP_DB_SENHA:-trocar-no-env}@vc-whatsapp-db:5432/evolution?schema=evolution_api
+      DATABASE_CONNECTION_CLIENT_NAME: virtual
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "true"
+      DATABASE_SAVE_MESSAGE_UPDATE: "false"
+      DATABASE_SAVE_DATA_CONTACTS: "true"
+      DATABASE_SAVE_DATA_CHATS: "true"
+      DATABASE_SAVE_DATA_HISTORIC: "true"
+      DATABASE_SAVE_DATA_LABELS: "false"
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://vc-whatsapp-redis:6379/6
+      CACHE_REDIS_PREFIX_KEY: evolution
+      CACHE_REDIS_SAVE_INSTANCES: "false"
+      CACHE_LOCAL_ENABLED: "false"
+      # Avisos para o sistema: mensagens novas, histórico, QR Code e conexão (com a chave secreta)
+      WEBHOOK_GLOBAL_ENABLED: "true"
+      WEBHOOK_GLOBAL_URL: http://vc-app-producao:3000/api/whatsapp/webhook?chave=${WHATSAPP_WEBHOOK_SEGREDO:-}
+      WEBHOOK_GLOBAL_WEBHOOK_BY_EVENTS: "false"
+      WEBHOOK_EVENTS_APPLICATION_STARTUP: "false"
+      WEBHOOK_EVENTS_QRCODE_UPDATED: "true"
+      WEBHOOK_EVENTS_MESSAGES_SET: "true"
+      WEBHOOK_EVENTS_MESSAGES_UPSERT: "true"
+      WEBHOOK_EVENTS_MESSAGES_UPDATE: "false"
+      WEBHOOK_EVENTS_SEND_MESSAGE: "true"
+      WEBHOOK_EVENTS_CONNECTION_UPDATE: "true"
+    volumes:
+      - whatsapp_sessoes:/evolution/instances
+    depends_on: [whatsapp-db, whatsapp-redis]
+    networks:
+      interna:
+        aliases: [vc-whatsapp]
+
+  whatsapp-db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: evolution
+      POSTGRES_USER: evolution
+      POSTGRES_PASSWORD: ${WHATSAPP_DB_SENHA:-trocar-no-env}
+    volumes:
+      - whatsapp_db:/var/lib/postgresql/data
+    networks:
+      interna:
+        aliases: [vc-whatsapp-db]
+
+  whatsapp-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - whatsapp_redis:/data
+    networks:
+      interna:
+        aliases: [vc-whatsapp-redis]
+
   # Backup diário do banco de produção (guarda 30 dias no servidor;
   # a cópia para fora do servidor é configurada em backup.sh)
   backup:
@@ -98,6 +176,9 @@ volumes:
   db_teste:
   caddy_dados:
   backups:
+  whatsapp_sessoes:
+  whatsapp_db:
+  whatsapp_redis:
 
 networks:
   interna:

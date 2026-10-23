@@ -115,6 +115,14 @@ const impKeila = await abrir("/estoque/importar", await sessao("keila@teste.loca
 const semAcesso = (r) => (r.status >= 300 && r.status < 400 && r.local.includes("/sem-permissao")) || r.html.includes("Sem acesso a esta área") || r.html.includes("Só gerente ou dono");
 ok(semAcesso(impKeila), "Vendedora não importa produtos");
 ok(semAcesso(await abrir("/equipe", await sessao("keila@teste.local"))), "Vendedora não abre Equipe e acessos");
+// WhatsApp: gerente abre o acompanhamento e as conexões; vendedora não abre por padrão; webhook exige a chave
+for (const tela of ["/whatsapp", "/whatsapp?p=30&f=aguardando&o=espera", "/whatsapp/conexoes"]) {
+  const r = await abrir(tela, await sessao("gerente@teste.local"));
+  ok(r.status === 200 && !r.html.includes("Application error"), `Gerente: ${tela} abre`);
+}
+ok(semAcesso(await abrir("/whatsapp/conexoes", await sessao("keila@teste.local"))), "Vendedora não abre as conexões do WhatsApp");
+ok((await fetch(base + "/api/whatsapp/webhook", { method: "POST", body: "{}", headers: { "content-type": "application/json" } })).status === 401,
+  "Webhook do WhatsApp sem chave é recusado");
 const semPerm = await abrir("/sem-permissao?area=equipe", await sessao("keila@teste.local"));
 ok(semPerm.status === 200 && semPerm.html.includes("Sem acesso a esta área"), "Tela de sem acesso abre");
 

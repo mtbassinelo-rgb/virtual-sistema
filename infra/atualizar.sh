@@ -6,8 +6,14 @@ set -euo pipefail
 cd "$(dirname "$0")"
 alvo="${1:?Informe: teste ou producao}"
 [[ "$alvo" == "teste" || "$alvo" == "producao" ]] || { echo "Use teste ou producao"; exit 1; }
-set -a; . ./.env; set +a
 git -C .. pull --ff-only
+# Senhas que versões novas precisam: criadas uma vez, com valor aleatório, sem ninguém digitar
+[ -z "$(tail -c1 .env)" ] || echo >> .env
+garantir() { grep -q "^$1=" .env || echo "$1=$(openssl rand -hex 24)" >> .env; }
+garantir WHATSAPP_API_KEY
+garantir WHATSAPP_DB_SENHA
+garantir WHATSAPP_WEBHOOK_SEGREDO
+set -a; . ./.env; set +a
 senha_var="DB_$(echo "$alvo" | tr a-z A-Z)_SENHA"; app_var="APP_$(echo "$alvo" | tr a-z A-Z)_SENHA"
 # rede e pasta compartilhadas com o Instituto Supremo (o Caddy atende os dois sistemas)
 docker network create supremo-web >/dev/null 2>&1 || true
@@ -25,7 +31,11 @@ docker run --rm --network virtual_interna -v "$(cd .. && pwd)/db:/db" \
 # 2) senha do papel da aplicação
 docker run --rm --network virtual_interna postgres:16 psql "postgresql://virtual_admin:${!senha_var}@db-$alvo/virtual" \
   -qc "alter role vc_app login password '${!app_var}'"
-# 3) aplicação
+# 3) WhatsApp por QR Code (só produção)
+if [ "$alvo" = "producao" ]; then
+  docker compose --env-file .env up -d whatsapp-db whatsapp-redis whatsapp
+fi
+# 4) aplicação
 docker compose --env-file .env build "app-$alvo"
 docker compose --env-file .env up -d "app-$alvo"
 # o Caddyfile é montado como arquivo: depois do git pull o contêiner só enxerga a versão nova se for recriado

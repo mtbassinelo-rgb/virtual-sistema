@@ -416,3 +416,7 @@ table.dre tfoot th { border-top: 2px solid var(--linha); }
 .unidade-grade > div.ruim { background: var(--erro-suave); }
 .unidade-grade > div.ruim b { color: var(--erro); }
 @media (max-width: 420px) { .unidades-lado { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- WhatsApp: conversa ---------- */
+.conversa-grade { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 900px) { .conversa-grade { grid-template-columns: minmax(0, 1fr); } }

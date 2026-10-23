@@ -64,6 +64,11 @@ export default async function AreaInterna({ children }: { children: React.ReactN
         dica: "Produtos pedidos que estavam esgotados e os que já chegaram: avisar o cliente" },
       { href: "/metas", texto: "Metas" },
     ] },
+    { id: "whatsapp", titulo: "WhatsApp", icone: "whatsapp", itens: [
+      { href: "/whatsapp", texto: "Acompanhamento", dica: "Mensagens enviadas e recebidas, tempo de resposta, quem está esperando e pedidos de cada conversa" },
+      { href: "/whatsapp?f=aguardando&o=espera", texto: "Esperando resposta", dica: "Conversas em que a última mensagem foi do cliente" },
+      { href: "/whatsapp/conexoes", texto: "Conexões (QR Code)", dica: "Conectar os números da equipe" },
+    ] },
     { id: "produtos", titulo: "Produtos", icone: "produtos", itens: [
       { href: "/produtos", texto: "Todos os produtos" },
       ...(gestao ? [
