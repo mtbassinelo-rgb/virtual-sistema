@@ -1,0 +1,17 @@
+-- =====================================================================
+-- Mais SKUs do Mercado Livre/Shopee ligados ao estoque do sistema (códigos MLB..., kits de 2/4/12, gel beijável variado)
+-- e itens que chegam do Bling sem código (SEMCOD-<descrição>). Não mexe em preços.
+-- =====================================================================
+do $$
+declare d jsonb := '{"kits": [{"codigo": "KIT12-2407203013", "nome": "KIT 12 UN - CREME REDUTOR DE MEDIDAS PIMENTA NEGRA RHENUKS", "componentes": [{"codigo": "2407203013", "quantidade": 12}]}, {"codigo": "KC-MPLA-M4", "nome": "KIT MATIZADOR PLATINUM MAYCRENE 4 MASCARAS", "componentes": [{"codigo": "2407203190", "quantidade": 4}]}, {"codigo": "KC-SEBO-2", "nome": "KIT 2 CREME SEBO DE CARNEIRO RHENUKS", "componentes": [{"codigo": "2407203291", "quantidade": 2}]}, {"codigo": "KIT2-2407202626", "nome": "KIT 2 UN - PROTETOR TERMICO SPRAY BABALISS RHENUKS", "componentes": [{"codigo": "2407202626", "quantidade": 2}]}, {"codigo": "KIT4-2407203279", "nome": "KIT 4 UN - PROTETOR TERMICO SPRAY MEU LISO MINHA VIDA RHENUKS", "componentes": [{"codigo": "2407203279", "quantidade": 4}]}, {"codigo": "KC-GELBEIJ-12", "nome": "KIT 12 GEL BEIJAVEL MIX GLOW BIO INSTINTO (4 DE CADA)", "componentes": [{"codigo": "2407202910", "quantidade": 4}, {"codigo": "2407202911", "quantidade": 4}, {"codigo": "2407202909", "quantidade": 4}]}, {"codigo": "KC-GELBEIJ-3", "nome": "KIT 3 GEL BEIJAVEL MIX GLOW BIO INSTINTO (1 DE CADA)", "componentes": [{"codigo": "2407202910", "quantidade": 1}, {"codigo": "2407202911", "quantidade": 1}, {"codigo": "2407202909", "quantidade": 1}]}], "aliases": {"MLB7379263692": "papel1000", "MLBU1726596230": "KIT12-2407203013", "22294081556": "KC-MPLA-M4", "RSEB2": "KC-SEBO-2", "MLB7379287314": "KC-PAPEL-3X120", "MLB7379287398": "KC-PAPEL-3X180", "MLB4616876705": "KC-MPLA-MM", "MLB6638083812": "KC-MMAR-SC", "MLB6637566360": "KC-MMAR-SCMPRO", "MLB7379263906": "papel120", "MLB4616646629": "KC-MPLA-SM", "MLB4616876683": "KC-MPLA-SC", "MLBU1746690772": "papel180", "MLB5032895369": "KC-PAPEL-180+200", "MLB6717966802": "2407203190", "MLB7532505380": "2407203248", "MLB4616647681": "2407203185", "MLB2047922019": "KC-MMAR-SCM", "MLB6638083770": "KC-MMAR-SCMPER", "MLB4646418447": "2407203185", "MLB4616646935": "KC-MMAR-SCMPER", "skininf": "2407202881", "skin": "2407202881", "skin1": "2407202881", "MLB7446487972": "2407202881", "00": "KC-PAPEL-3X180", "MLB2042230557": "KIT2-2407202626", "1735459406660994147": "KC-MABA-SCMAO", "BON-1L": "2407202740", "58202214383": "2407202801", "MLB6182220464": "KC-MPLA-SCM", "12619989271": "2407202835", "MLB2054783228": "KIT4-2407203279", "1735720235851678819": "2407202814", "22098404347-12 - VARIADOS (4und de cada)": "KC-GELBEIJ-12", "20299673937-03 - VARIADOS (1 ITEM DE CADA)": "KC-GELBEIJ-3", "SEMCOD-PAPELECOLOGICOPARAMECHASSTANDARD11X47CM1": "papel120", "SEMCOD-FLUIDOMATIZADORVIOLETAFARMAX30MLIMEDIATA": "2407202666"}}'; k jsonb; a record; r text; n_ok int := 0; n_al int := 0;
+begin
+  for k in select * from jsonb_array_elements(d->'kits') loop
+    r := app.registrar_kit_marketplace(k->>'codigo', k->>'nome', k->'componentes');
+    if r = 'ok' then n_ok := n_ok + 1; else raise notice 'Kit %: %', k->>'codigo', r; end if;
+  end loop;
+  for a in select key, value #>> '{}' v from jsonb_each(d->'aliases') loop
+    r := app.ligar_codigo_marketplace(a.key, a.v);
+    if r = 'ok' then n_al := n_al + 1; else raise notice 'Código % → %: %', a.key, a.v, r; end if;
+  end loop;
+  raise notice 'Kits: % ok; códigos ligados: %', n_ok, n_al;
+end $$;
