@@ -59,3 +59,20 @@ export async function ligarSku(fd: FormData) {
   }
   ir(erro, ok);
 }
+
+/** Pedidos cancelados no marketplace: cancela no sistema e devolve o estoque que saiu. */
+export async function cancelarVendas(fd: FormData) {
+  const u = await exigirUsuario();
+  let erro: string | null = null, ok = "";
+  try {
+    const canal = texto(fd, "canal");
+    if (!["shopee", "mercado_livre", "tiktok"].includes(canal)) throw new Error("Escolha o marketplace.");
+    const numeros = [...new Set(String(fd.get("numeros") ?? "").split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean))].slice(0, 500);
+    if (!numeros.length) throw new Error("Informe os números dos pedidos cancelados.");
+    const n = await comUsuario(u.id, async (c) => Number((await c.query("select app.cancelar_vendas_marketplace($1, $2::text[]) n", [canal, numeros])).rows[0].n));
+    ok = `${n} pedido(s) cancelado(s) e estoque devolvido.` + (n < numeros.length ? ` ${numeros.length - n} não estavam no sistema ou já estavam cancelados.` : "");
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  ir(erro, ok);
+}

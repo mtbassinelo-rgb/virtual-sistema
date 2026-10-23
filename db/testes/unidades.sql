@@ -163,5 +163,23 @@ select teste.falha($$select app.lancar_saldo_anterior('00000000-0000-0000-0000-0
 select teste.como(:'YESSICA');
 select teste.ok((select count(*) = 0 from app.saldos_anteriores where cliente_id = '00000000-0000-0000-0000-0000000000c1'), 'Outra vendedora não vê');
 
+\echo '== Kits de marketplace pelos componentes =='
+reset role;
+select app.registrar_kit_marketplace('KC-TESTE-2', 'Kit teste 2 un', '[{"codigo":"UNI-001","quantidade":2}]') as rk \gset
+select teste.ok(:'rk' = 'ok', 'Kit de marketplace criado com componentes');
+select teste.ok(app.registrar_kit_marketplace('KC-TESTE-X', 'x', '[{"codigo":"NAO-HA","quantidade":1}]') like 'faltando%', 'Kit com componente sem cadastro não é criado');
+select teste.ok(app.ligar_codigo_marketplace('ANUNCIO-ANTIGO', 'KC-TESTE-2') = 'ok', 'Código antigo do anúncio ligado ao kit');
+set role vc_app;
+select teste.como(:'EST');
+select (select quantidade from app.estoque_saldos where deposito_id = :'cd' and produto_id = :'UP1') as antes \gset
+select app.lancar_vendas_marketplace('mercado_livre', :'cd', '[{"pedido":"ML-777","itens":[{"sku":"ANUNCIO-ANTIGO","quantidade":3,"valor":20}]}]'::jsonb);
+select teste.ok((select quantidade from app.estoque_saldos where deposito_id = :'cd' and produto_id = :'UP1') = :antes - 6, 'Venda do kit pelo código antigo baixa 3 × 2 unidades');
+select teste.ok(app.cancelar_vendas_marketplace('mercado_livre', array['ML-777']) = 1, 'Cancelado no marketplace');
+select teste.ok((select quantidade from app.estoque_saldos where deposito_id = :'cd' and produto_id = :'UP1') = :antes
+            and (select status_comercial = 'cancelado' from app.pedidos where numero_externo = 'ML-777'), 'Cancelamento devolve o estoque');
+select teste.ok(app.cancelar_vendas_marketplace('mercado_livre', array['ML-777']) = 0, 'Cancelar de novo não devolve duas vezes');
+select teste.como(:'KEILA');
+select teste.falha($$select app.cancelar_vendas_marketplace('shopee', array['X'])$$, 'Sem permissão', 'Vendedora não cancela venda de marketplace');
+
 reset role;
 \echo '== Testes das unidades passaram =='

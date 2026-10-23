@@ -3,7 +3,7 @@ import { exigirUsuario } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
 import { dinheiro, hojeISO } from "@/lib/formato";
 import { Avisos } from "../../avisos";
-import { importarRelatorio, ligarSku } from "./acoes";
+import { cancelarVendas, importarRelatorio, ligarSku } from "./acoes";
 
 export const metadata = { title: "Vendas de marketplace" };
 const NOMES: Record<string, string> = { shopee: "Shopee", mercado_livre: "Mercado Livre", tiktok: "TikTok Shop" };
@@ -44,7 +44,7 @@ export default async function Marketplace({ searchParams }: { searchParams: Prom
 
       <section className="painel">
         <h2>Lançar relatório</h2>
-        <form action={importarRelatorio} className="campos">
+        <form action={importarRelatorio} className="campos" id="form-relatorio">
           <label>Marketplace<select name="canal" defaultValue="shopee">{Object.entries(NOMES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
           <label>Sai do estoque de<select name="deposito" defaultValue={d.deps[0].id}>{d.deps.map((x) => <option key={x.id} value={x.id}>{x.nome}</option>)}</select></label>
           <label>Data (se o relatório não tiver)<input type="date" name="data" defaultValue={hojeISO()} /></label>
@@ -55,6 +55,17 @@ export default async function Marketplace({ searchParams }: { searchParams: Prom
         </form>
         <p className="pequeno suave" style={{ margin: 0 }}>Colunas reconhecidas: nº do pedido, SKU (número de referência SKU), quantidade/unidades, preço, data, status (cancelados ficam de fora) e taxa/tarifa.
           Kits saem pelos componentes. Sem preço no relatório, usa o preço Brasil Normal como estimativa.</p>
+      </section>
+
+      <section className="painel">
+        <h2>Pedidos cancelados no marketplace</h2>
+        <form action={cancelarVendas} className="campos" id="form-cancelados">
+          <label>Marketplace<select name="canal" defaultValue="shopee">{Object.entries(NOMES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
+          <label className="largo">Números dos pedidos cancelados (um por linha)
+            <textarea name="numeros" rows={3} style={{ fontFamily: "monospace" }} placeholder={"261023C55UGHW6\n2000013612345678"} /></label>
+          <button>Cancelar no sistema e devolver o estoque</button>
+        </form>
+        <p className="pequeno suave" style={{ margin: 0 }}>Só cancela pedidos que já entraram pelo relatório; o estoque volta exatamente como saiu.</p>
       </section>
 
       {d.pend.length > 0 && (
