@@ -34,13 +34,8 @@ export async function enviarPendente(fd: FormData) {
   try {
     const u = await exigirUsuario();
     const arq = fd.get("foto");
-    if (!(arq instanceof File) || arq.size === 0) throw new Error("Tire a foto do produto.");
-    if (arq.size > MAX) throw new Error("Foto maior que 10 MB.");
-    const bytes = Buffer.from(await arq.arrayBuffer());
-    const ext = tipoImagem(bytes);
-    if (!ext) throw new Error("A foto precisa ser JPG, PNG ou WEBP.");
-    const desc = texto(fd, "descricao").trim();
-    if (desc.length < 2) throw new Error("Escreva o nome do produto.");
+    const temFoto = arq instanceof File && arq.size > 0;
+    let desc = texto(fd, "descricao").trim();
     const qtd = numero(fd, "quantidade");
     if (!qtd || qtd <= 0) throw new Error("Informe a quantidade (em unidades).");
     const normal = preco(fd, "preco_normal");
@@ -48,11 +43,33 @@ export async function enviarPendente(fd: FormData) {
     const vip = preco(fd, "preco_vip");
     const dep = texto(fd, "deposito_id");
     if (!UUID.test(dep)) throw new Error("Escolha a unidade.");
-    const nome = `pend-${createHash("sha256").update(bytes).digest("hex").slice(0, 32)}.${ext}`;
-    await mkdir(pastaArquivos(), { recursive: true });
-    await writeFile(path.join(pastaArquivos(), nome), bytes);
-    await comUsuario(u.id, (c) => c.query("select app.enviar_produto_pendente($1, $2, $3, $4, $5, $6, $7, $8, $9)",
-      [dep, desc.slice(0, 200), texto(fd, "marca").slice(0, 80), qtd, normal, vip, nome, `image/${ext === "jpg" ? "jpeg" : ext}`, texto(fd, "observacao").slice(0, 500)]));
+    const existente = texto(fd, "produto").split(" · ")[0].trim();
+    await comUsuario(u.id, async (c) => {
+      let prodId: string | null = null;
+      if (existente) {
+        const p = (await c.query(
+          `select p.id, p.nome from app.produtos p where p.codigo = $1
+           union all select p.id, p.nome from app.produto_codigos x join app.produtos p on p.id = x.produto_id where x.codigo = $1 limit 1`, [existente])).rows[0];
+        if (!p) throw new Error(`Produto "${existente}" não encontrado. Escolha da lista ou deixe vazio se for produto novo.`);
+        prodId = String(p.id);
+        if (desc.length < 2) desc = String(p.nome);
+      }
+      if (desc.length < 2) throw new Error("Escreva o nome do produto.");
+      if (!temFoto && !prodId) throw new Error("Tire a foto do produto (ou escolha o produto que já existe no sistema).");
+      let nome = "", mime = "";
+      if (temFoto) {
+        if (arq.size > MAX) throw new Error("Foto maior que 10 MB.");
+        const bytes = Buffer.from(await arq.arrayBuffer());
+        const ext = tipoImagem(bytes);
+        if (!ext) throw new Error("A foto precisa ser JPG, PNG ou WEBP.");
+        nome = `pend-${createHash("sha256").update(bytes).digest("hex").slice(0, 32)}.${ext}`;
+        mime = `image/${ext === "jpg" ? "jpeg" : ext}`;
+        await mkdir(pastaArquivos(), { recursive: true });
+        await writeFile(path.join(pastaArquivos(), nome), bytes);
+      }
+      await c.query("select app.enviar_produto_pendente($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+        [dep, desc.slice(0, 200), texto(fd, "marca").slice(0, 80), qtd, normal, vip, nome, mime || null, texto(fd, "observacao").slice(0, 500), prodId]);
+    });
   } catch (e) {
     erro = mensagemErro(e);
   }

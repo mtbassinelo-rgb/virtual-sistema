@@ -21,6 +21,7 @@ create table if not exists app.produtos_pendentes (
   observacao     text,
   status         text not null default 'pendente' check (status in ('pendente','aprovado','recusado')),
   produto_id     uuid references app.produtos(id) on delete set null,
+  produto_sugerido_id uuid references app.produtos(id) on delete set null,   -- a vendedora já indicou que é este produto
   criado_por     uuid references app.usuarios(id) default app.uid(),
   criado_em      timestamptz not null default now(),
   decidido_por   uuid references app.usuarios(id),
@@ -35,7 +36,7 @@ grant select on app.produtos_pendentes to vc_app;
 
 -- Vendedora (ou quem opera a unidade) envia
 create or replace function app.enviar_produto_pendente(p_deposito uuid, p_descricao text, p_marca text, p_quantidade numeric,
-  p_normal numeric, p_vip numeric, p_foto text, p_mime text, p_obs text) returns uuid
+  p_normal numeric, p_vip numeric, p_foto text, p_mime text, p_obs text, p_produto uuid default null) returns uuid
 language plpgsql security definer set search_path = app, pg_temp as $$
 declare v_id uuid;
 begin
@@ -46,9 +47,10 @@ begin
           or exists (select 1 from app.vendedora_depositos vd where vd.deposito_id = p_deposito and vd.vendedora_id = app.minha_vendedora())) then
     raise exception 'Você não trabalha nessa unidade.' using errcode = 'insufficient_privilege';
   end if;
-  if coalesce(p_foto, '') = '' then raise exception 'Tire a foto do produto.'; end if;
-  insert into app.produtos_pendentes (deposito_id, descricao, marca, quantidade, preco_normal, preco_vip, foto, foto_mime, observacao)
-  values (p_deposito, trim(p_descricao), nullif(upper(trim(p_marca)), ''), p_quantidade, p_normal, p_vip, p_foto, p_mime, nullif(trim(p_obs), ''))
+  -- produto novo precisa de foto; vínculo a produto existente pode ir sem
+  if coalesce(p_foto, '') = '' and p_produto is null then raise exception 'Tire a foto do produto.'; end if;
+  insert into app.produtos_pendentes (deposito_id, descricao, marca, quantidade, preco_normal, preco_vip, foto, foto_mime, observacao, produto_sugerido_id)
+  values (p_deposito, trim(p_descricao), nullif(upper(trim(p_marca)), ''), p_quantidade, p_normal, p_vip, nullif(p_foto, ''), p_mime, nullif(trim(p_obs), ''), p_produto)
   returning id into v_id;
   return v_id;
 end $$;
@@ -115,7 +117,7 @@ begin
 end $$;
 
 grant execute on function
-  app.enviar_produto_pendente(uuid, text, text, numeric, numeric, numeric, text, text, text),
+  app.enviar_produto_pendente(uuid, text, text, numeric, numeric, numeric, text, text, text, uuid),
   app.aprovar_produto_pendente(uuid, uuid, text, text, numeric, numeric, numeric),
   app.recusar_produto_pendente(uuid, text)
 to vc_app;
