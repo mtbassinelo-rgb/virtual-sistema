@@ -37,7 +37,8 @@ export default async function Conexoes({ searchParams }: { searchParams: Promise
     const mudou = await Promise.all(lista.map(async (w) => {
       const a = await estadoAtual(w.instancia);
       if (!a) return false;
-      const novo = a.estado === "desconectado" && w.estado === "aguardando_qr" ? "aguardando_qr" : a.estado;
+      // enquanto o QR está na tela o servidor diz "conectando": continua esperando o QR
+      const novo = (a.estado === "desconectado" || a.estado === "conectando") && w.estado === "aguardando_qr" ? "aguardando_qr" : a.estado;
       if (novo === w.estado && (!a.numero || a.numero === w.numero)) return false;
       await pool.query("select app.whatsapp_estado($1, $2, $3, null)", [w.instancia, novo, a.numero]);
       return true;
@@ -70,7 +71,7 @@ export default async function Conexoes({ searchParams }: { searchParams: Promise
 
       {lista.map((w) => {
         const e = ESTADOS[w.estado] ?? ESTADOS.desconectado;
-        const mostrarQr = w.estado === "aguardando_qr" && w.qr;
+        const mostrarQr = (w.estado === "aguardando_qr" || w.estado === "conectando") && w.qr;
         return (
           <section key={w.id} className="painel">
             <div className="linha entre">
