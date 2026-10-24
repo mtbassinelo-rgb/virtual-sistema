@@ -26,10 +26,15 @@ export async function criarConexao(fd: FormData) {
   const u = await exigirUsuario();
   const nome = texto(fd, "nome");
   const slug = nome.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "numero";
-  const instancia = `vc-${slug}-${randomBytes(2).toString("hex")}`;
+  let instancia = `vc-${slug}-${randomBytes(2).toString("hex")}`;
   let erro: string | null = null, id = "", codigo = "";
   try {
-    id = await comUsuario(u.id, async (c) => (await c.query(
+    // Mesmo nome e ainda não conectado: reaproveita (evita várias conexões repetidas quando o botão é apertado de novo)
+    const existente = await comUsuario(u.id, async (c) => (await c.query(
+      `select id, instancia from app.whatsapp_conexoes where ativo and estado <> 'conectado' and lower(trim(nome)) = lower(trim($1))
+        order by criado_em limit 1`, [nome])).rows[0] as { id: string; instancia: string } | undefined);
+    if (existente) { id = existente.id; instancia = existente.instancia; }
+    else id = await comUsuario(u.id, async (c) => (await c.query(
       `insert into app.whatsapp_conexoes (nome, instancia, pais, vendedora_id) values ($1, $2, $3, nullif($4, '')::uuid) returning id`,
       [nome, instancia, texto(fd, "pais") || "PY", texto(fd, "vendedora_id")])).rows[0].id);
     const numero = texto(fd, "numero").replace(/\D/g, "");
