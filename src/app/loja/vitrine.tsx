@@ -166,7 +166,7 @@ export async function Vitrine({ f, cabecalho }: { f: Filtros; cabecalho?: Cabeca
   return (
     <>
       {seoInicio && banners.length > 0 && (
-        <div className="in seo-topo"><h1>{seo.h1Inicio}</h1></div>
+        <h1 className="sr-only">{seo.h1Inicio}</h1>
       )}
       {!filtrando && banners.length > 0 && <FaixaBanners banners={banners} rotulo={t.destaques} acao={t.verAgora} />}
 
