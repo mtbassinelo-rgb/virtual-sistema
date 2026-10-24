@@ -31,11 +31,12 @@ export default async function AreaInterna({ children }: { children: React.ReactN
            (select count(*) from app.procuras_chegaram())::int as chegaram,
            (select count(*) from app.pedidos where desconto_qtd_status = 'pendente' and status_comercial <> 'cancelado')::int as descontos,
            ${gestao ? `(select count(distinct pedido_id) from app.pedido_remocoes where status = 'pendente')::int` : "0"} as remocoes,
+           ${gestao ? `(select count(*) from app.produtos_pendentes where status = 'pendente')::int` : "0"} as prod_pendentes,
            ((select count(*) from app.pedidos where status_comercial = 'em_separacao' and origem <> 'bling' and separacao_conferida_em is null and app.pode_operar_deposito(deposito_id))
             + (select count(*) from app.transferencias where status = 'solicitada' and app.pode_operar_deposito(origem_id)))::int as a_separar,
            (select count(*) from app.transferencias where (status = 'separada' and app.pode_aprovar_transferencia())
                or (status = 'enviada' and (app.pode_operar_deposito(destino_id) or app.trabalha_na_unidade(destino_id))))::int as transf_acao
-  `)).rows[0] as { pedidos_abertos: number; contas_vencidas: number; procuras: number; fotos: number; sem_preco: number; fora_site: number; carrinhos: number; chegaram: number; descontos: number; remocoes: number; a_separar: number; transf_acao: number }).catch(() => ({ pedidos_abertos: 0, contas_vencidas: 0, procuras: 0, fotos: 0, sem_preco: 0, fora_site: 0, carrinhos: 0, chegaram: 0, descontos: 0, remocoes: 0, a_separar: 0, transf_acao: 0 }));
+  `)).rows[0] as { pedidos_abertos: number; contas_vencidas: number; procuras: number; fotos: number; sem_preco: number; fora_site: number; carrinhos: number; chegaram: number; descontos: number; remocoes: number; prod_pendentes: number; a_separar: number; transf_acao: number }).catch(() => ({ pedidos_abertos: 0, contas_vencidas: 0, procuras: 0, fotos: 0, sem_preco: 0, fora_site: 0, carrinhos: 0, chegaram: 0, descontos: 0, remocoes: 0, prod_pendentes: 0, a_separar: 0, transf_acao: 0 }));
 
   // Menu: Dashboard → operação do dia (vendas, clientes) → cadastro (produtos, estoque) → loja e marketing → análise → financeiro → configurações
   const todos: GrupoMenu[] = [
@@ -75,6 +76,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
       { href: "/whatsapp/conexoes", texto: "Conexões (QR Code)", dica: "Conectar os números da equipe" },
     ] },
     { id: "produtos", titulo: "Produtos", icone: "produtos", itens: [
+      { href: "/produtos/pendentes", texto: "Novos produtos (pendentes)", contador: n.prod_pendentes, dica: "Vendedora fotografa o produto com quantidade e preço; o gerente clica em Atualizar" },
       { href: "/produtos", texto: "Todos os produtos" },
       ...(gestao ? [
         { href: "/produtos/novo", texto: "Novo produto" },
