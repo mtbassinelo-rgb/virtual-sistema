@@ -25,7 +25,7 @@ export default async function Transferencia({ params, searchParams }: { params: 
       left join app.pedidos p on p.id = coalesce(t.pedido_origem_id, t.pedido_id)
       where t.id = $1`, [id])).rows[0];
     if (!t) return null;
-    const itens = (await c.query(`select i.*, p.nome, p.codigo, p.marca, p.gtin, p.unidades_caixa,
+    const itens = (await c.query(`select i.*, p.nome, p.codigo, p.marca, p.gtin, p.unidades_caixa_fornecedor as unidades_caixa,
         coalesce((select quantidade from app.estoque_saldos s where s.deposito_id = $2 and s.produto_id = i.produto_id), 0)::float saldo_origem
       from app.transferencia_itens i join app.produtos p on p.id = i.produto_id where i.transferencia_id = $1 order by p.marca, p.nome`, [id, t.origem_id])).rows;
     return { t, itens };

@@ -49,7 +49,7 @@ export default async function PlanejarCompra({ searchParams }: {
          where pe.status_comercial not in ('cancelado') and pe.data_pedido > current_date - 90
            and ($4::uuid is null or coalesce(pe.deposito_id, $5::uuid) = $4::uuid)
          group by 1)
-      select p.id as produto_id, p.codigo, p.nome, p.marca, p.fornecedor, p.unidades_caixa, p.estoque_minimo, p.custo,
+      select p.id as produto_id, p.codigo, p.nome, p.marca, p.fornecedor, p.unidades_caixa_fornecedor as unidades_caixa, p.estoque_minimo, p.custo,
              coalesce(s.saldo, 0)::numeric as saldo, coalesce(v.v30, 0)::numeric as v30, coalesce(v.v90, 0)::numeric as v90
         from app.produtos p
         left join lateral (select sum(es.quantidade) as saldo from app.estoque_saldos es

@@ -75,7 +75,7 @@ export default async function Produtos({ searchParams }: { searchParams: Promise
                            where es.produto_id = p.id ${unidade ? `and dp.id = '${unidade.id}'` : ""}) s
       where ${cond.join(" and ")}`;
     const total = Number((await c.query(`select count(*) n ${base}`, par)).rows[0].n);
-    const lista = (await c.query(`select p.id, p.codigo, p.nome, p.marca, p.foto, p.tipo, p.ativo, p.codigo_provisorio, p.unidades_caixa,
+    const lista = (await c.query(`select p.id, p.codigo, p.nome, p.marca, p.foto, p.tipo, p.ativo, p.codigo_provisorio, p.unidades_caixa_fornecedor as unidades_caixa,
         p.estoque_minimo, s.saldo, x.*, ${promo("PY", "py_normal", "GS")} as promo_py, ${promo("BR", "br_normal", "BRL")} as promo_br,
         (select max(pr.fim) from app.promocoes pr where pr.produto_id = p.id and pr.status = 'aprovada' and current_date between pr.inicio and pr.fim)::text as promo_fim
         ${base} order by ${ordem[1]} limit ${POR_PAGINA} offset ${(pagina - 1) * POR_PAGINA}`, par)).rows as LinhaProduto[];

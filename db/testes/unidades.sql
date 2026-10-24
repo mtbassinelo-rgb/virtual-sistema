@@ -181,5 +181,15 @@ select teste.ok(app.cancelar_vendas_marketplace('mercado_livre', array['ML-777']
 select teste.como(:'KEILA');
 select teste.falha($$select app.cancelar_vendas_marketplace('shopee', array['X'])$$, 'Sem permissão', 'Vendedora não cancela venda de marketplace');
 
+\echo '== Caixa de venda sempre com 12 =='
+reset role;
+insert into app.produtos (codigo, nome, unidades_caixa) values ('CX-24', 'Produto caixa 24', 24), ('CX-6', 'Produto caixa 6', 6);
+select teste.ok((select unidades_caixa = 12 and unidades_caixa_fornecedor = 24 from app.produtos where codigo = 'CX-24'), 'Caixa do fornecedor 24 → cliente compra caixa de 12');
+select teste.ok((select unidades_caixa = 12 and unidades_caixa_fornecedor = 6 from app.produtos where codigo = 'CX-6'), 'Caixa do fornecedor 6 → cliente compra caixa de 12');
+update app.produtos set unidades_caixa_fornecedor = 36 where codigo = 'CX-24';
+select teste.ok((select unidades_caixa = 12 and unidades_caixa_fornecedor = 36 from app.produtos where codigo = 'CX-24'), 'Mudar a caixa do fornecedor mantém a de venda em 12');
+update app.produtos set unidades_caixa_fornecedor = null where codigo = 'CX-6';
+select teste.ok((select unidades_caixa is null from app.produtos where codigo = 'CX-6'), 'Sem caixa do fornecedor: vende por unidade');
+
 reset role;
 \echo '== Testes das unidades passaram =='

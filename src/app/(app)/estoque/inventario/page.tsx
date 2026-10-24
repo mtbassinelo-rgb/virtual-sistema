@@ -16,7 +16,7 @@ export default async function Inventario({ searchParams }: { searchParams: Promi
     if (!dep) return { podem, dep: null, itens: [] as ItemInventario[], listaAberta: null };
     const itens = (await c.query(`select p.id, p.codigo, p.nome, p.marca, p.gtin, p.foto,
         (select string_agg(kp.nome, ' · ' order by kp.nome) from app.kit_componentes k join app.produtos kp on kp.id = k.kit_id
-          where k.componente_id = p.id and kp.ativo) as kits, p.unidades_caixa::float as caixa,
+          where k.componente_id = p.id and kp.ativo) as kits, p.unidades_caixa_fornecedor::float as caixa,
         coalesce((select array_agg(pc.codigo) from app.produto_codigos pc where pc.produto_id = p.id), '{}') as codigos,
         coalesce((select quantidade from app.estoque_saldos s where s.deposito_id = $1 and s.produto_id = p.id), 0)::float as saldo
       from app.produtos p where p.tipo <> 'kit' and (p.ativo

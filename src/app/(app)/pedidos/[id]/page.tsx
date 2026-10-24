@@ -17,6 +17,13 @@ import {
 
 export const metadata = { title: "Pedido" };
 
+/** Para o estoquista: quando a caixa do fornecedor tem menos de 12, quantas caixas físicas mandar. */
+function caixasFisicas(qtd: number, cx: number | null): string {
+  if (!cx || cx >= 12 || qtd <= 0) return "";
+  const n = Math.floor(qtd / cx), r = qtd - n * cx;
+  return `enviar ${n ? `${n} cx de ${cx}` : ""}${n && r ? " + " : ""}${r ? `${r} un` : ""}`;
+}
+
 export default async function Pedido({ params, searchParams }: {
   params: Promise<{ id: string }>; searchParams: Promise<{ ok?: string; erro?: string; link?: string }>;
 }) {
@@ -32,8 +39,9 @@ export default async function Pedido({ params, searchParams }: {
       ? (await c.query("select id, nome, whatsapp, telefone, categoria_preco, pais from app.clientes where id = $1", [p.cliente_id])).rows[0]
       : null;
     const itens = (await c.query(
-      `select i.id, i.codigo, i.descricao, i.quantidade, i.quantidade_pedida, i.preco_unitario, i.desconto, i.total, d.nome as origem
-         from app.pedido_itens i left join app.depositos d on d.id = i.deposito_origem_id
+      `select i.id, i.codigo, i.descricao, i.quantidade, i.quantidade_pedida, i.preco_unitario, i.desconto, i.total, d.nome as origem,
+              pr.unidades_caixa_fornecedor as cx_forn
+         from app.pedido_itens i left join app.depositos d on d.id = i.deposito_origem_id left join app.produtos pr on pr.id = i.produto_id
         where i.pedido_id = $1 order by i.codigo, d.nome`, [id])).rows;
     const fluxo = (await c.query(
       `select volumes, separacao_conferida_em, total_confirmado_em, conta_pagamento, app.pode_operar_deposito(deposito_id) as opera,
@@ -207,7 +215,8 @@ export default async function Pedido({ params, searchParams }: {
             <input type="hidden" name="pedido_id" value={p.id} />
             {d.itens.map((i) => (
               <div key={i.id} className="largo linha separar-item">
-                <span style={{ flex: 1, minWidth: 180 }}>{i.descricao} <span className="suave">(pedido {Number(i.quantidade_pedida)})</span></span>
+                <span style={{ flex: 1, minWidth: 180 }}>{i.descricao} <span className="suave">(pedido {Number(i.quantidade_pedida)} un)</span>
+                  {caixasFisicas(Number(i.quantidade_pedida), i.cx_forn) && <span className="pequeno" style={{ display: "block" }}><b>{caixasFisicas(Number(i.quantidade_pedida), i.cx_forn)}</b></span>}</span>
                 <input name={`sep_${i.id}`} inputMode="decimal" defaultValue={Number(i.quantidade)} aria-label={`Separado de ${i.descricao}`} style={{ width: 90 }} />
                 <label className="linha" style={{ gap: 6 }}><input type="checkbox" name={`falta_${i.id}`} /> Não tem</label>
               </div>
@@ -423,7 +432,8 @@ export default async function Pedido({ params, searchParams }: {
                 <thead><tr><th>Código</th><th>Produto</th><th>Qtd</th><th>Preço</th><th>Total</th></tr></thead>
                 <tbody>{d.itens.map((i, k) => (
                   <tr key={k}><td className="num">{i.codigo}</td><td>{i.descricao}{i.origem && <div className="pequeno suave">Sai de: {i.origem}</div>}</td>
-                    <td className="num">{Number(i.quantidade)}{Number(i.quantidade_pedida) !== Number(i.quantidade) && <div className="pequeno suave">pedido: {Number(i.quantidade_pedida)}</div>}</td>
+                    <td className="num">{Number(i.quantidade)} un{Number(i.quantidade_pedida) !== Number(i.quantidade) && <div className="pequeno suave">pedido: {Number(i.quantidade_pedida)}</div>}
+                      {caixasFisicas(Number(i.quantidade), i.cx_forn) && <div className="pequeno"><b>{caixasFisicas(Number(i.quantidade), i.cx_forn)}</b></div>}</td>
                     <td className="num">{dinheiro(i.preco_unitario, moeda)}</td><td className="num">{dinheiro(i.total, moeda)}</td></tr>))}
                 </tbody></table></div>
             ) : itensBling.length > 0 ? (

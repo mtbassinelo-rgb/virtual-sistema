@@ -6,7 +6,7 @@ export async function GET() {
   const u = await usuarioAtual();
   if (!u || !ehGestao(u)) return new Response("Sem permissão.", { status: 403 });
   const rows = await comUsuario(u.id, async (c) => (await c.query(`
-    select p.codigo, p.nome, coalesce(p.fornecedor, p.marca, '') as fornecedor, p.custo, p.preco_bling, p.unidades_caixa,
+    select p.codigo, p.nome, coalesce(p.fornecedor, p.marca, '') as fornecedor, p.custo, p.preco_bling, p.unidades_caixa_fornecedor as unidades_caixa,
            ${["py_normal", "py_vip", "br_normal", "br_vip"].map((t) => `
            (select valor from app.precos x where x.produto_id = p.id and x.tabela = '${t}' and x.vigente_desde <= current_date
              order by vigente_desde desc limit 1) as ${t}`).join(",")}

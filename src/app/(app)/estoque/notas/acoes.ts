@@ -91,7 +91,7 @@ export async function importarXml(fd: FormData) {
       const n = lerNfe(await arq.text());
       if (!n.itens.length) throw new Error("a nota não tem itens");
       ultimo = await comUsuario(u.id, async (c) => {
-        const prods = (await c.query("select id::text, nome, marca, gtin, unidades_caixa from app.produtos order by ativo desc")).rows as
+        const prods = (await c.query("select id::text, nome, marca, gtin, coalesce(unidades_caixa_fornecedor, unidades_caixa) unidades_caixa from app.produtos order by ativo desc")).rows as
           { id: string; nome: string; marca: string | null; gtin: string | null; unidades_caixa: number | null }[];
         const porId = new Map(prods.map((p) => [p.id, p]));
         const porEan = new Map(prods.filter((p) => p.gtin).map((p) => [p.gtin!, p]));

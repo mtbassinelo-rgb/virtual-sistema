@@ -21,7 +21,7 @@ export default async function RevisarCustos({ searchParams }: { searchParams: Pr
     const cambio = Number((await c.query("select app.param('cambio_custo_gs') v")).rows[0]?.v) || 1300;
     const ultimo = (t: string) => `(select valor from app.precos z where z.produto_id = p.id and z.tabela = '${t}' and z.vigente_desde <= current_date order by vigente_desde desc limit 1)`;
     const linhas = (await c.query(`select * from (
-        select p.id, p.codigo, p.nome, p.marca, app.custo_produto(p.id) custo, p.custo_origem origem, p.unidades_caixa,
+        select p.id, p.codigo, p.nome, p.marca, app.custo_produto(p.id) custo, p.custo_origem origem, p.unidades_caixa_fornecedor as unidades_caixa,
                ${ultimo("py_normal")} py_normal, ${ultimo("br_normal")} br_normal,
                coalesce((select sum(quantidade) from app.estoque_saldos s where s.produto_id = p.id), 0)::float estoque
           from app.produtos p where p.ativo and not p.marketplace and p.codigo is not null) x

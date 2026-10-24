@@ -83,7 +83,7 @@ export function TabelaProdutos({ linhas, gestao, acao }: {
           <th></th><th>Produto</th>
           <th className="num" title="Saldo somando os depósitos ativos">Estoque</th>
           <th className="num" title="Abaixo disso o produto entra no relatório de compra">Mínimo</th>
-          <th className="num" title="Peças por caixa: o site mostra o preço da caixa fechada e o da unidade">Caixa</th>
+          <th className="num" title="Peças na caixa do fornecedor. Para o cliente a caixa é sempre de 12 unidades">Cx forn.</th>
           {TABELAS.map((t) => <th key={t.k} className="num">{t.t}</th>)}
           {PROMOS.map((t) => <th key={t.k} className="num promo-col" title="Preço promocional (sobre a tabela normal do país). Vale 30 dias e aparece em Promoções no site. Em branco = sem promoção.">{t.t}</th>)}
         </tr></thead>

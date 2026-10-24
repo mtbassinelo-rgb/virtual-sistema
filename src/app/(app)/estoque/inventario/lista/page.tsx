@@ -28,7 +28,7 @@ export default async function ListaInventario({ searchParams }: { searchParams: 
     if (!atual) return null;
     const linhas = (await c.query(`select l.*, l.quantidade::float quantidade, l.caixas::float caixas, p.nome produto_nome, p.codigo produto_codigo
         from app.inventario_lista l left join app.produtos p on p.id = l.produto_id where l.lista = $1 order by l.ordem`, [atual.lista])).rows as Linha[];
-    const produtos = (await c.query(`select p.id, p.codigo, p.nome, p.marca, p.ativo, p.tipo, p.foto, p.unidades_caixa::float caixa,
+    const produtos = (await c.query(`select p.id, p.codigo, p.nome, p.marca, p.ativo, p.tipo, p.foto, p.unidades_caixa_fornecedor::float caixa,
         coalesce((select quantidade from app.estoque_saldos s where s.deposito_id = $1 and s.produto_id = p.id), 0)::float saldo
         from app.produtos p`, [atual.deposito_id])).rows as Produto[];
     return { listas, atual, linhas, produtos };

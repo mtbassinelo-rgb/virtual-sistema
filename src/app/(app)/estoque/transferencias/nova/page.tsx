@@ -35,7 +35,7 @@ export default async function NovaSolicitacao({ searchParams }: {
       for (const r of its) sug.set(r.produto_id, Number(r.q));
     }
     const linhas = (await c.query(`
-      select p.id, p.codigo, p.nome, p.marca, p.unidades_caixa caixa,
+      select p.id, p.codigo, p.nome, p.marca, p.unidades_caixa_fornecedor caixa,
              coalesce(so.quantidade, 0)::float origem, coalesce(sd.quantidade, 0)::float destino,
              coalesce((select sum(i.quantidade) from app.pedido_itens i join app.pedidos pe on pe.id = i.pedido_id
                         where i.produto_id = p.id and pe.deposito_id = $2 and app.conta_como_venda(pe.status_comercial)
