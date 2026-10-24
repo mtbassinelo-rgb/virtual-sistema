@@ -179,7 +179,11 @@ export default async function WhatsApp({ searchParams }: {
           <p>Mensagens enviadas e recebidas, tempo de resposta, quem está esperando e quanto cada conversa virou em pedidos.
             {gestao ? " A conversa é casada com o cliente pelo número cadastrado." : ""}</p>
         </div>
-        {pode(u, "whatsapp_conexoes") && <Link className="botao" href="/whatsapp/conexoes">Conexões (QR Code)</Link>}
+        <div className="linha" style={{ gap: 6 }}>
+          <a className="botao" href={`/whatsapp/exportar?de=${de}&ate=${ate}${f.w ? `&w=${f.w}` : ""}`} title="Todas as mensagens do período escolhido, uma por linha (abre no Excel)">
+            Baixar conversas ({data(de)} a {data(ate)})</a>
+          {pode(u, "whatsapp_conexoes") && <Link className="botao" href="/whatsapp/conexoes">Conexões (QR Code)</Link>}
+        </div>
       </section>
 
       {conexoes.length === 0 ? (

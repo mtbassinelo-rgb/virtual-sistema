@@ -121,6 +121,10 @@ for (const tela of ["/whatsapp", "/whatsapp?p=30&f=aguardando&o=espera", "/whats
   ok(r.status === 200 && !r.html.includes("Application error"), `Gerente: ${tela} abre`);
 }
 ok(semAcesso(await abrir("/whatsapp/conexoes", await sessao("keila@teste.local"))), "Vendedora não abre as conexões do WhatsApp");
+{
+  const r = await fetch(base + "/whatsapp/exportar", { headers: { cookie: await sessao("gerente@teste.local") } });
+  ok(r.status === 200 && (await r.text()).includes("Quem escreveu"), "Gerente baixa a planilha de conversas do WhatsApp");
+}
 ok((await fetch(base + "/api/whatsapp/webhook", { method: "POST", body: "{}", headers: { "content-type": "application/json" } })).status === 401,
   "Webhook do WhatsApp sem chave é recusado");
 const semPerm = await abrir("/sem-permissao?area=equipe", await sessao("keila@teste.local"));
