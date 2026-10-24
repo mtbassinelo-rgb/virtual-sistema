@@ -278,11 +278,6 @@ export default async function Hoje() {
         </section>
       )}
 
-            </div>
-          </div>
-        </section>
-      )}
-
       {gestao && d.pendencias > 0 && (
         <div className="aviso-caixa aviso linha entre">
           <span>{d.pendencias} pendência(s) de estoque de pedidos de marketplace (falta de estoque ou código sem cadastro).</span>
