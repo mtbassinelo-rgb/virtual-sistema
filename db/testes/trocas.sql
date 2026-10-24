@@ -24,9 +24,9 @@ select teste.como(:'YESSICA');
 select teste.falha($$select app.trocar_item_pedido('00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000e7', 2, 'a.jpg', 'a.jpg', 'image/jpeg', 10, 'abc')$$,
   'vendedora do pedido', 'Outra vendedora não troca produto do pedido');
 select teste.como(:'KEILA');
-select teste.falha($$select app.trocar_item_pedido('00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000e7', 2, '', null, 'image/jpeg', 0, '')$$,
-  'print', 'Troca sem print da conversa é barrada');
-select app.trocar_item_pedido('00000000-0000-0000-0000-0000000000e1', :'SUBST', 2, 'a.jpg', 'a.jpg', 'image/jpeg', 10, 'abc', 'cliente aceitou morango');
+select app.trocar_item_pedido('00000000-0000-0000-0000-0000000000e1', :'SUBST', 2, '', null, '', 0, '', 'cliente aceitou morango');
+select teste.ok((select arquivo is null from app.pedido_trocas where item_id = '00000000-0000-0000-0000-0000000000e1'),
+  'Troca sem print é aceita (print opcional)');
 select teste.ok((select produto_id from app.pedido_itens where id = '00000000-0000-0000-0000-0000000000e1') = :'SUBST'::uuid,
   'Item passa a ser o produto substituto');
 select teste.ok((select preco_unitario from app.pedido_itens where id = '00000000-0000-0000-0000-0000000000e1')
@@ -34,7 +34,7 @@ select teste.ok((select preco_unitario from app.pedido_itens where id = '0000000
   'Preço do substituto é o da tabela do cliente');
 select teste.ok((select valor_total from app.pedidos where id = :'PED') = (select sum(total) from app.pedido_itens where pedido_id = :'PED'),
   'Total do pedido é recalculado');
-select teste.ok((select count(*) from app.pedido_trocas where pedido_id = :'PED') = 1, 'Troca fica registrada com o print');
+select teste.ok((select count(*) from app.pedido_trocas where pedido_id = :'PED') = 1, 'Troca fica registrada');
 
 \echo '== Remoção autorizada vai para os procurados =='
 select teste.falha($$select app.pedir_remocao_item('00000000-0000-0000-0000-0000000000e2', '')$$, 'motivo', 'Pedido de remoção exige motivo');

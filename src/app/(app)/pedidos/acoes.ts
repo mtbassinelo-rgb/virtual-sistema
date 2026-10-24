@@ -273,25 +273,28 @@ async function produtoPorCodigo(c: PoolClient, valor: string) {
   return String(r.rows[0].id);
 }
 
-/** Produto sem estoque: troca por outro produto/aroma com o print da conversa com o cliente (obrigatório). */
+/** Troca de produto ou fragrância combinada com o cliente (print opcional). */
 export async function trocarItem(fd: FormData) {
   const pedido = texto(fd, "pedido_id");
   await executar(pedido, "Produto trocado. O total do pedido foi recalculado.", async (uid) => {
+    // Print da conversa é opcional: a vendedora combina com o cliente e troca direto
     const arquivo = fd.get("print");
-    if (!(arquivo instanceof File) || arquivo.size === 0) throw new Error("Anexe o print da conversa em que o cliente aceitou a troca.");
-    const ext = TIPOS_COMPROVANTE[arquivo.type];
-    if (!ext) throw new Error("O print deve ser foto (JPG, PNG, WEBP) ou PDF.");
-    if (arquivo.size > MAX_COMPROVANTE) throw new Error("Arquivo maior que 10 MB.");
-    const bytes = Buffer.from(await arquivo.arrayBuffer());
-    const sha = createHash("sha256").update(bytes).digest("hex");
-    const nome = `${sha}.${ext}`;
-    await mkdir(pastaArquivos(), { recursive: true });
-    await writeFile(path.join(pastaArquivos(), nome), bytes);
+    let nome = "", original = "", mime = "", tamanho = 0, sha = "";
+    if (arquivo instanceof File && arquivo.size > 0) {
+      const ext = TIPOS_COMPROVANTE[arquivo.type];
+      if (!ext) throw new Error("O print deve ser foto (JPG, PNG, WEBP) ou PDF.");
+      if (arquivo.size > MAX_COMPROVANTE) throw new Error("Arquivo maior que 10 MB.");
+      const bytes = Buffer.from(await arquivo.arrayBuffer());
+      sha = createHash("sha256").update(bytes).digest("hex");
+      nome = `${sha}.${ext}`; original = arquivo.name; mime = arquivo.type; tamanho = arquivo.size;
+      await mkdir(pastaArquivos(), { recursive: true });
+      await writeFile(path.join(pastaArquivos(), nome), bytes);
+    }
     const qtd = numero(fd, "quantidade");
     await comUsuario(uid, async (c) => {
       const produto = await produtoPorCodigo(c, texto(fd, "produto"));
       await c.query("select app.trocar_item_pedido($1, $2, $3, $4, $5, $6, $7, $8, nullif($9,''))",
-        [texto(fd, "item_id"), produto, qtd, nome, arquivo.name, arquivo.type, arquivo.size, sha, texto(fd, "observacao")]);
+        [texto(fd, "item_id"), produto, qtd, nome, original, mime, tamanho, sha, texto(fd, "observacao")]);
     });
   });
 }

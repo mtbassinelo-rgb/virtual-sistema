@@ -10,10 +10,11 @@ import {
 } from "@/lib/formato";
 import { Avisos, Selo } from "../../avisos";
 import {
-  anexarComprovante, atualizarPedido, avancarEntrega, conferirPagamento, conferirSeparacao, confirmarTotal, decidirPedidoPortal,
+  anexarComprovante, atualizarPedido, avancarEntrega, conferirPagamento, confirmarTotal, decidirPedidoPortal,
   reconhecerBling, recusarPagamento, registrarAtendimento, registrarPagamento, gerarLinkPedido, definirVolumes, decidirDescontoQuantidade,
-  trocarItem, pedirRemocao, decidirRemocao,
+  decidirRemocao,
 } from "../acoes";
+import { ItensPedido, type ItemPedido, type Sugestao } from "./itens-pedido";
 
 export const metadata = { title: "Pedido" };
 
@@ -23,6 +24,46 @@ function caixasFisicas(qtd: number, cx: number | null): string {
   const n = Math.floor(qtd / cx), r = qtd - n * cx;
   return `enviar ${n ? `${n} cx de ${cx}` : ""}${n && r ? " + " : ""}${r ? `${r} un` : ""}`;
 }
+
+const palavras = (t: string) => t.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toUpperCase()
+  .replace(/[^A-Z0-9 ]/g, " ").split(/\s+/).filter((w) => w.length > 1);
+
+/** Outras fragrâncias/variações do mesmo produto: mesma marca e nome parecido (troca com um clique). */
+function variacoes(item: { codigo: string | null; nome: string | null; descricao: string; marca: string | null },
+                   produtos: { codigo: string; nome: string; marca: string | null; estoque: number }[]): Sugestao[] {
+  const a = new Set(palavras(item.nome ?? item.descricao));
+  if (a.size === 0) return [];
+  return produtos
+    .filter((x) => x.codigo !== item.codigo && (!item.marca || !x.marca || x.marca === item.marca))
+    .map((x) => {
+      const b = new Set(palavras(x.nome));
+      const comum = [...b].filter((w) => a.has(w)).length;
+      return { x, nota: comum / Math.max(a.size, b.size) };
+    })
+    .filter((r) => r.nota >= 0.5)
+    .sort((r1, r2) => r2.nota - r1.nota || Number(r2.x.estoque > 0) - Number(r1.x.estoque > 0))
+    .slice(0, 8)
+    .map(({ x }) => ({ codigo: x.codigo, nome: x.nome, estoque: Number(x.estoque) }));
+}
+
+/** O que falta fazer neste pedido, em uma frase (para a vendedora e a expedição). */
+function proximoPasso(p: { status_comercial: string; origem: string; saldo: string },
+                      f: { separacao_conferida_em: string | null; total_confirmado_em: string | null } | undefined): string | null {
+  switch (p.status_comercial) {
+    case "aguardando_cliente": return "Mandar o link para o cliente conferir e confirmar as caixas.";
+    case "aguardando_aprovacao": return "Conferir os itens e aprovar o pedido feito pelo cliente.";
+    case "em_separacao":
+      if (p.origem !== "bling" && !f?.separacao_conferida_em) return "Expedição: conferir a separação na lista de itens. Faltou algo? Troque a fragrância com o cliente.";
+      if (p.origem !== "bling" && !f?.total_confirmado_em) return "Confirmar o total e mandar a conta para o cliente pelo WhatsApp.";
+      if (Number(p.saldo) > 0) return "Aguardando o pagamento do cliente (registre o comprovante quando chegar).";
+      return "Pago: despachar o pedido.";
+    case "enviado": return "Em transporte: avisar quando chegar para retirada.";
+    case "aguardando_retirada": return "Aguardando o cliente retirar.";
+    default: return null;
+  }
+}
+
+const PASSOS = ["Pedido", "Confirmado", "Separado", "Total enviado", "Pago", "Enviado", "Entregue"];
 
 export default async function Pedido({ params, searchParams }: {
   params: Promise<{ id: string }>; searchParams: Promise<{ ok?: string; erro?: string; link?: string }>;
@@ -40,7 +81,7 @@ export default async function Pedido({ params, searchParams }: {
       : null;
     const itens = (await c.query(
       `select i.id, i.codigo, i.descricao, i.quantidade, i.quantidade_pedida, i.preco_unitario, i.desconto, i.total, d.nome as origem,
-              pr.unidades_caixa_fornecedor as cx_forn
+              pr.unidades_caixa_fornecedor as cx_forn, pr.nome, pr.marca
          from app.pedido_itens i left join app.depositos d on d.id = i.deposito_origem_id left join app.produtos pr on pr.id = i.produto_id
         where i.pedido_id = $1 order by i.codigo, d.nome`, [id])).rows;
     const fluxo = (await c.query(
@@ -79,7 +120,7 @@ export default async function Pedido({ params, searchParams }: {
            or (a.tabela = 'pagamentos' and a.registro_id in (select id::text from app.pagamentos where pedido_id = $1::uuid))
         order by a.em desc limit 50`, [id])).rows;
     const trocas = (await c.query(
-      `select t.id, t.descricao_antes, t.quantidade_antes, t.descricao_depois, t.quantidade, t.preco_depois, t.observacao, t.feito_em, u.nome
+      `select t.id, t.arquivo is not null as tem_print, t.descricao_antes, t.quantidade_antes, t.descricao_depois, t.quantidade, t.preco_depois, t.observacao, t.feito_em, u.nome
          from app.pedido_trocas t left join app.usuarios u on u.id = t.feito_por
         where t.pedido_id = $1 order by t.feito_em`, [id])).rows;
     const remocoes = (await c.query(
@@ -90,7 +131,11 @@ export default async function Pedido({ params, searchParams }: {
     const editavelItens = p.origem !== "bling" && !fluxo?.total_confirmado_em
       && ["aguardando_cliente", "aguardando_aprovacao", "em_separacao"].includes(p.status_comercial);
     const produtos = editavelItens
-      ? (await c.query("select codigo, nome from app.produtos where ativo and not marketplace and codigo is not null order by nome")).rows as { codigo: string; nome: string }[]
+      ? (await c.query(
+          `select pr.codigo, pr.nome, pr.marca, coalesce(s.quantidade, 0)::float estoque
+             from app.produtos pr left join app.estoque_saldos s on s.produto_id = pr.id and s.deposito_id = $1
+            where pr.ativo and not pr.marketplace and pr.codigo is not null order by pr.nome`, [p.deposito_id])).rows as
+          { codigo: string; nome: string; marca: string | null; estoque: number }[]
       : [];
     return { p, cliente, itens, fluxo, transf, bling, pagamentos, comprovantes, atendimentos, depositos, historico, indisponiveis,
              trocas, remocoes, editavelItens, produtos };
@@ -126,6 +171,25 @@ export default async function Pedido({ params, searchParams }: {
       `\nTotal: ${dinheiro(p.valor_total, moeda)}\nConfira e confirme as caixas por este link: ${linkCliente}`
     : null;
   const whatsLink = msgLink ? linkWhatsApp(cliente?.whatsapp ?? cliente?.telefone, msgLink) : null;
+  const separar = p.status_comercial === "em_separacao" && p.origem !== "bling" && !fluxo?.separacao_conferida_em && Boolean(gestao || fluxo?.opera);
+  const trocar = escrever && d.editavelItens;
+  const itensVista: ItemPedido[] = d.itens.map((i) => ({
+    id: i.id, codigo: i.codigo, descricao: i.descricao, quantidade: Number(i.quantidade), pedida: Number(i.quantidade_pedida),
+    preco: dinheiro(i.preco_unitario, moeda), total: dinheiro(i.total, moeda), origem: i.origem,
+    caixas: caixasFisicas(Number(i.quantidade), i.cx_forn),
+    sugestoes: trocar ? variacoes(i, d.produtos) : [],
+    remocaoPendente: d.remocoes.some((r) => r.status === "pendente" && r.item_id === i.id),
+  }));
+  const passo = proximoPasso(p, fluxo);
+  const feitos = [
+    true,
+    !["aguardando_cliente", "aguardando_aprovacao"].includes(p.status_comercial),
+    Boolean(fluxo?.separacao_conferida_em) || ["enviado", "aguardando_retirada", "entregue"].includes(p.status_comercial),
+    Boolean(fluxo?.total_confirmado_em) || ehBling,
+    p.status_pagamento === "pago",
+    ["enviado", "aguardando_retirada", "entregue"].includes(p.status_comercial),
+    p.status_comercial === "entregue",
+  ];
   const itensBling: { codigo?: string; descricao?: string; quantidade?: number; valor?: number }[] =
     d.bling && Array.isArray(d.bling.itens) ? d.bling.itens : [];
 
@@ -151,6 +215,24 @@ export default async function Pedido({ params, searchParams }: {
           {whats && <a className="botao whatsapp" href={whats} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
         </div>
       </section>
+
+      {p.status_comercial === "cancelado" ? (
+        <div className="aviso-caixa erro"><b>Pedido cancelado.</b></div>
+      ) : (
+        <section className="painel passos-pedido">
+          <ol className="passos">
+            {PASSOS.map((nome, k) => (
+              <li key={nome} className={feitos[k] ? "feito" : k === feitos.indexOf(false) ? "atual" : ""}>
+                <span className="passo-ponto">{feitos[k] ? "✓" : k + 1}</span><span>{nome}</span>
+              </li>
+            ))}
+          </ol>
+          {passo && <div className="proximo-passo"><span>Próximo passo</span><b>{passo}</b></div>}
+          {p.status_comercial === "em_separacao" && p.origem !== "bling" && !fluxo?.separacao_conferida_em && !(gestao || fluxo?.opera) && (
+            <span className="pequeno suave">Aguardando a expedição conferir a separação.</span>
+          )}
+        </section>
+      )}
 
       <Avisos ok={avisos.ok} erro={avisos.erro} />
 
@@ -207,28 +289,25 @@ export default async function Pedido({ params, searchParams }: {
         </section>
       )}
 
-      {p.status_comercial === "em_separacao" && p.origem !== "bling" && !fluxo?.separacao_conferida_em && (gestao || fluxo?.opera) && (
-        <section className="painel" id="separar" style={{ borderColor: "var(--info)" }}>
-          <h2>Conferir separação</h2>
-          <p className="suave pequeno">Informe quanto foi separado de cada item. Se não tem, marque “Não tem”: o item sai do pedido, o total é recalculado e o cliente vê no acompanhamento que ele não estava disponível.</p>
-          <form action={conferirSeparacao} className="campos">
-            <input type="hidden" name="pedido_id" value={p.id} />
-            {d.itens.map((i) => (
-              <div key={i.id} className="largo linha separar-item">
-                <span style={{ flex: 1, minWidth: 180 }}>{i.descricao} <span className="suave">(pedido {Number(i.quantidade_pedida)} un)</span>
-                  {caixasFisicas(Number(i.quantidade_pedida), i.cx_forn) && <span className="pequeno" style={{ display: "block" }}><b>{caixasFisicas(Number(i.quantidade_pedida), i.cx_forn)}</b></span>}</span>
-                <input name={`sep_${i.id}`} inputMode="decimal" defaultValue={Number(i.quantidade)} aria-label={`Separado de ${i.descricao}`} style={{ width: 90 }} />
-                <label className="linha" style={{ gap: 6 }}><input type="checkbox" name={`falta_${i.id}`} /> Não tem</label>
-              </div>
-            ))}
-            <button className="principal">Separação conferida</button>
-          </form>
-        </section>
-      )}
-      {p.status_comercial === "em_separacao" && p.origem !== "bling" && !fluxo?.separacao_conferida_em && !(gestao || fluxo?.opera) && (
-        <div className="aviso-caixa">Aguardando a expedição conferir a separação.</div>
-      )}
 
+      <section className="painel" id="itens">
+        <div className="linha entre">
+          <h2>Itens do pedido <span className="suave pequeno">({d.itens.length || itensBling.length})</span></h2>
+          {trocar && <span className="pequeno suave">Falou com o cliente? Use <b>⇄ Trocar</b> para mudar o produto ou a fragrância.</span>}
+        </div>
+        {d.itens.length > 0 ? (
+          <ItensPedido pedidoId={p.id} itens={itensVista} total={dinheiro(p.valor_total, moeda)} separar={separar} trocar={trocar}
+            produtos={d.produtos.map((x) => `${x.codigo} · ${x.nome}`)} />
+        ) : itensBling.length > 0 ? (
+          <div className="tabela"><table>
+            <thead><tr><th>Código</th><th>Produto</th><th>Qtd</th><th>Valor</th></tr></thead>
+            <tbody>{itensBling.map((i, k) => (
+              <tr key={k}><td className="num">{i.codigo}</td><td>{i.descricao ?? "—"}</td><td className="num">{i.quantidade}</td>
+                <td className="num">{dinheiro(i.valor ?? null, moeda)}</td></tr>))}
+            </tbody></table></div>
+        ) : <p className="suave">Itens não informados (pedido vindo da planilha).</p>}
+        {ehBling && <p className="pequeno suave">Itens e valores deste pedido vêm do Bling e só mudam lá.</p>}
+      </section>
       {d.remocoes.some((r) => r.status === "pendente") && (
         <section className="painel" id="remocoes" style={{ borderColor: "#e0b04a", background: "#fffaf0" }}>
           <h2 style={{ margin: 0 }}>Tirar produto do pedido: aguardando autorização</h2>
@@ -252,44 +331,6 @@ export default async function Pedido({ params, searchParams }: {
         </section>
       )}
 
-      {escrever && d.editavelItens && d.itens.length > 0 && (
-        <section className="painel" id="sem-estoque">
-          <h2>Produto sem estoque? Trocar ou tirar do pedido</h2>
-          <p className="suave pequeno">Fale com o cliente antes. <b>Trocar</b>: escolha o substituto (outro produto ou aroma) e anexe o print da conversa
-            em que o cliente aceitou; o preço é o da tabela dele. <b>Tirar do pedido</b>: se o cliente não quiser outro, peça a autorização;
-            o gerente ou o dono aprova e o produto vai para a lista de procurados sem estoque (para comprarmos quando juntar volume).</p>
-          <datalist id="lista-substitutos">
-            {d.produtos.map((x) => <option key={x.codigo} value={`${x.codigo} · ${x.nome}`} />)}
-          </datalist>
-          {d.itens.map((i) => {
-            const pendente = d.remocoes.some((r) => r.status === "pendente" && r.item_id === i.id);
-            return (
-              <details key={i.id} className="aviso-caixa" style={{ marginBottom: 8 }}>
-                <summary><b>{Number(i.quantidade)}× {i.descricao}</b> <span className="suave pequeno">({i.codigo})</span>
-                  {pendente && <span className="pequeno"> · remoção aguardando autorização</span>}</summary>
-                <form action={trocarItem} className="campos" style={{ marginTop: 8 }}>
-                  <input type="hidden" name="pedido_id" value={p.id} />
-                  <input type="hidden" name="item_id" value={i.id} />
-                  <label className="largo">Trocar por (produto ou aroma)
-                    <input name="produto" list="lista-substitutos" required placeholder="Digite o código ou o nome" autoComplete="off" /></label>
-                  <label>Quantidade<input name="quantidade" inputMode="decimal" defaultValue={Number(i.quantidade)} required /></label>
-                  <label>Print da conversa com o cliente (obrigatório)<input type="file" name="print" accept="image/jpeg,image/png,image/webp,application/pdf" required /></label>
-                  <label className="largo">Observação<input name="observacao" placeholder="Ex.: cliente preferiu o aroma morango" /></label>
-                  <button className="principal">Trocar produto</button>
-                </form>
-                {!pendente && (
-                  <form action={pedirRemocao} className="linha" style={{ marginTop: 8 }}>
-                    <input type="hidden" name="pedido_id" value={p.id} />
-                    <input type="hidden" name="item_id" value={i.id} />
-                    <input name="motivo" required placeholder="Por que tirar? (ex.: cliente não quis outro aroma)" style={{ flex: 1, minWidth: 200 }} />
-                    <button className="perigo">Pedir para tirar do pedido</button>
-                  </form>
-                )}
-              </details>
-            );
-          })}
-        </section>
-      )}
 
       {(d.trocas.length > 0 || d.remocoes.some((r) => r.status !== "pendente")) && (
         <section className="painel">
@@ -298,7 +339,7 @@ export default async function Pedido({ params, searchParams }: {
             {d.trocas.map((t) => (
               <li key={t.id}>{dataHora(t.feito_em)} · {t.nome ?? "—"} trocou <b>{Number(t.quantidade_antes)}× {t.descricao_antes}</b> por{" "}
                 <b>{Number(t.quantidade)}× {t.descricao_depois}</b> ({dinheiro(t.preco_depois, moeda)} cada)
-                {t.observacao && <> · {t.observacao}</>} · <a href={`/trocas/${t.id}`} target="_blank" rel="noopener noreferrer">ver print</a></li>
+                {t.observacao && <> · {t.observacao}</>}{t.tem_print && <> · <a href={`/trocas/${t.id}`} target="_blank" rel="noopener noreferrer">ver print</a></>}</li>
             ))}
             {d.remocoes.filter((r) => r.status !== "pendente").map((r) => (
               <li key={r.id}>{dataHora(r.decidido_em)} · remoção de <b>{Number(r.quantidade)}× {r.descricao}</b>{" "}
@@ -425,27 +466,6 @@ export default async function Pedido({ params, searchParams }: {
 
       <div className="duas-colunas">
         <div className="coluna">
-          <section className="painel">
-            <h2>Itens</h2>
-            {d.itens.length > 0 ? (
-              <div className="tabela"><table>
-                <thead><tr><th>Código</th><th>Produto</th><th>Qtd</th><th>Preço</th><th>Total</th></tr></thead>
-                <tbody>{d.itens.map((i, k) => (
-                  <tr key={k}><td className="num">{i.codigo}</td><td>{i.descricao}{i.origem && <div className="pequeno suave">Sai de: {i.origem}</div>}</td>
-                    <td className="num">{Number(i.quantidade)} un{Number(i.quantidade_pedida) !== Number(i.quantidade) && <div className="pequeno suave">pedido: {Number(i.quantidade_pedida)}</div>}
-                      {caixasFisicas(Number(i.quantidade), i.cx_forn) && <div className="pequeno"><b>{caixasFisicas(Number(i.quantidade), i.cx_forn)}</b></div>}</td>
-                    <td className="num">{dinheiro(i.preco_unitario, moeda)}</td><td className="num">{dinheiro(i.total, moeda)}</td></tr>))}
-                </tbody></table></div>
-            ) : itensBling.length > 0 ? (
-              <div className="tabela"><table>
-                <thead><tr><th>Código</th><th>Produto</th><th>Qtd</th><th>Valor</th></tr></thead>
-                <tbody>{itensBling.map((i, k) => (
-                  <tr key={k}><td className="num">{i.codigo}</td><td>{i.descricao ?? "—"}</td><td className="num">{i.quantidade}</td>
-                    <td className="num">{dinheiro(i.valor ?? null, moeda)}</td></tr>))}
-                </tbody></table></div>
-            ) : <p className="suave">Itens não informados (pedido vindo da planilha).</p>}
-            {ehBling && <p className="pequeno suave">Itens e valores deste pedido vêm do Bling e só mudam lá.</p>}
-          </section>
 
           <section className="painel" id="pagamentos">
             <h2>Pagamentos</h2>

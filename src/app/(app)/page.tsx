@@ -4,6 +4,11 @@ import { comUsuario } from "@/lib/db";
 import { dinheiro, data, dataHora, linkWhatsApp, MODALIDADES, telefone, type Moeda } from "@/lib/formato";
 import { Selo } from "./avisos";
 import { apagarPedidosSite, marcarPedidoSiteAtendido } from "./acoes-site";
+import { carregarFila, FilaPedidos } from "./pedidos/fila";
+
+type Recompra = { cliente_id: string; nome: string; whatsapp: string | null; vendedora: string; atraso_dias: number; dias_desde: number; alto_valor: boolean; moeda: Moeda; valor_medio: string | null };
+type Carrinho = { cliente_id: string; cliente: string; whatsapp: string | null; vendedora: string; itens: number; atualizado_em: string };
+type Espera = { contato: string; texto: string | null; em: string };
 
 export const metadata = { title: "Hoje" };
 
@@ -87,19 +92,102 @@ export default async function Hoje() {
        where i.descricao ilike '%SEM ESTOQUE%' and p.status_comercial::text in ('aguardando_cliente','aguardando_aprovacao','em_separacao')
        group by p.id, cl.nome, v.nome, p.data_pedido order by p.data_pedido desc limit 30`).catch(() => ({ rows: [] }))).rows as
       { id: string; cliente: string; vendedora: string; data_pedido: string; itens: string }[];
-    return { semEstoque, destaques, sugestoesCredito, cadastros, site, aConferir, metasPropostas, recusados, envioAtrasado, pagAtrasado, metasPerto, transferencias, portal, separar, confirmar, pendencias };
+    const fila = await carregarFila(c);
+    const meu = gestao ? "" : "and v.vendedora_id = app.minha_vendedora()";
+    const mes = (await c.query(`select v.moeda, coalesce(sum(v.valor_total), 0) vendido, count(*)::int n
+        from app.v_pedidos v where v.status_comercial <> 'cancelado' and v.data_pedido >= date_trunc('month', current_date) ${meu}
+          and not exists (select 1 from app.canais k where k.codigo = v.canal and k.marketplace)
+       group by 1 order by 1 desc`)).rows as { moeda: Moeda; vendido: string; n: number }[];
+    const receber = (await c.query(`select v.moeda, coalesce(sum(v.saldo), 0) saldo, count(*)::int n from app.v_pedidos v
+        where v.saldo > 0 and v.status_comercial <> 'cancelado' ${meu} group by 1 order by 1 desc`)).rows as { moeda: Moeda; saldo: string; n: number }[];
+    const comissao = gestao ? [] : (await c.query(`select moeda, comissao from app.comissoes(date_trunc('month', current_date)::date)
+        where vendedora_id = app.minha_vendedora()`).catch(() => ({ rows: [] }))).rows as { moeda: Moeda; comissao: string | null }[];
+    const recompra = (await c.query(`select r.* from app.recompra_clientes() r
+        where r.atraso_dias > 0 and exists (select 1 from app.clientes cl where cl.id = r.cliente_id and cl.ativo)
+          ${gestao ? "" : "and r.vendedora_id = app.minha_vendedora()"}
+        order by r.alto_valor desc, r.atraso_dias desc limit 6`).catch(() => ({ rows: [] }))).rows as Recompra[];
+    const carrinhos = (await c.query(`select * from app.carrinhos_parados() where avisado_em is null order by atualizado_em desc limit 5`)
+      .catch(() => ({ rows: [] }))).rows as Carrinho[];
+    const esperando = (await c.query(`select contato, texto, em from (
+          select distinct on (m.conexao_id, m.contato) m.contato, m.texto, m.em, m.enviada
+            from app.whatsapp_mensagens m where m.em > now() - interval '3 days'
+           order by m.conexao_id, m.contato, m.em desc) x
+        where not x.enviada order by em limit 50`).catch(() => ({ rows: [] }))).rows as Espera[];
+    return { fila, mes, receber, comissao, recompra, carrinhos, esperando, semEstoque, destaques, sugestoesCredito, cadastros, site, aConferir, metasPropostas, recusados, envioAtrasado, pagAtrasado, metasPerto, transferencias, portal, separar, confirmar, pendencias };
   });
 
   return (
     <>
-      <section>
-        <h1>Bom trabalho, {u.nome.split(" ")[0]}</h1>
-        <div className="suave">O que precisa de atenção hoje. Use o menu à esquerda para ir a qualquer parte do sistema.</div>
+      <section className="linha entre">
+        <div>
+          <h1>Bom trabalho, {u.nome.split(" ")[0]}</h1>
+          <div className="suave">{gestao ? "O que precisa de atenção hoje." : "Seu painel: pedidos, clientes para chamar e conversas esperando."}</div>
+        </div>
+        <Link className="botao principal" href="/pedidos/novo">+ Novo pedido</Link>
       </section>
+
+      <div className="kpis">
+        {d.mes.length === 0 && <div className="kpi marca"><span className="rotulo">{gestao ? "Vendido no mês" : "Você vendeu no mês"}</span><span className="valor">—</span></div>}
+        {d.mes.map((m) => (
+          <div key={m.moeda} className="kpi marca"><span className="rotulo">{gestao ? "Vendido no mês" : "Você vendeu no mês"} ({m.moeda === "GS" ? "Gs" : "R$"})</span>
+            <span className="valor num">{dinheiro(m.vendido, m.moeda)}</span><span className="pequeno">{m.n} pedido(s)</span></div>
+        ))}
+        {d.comissao.filter((x) => x.comissao !== null).map((x) => (
+          <Link key={x.moeda} href="/comissoes" className="kpi"><span className="rotulo">Sua comissão no mês</span>
+            <span className="valor num">{dinheiro(x.comissao, x.moeda)}</span><span className="pequeno suave">ver detalhes →</span></Link>
+        ))}
+        {d.receber.map((r) => (
+          <Link key={r.moeda} href="/pedidos?pagamento=aguardando" className="kpi"><span className="rotulo">A receber de clientes ({r.moeda === "GS" ? "Gs" : "R$"})</span>
+            <span className="valor num">{dinheiro(r.saldo, r.moeda)}</span><span className="pequeno suave">{r.n} pedido(s) com saldo</span></Link>
+        ))}
+        <Link href="/whatsapp?f=aguardando&o=espera" className="kpi"><span className="rotulo">WhatsApp esperando resposta</span>
+          <span className="valor">{d.esperando.length}</span><span className="pequeno suave">últimos 3 dias</span></Link>
+      </div>
+
+      <FilaPedidos itens={d.fila} titulo={gestao ? "Pedidos em andamento" : "Seus pedidos em andamento"} />
+
+      <div className="crm">
+        <section className="painel">
+          <div className="linha entre"><h2>Chamar hoje (recompra)</h2><Link className="pequeno" href="/clientes/recompra">ver todos →</Link></div>
+          {d.recompra.length === 0 ? <p className="suave pequeno">Nenhum cliente passou do ritmo de compra. 👏</p> : (
+            <ul className="crm-lista">{d.recompra.map((r) => {
+              const z = linkWhatsApp(r.whatsapp, `Olá ${r.nome}! Tudo bem? Aqui é da Virtual Cosméticos. Já está na hora de repor o estoque? Posso te mandar as novidades e promoções da semana?`);
+              return (
+                <li key={r.cliente_id}>
+                  <Link href={`/clientes/${r.cliente_id}`} className="crm-quem">{r.nome}{r.alto_valor && " ⭐"}
+                    <small>{r.dias_desde} dias sem comprar · {r.atraso_dias} de atraso{gestao ? ` · ${r.vendedora}` : ""}</small></Link>
+                  {z && <a className="botao whatsapp mini" href={z} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
+                </li>);
+            })}</ul>
+          )}
+        </section>
+        <section className="painel">
+          <div className="linha entre"><h2>Esperando resposta</h2><Link className="pequeno" href="/whatsapp?f=aguardando&o=espera">abrir WhatsApp →</Link></div>
+          {d.esperando.length === 0 ? <p className="suave pequeno">Ninguém esperando. Tudo respondido.</p> : (
+            <ul className="crm-lista">{d.esperando.slice(0, 6).map((m, k) => (
+              <li key={k}>
+                <span className="crm-quem">{telefone(m.contato)}<small>{(m.texto ?? "(mídia)").slice(0, 60)}</small></span>
+                <span className="pequeno suave num">{dataHora(m.em)}</span>
+              </li>))}</ul>
+          )}
+        </section>
+        <section className="painel">
+          <div className="linha entre"><h2>Carrinhos parados</h2><Link className="pequeno" href="/clientes/carrinhos">ver todos →</Link></div>
+          {d.carrinhos.length === 0 ? <p className="suave pequeno">Nenhum carrinho esquecido no site.</p> : (
+            <ul className="crm-lista">{d.carrinhos.map((x) => {
+              const z = linkWhatsApp(x.whatsapp, `Olá ${x.cliente}! Vi que você montou um carrinho no nosso site. Quer que eu finalize o pedido para você?`);
+              return (
+                <li key={x.cliente_id}>
+                  <Link href={`/clientes/${x.cliente_id}`} className="crm-quem">{x.cliente}<small>{x.itens} item(ns) · {data(x.atualizado_em)}{gestao ? ` · ${x.vendedora}` : ""}</small></Link>
+                  {z && <a className="botao whatsapp mini" href={z} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
+                </li>);
+            })}</ul>
+          )}
+        </section>
+      </div>
 
       <nav className="atalhos" aria-label="Atalhos">
         {gestao && <Link className="atalho" href="/abertura"><b>Abertura da loja</b><span>Preços, estoque e fotos que faltam</span></Link>}
-        <Link className="atalho" href="/pedidos/novo"><b>Novo pedido</b><span>Lançar um pedido de cliente</span></Link>
         <Link className="atalho" href="/clientes"><b>Clientes</b><span>Cadastro, crédito e acesso à loja</span></Link>
         {gestao && <Link className="atalho" href="/produtos/precos-rapido"><b>Editar preços</b><span>Preencher e ajustar preços na tabela</span></Link>}
         <Link className="atalho" href="/produtos"><b>Produtos</b><span>Buscar, ativar, fotos e caixas</span></Link>
@@ -190,31 +278,6 @@ export default async function Hoje() {
         </section>
       )}
 
-      {(d.portal.length > 0 || d.separar.length > 0 || d.confirmar.length > 0) && (
-        <section className="painel">
-          <h2>Pedidos da área do cliente</h2>
-          <div className="duas-colunas" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
-            <div>
-              <h3>1. Aprovar</h3>
-              {d.portal.length === 0 ? <p className="suave pequeno">Nada para aprovar.</p> : (
-                <ul className="lista-simples">{d.portal.map((p) => (
-                  <li key={p.id}><Link href={`/pedidos/${p.id}`}>{p.cliente_nome}</Link> · <span className="num">{dinheiro(p.valor_total, p.moeda as Moeda)}</span>
-                    {gestao && <span className="suave"> · {p.vendedora_nome}</span>}</li>))}</ul>
-              )}
-            </div>
-            <div>
-              <h3>2. Conferir separação</h3>
-              {d.separar.length === 0 ? <p className="suave pequeno">Nada para conferir.</p> : (
-                <ul className="lista-simples">{d.separar.map((p) => (
-                  <li key={p.id}><Link href={`/pedidos/${p.id}`}>{p.cliente_nome ?? "Pedido"}</Link> · {p.deposito}</li>))}</ul>
-              )}
-            </div>
-            <div>
-              <h3>3. Confirmar total e enviar conta</h3>
-              {d.confirmar.length === 0 ? <p className="suave pequeno">Nada para confirmar.</p> : (
-                <ul className="lista-simples">{d.confirmar.map((p) => (
-                  <li key={p.id}><Link href={`/pedidos/${p.id}`}>{p.cliente_nome}</Link> · <span className="num">{dinheiro(p.valor_total, p.moeda as Moeda)}</span></li>))}</ul>
-              )}
             </div>
           </div>
         </section>

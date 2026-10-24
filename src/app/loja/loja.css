@@ -633,3 +633,23 @@
 .bolinha-estoque.retirar i { background: #22a447; }
 .bolinha-estoque.solicitar i { background: #2f6fdf; }
 .bolinha-estoque.indisponivel i { background: #d83a3a; }
+
+/* Meus pedidos: resumo, próximo passo e cartão do pedido */
+.meus-resumo { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.meus-resumo > div { background: var(--papel); border: 1.5px solid var(--linha-l); border-radius: 16px; padding: 12px 16px; display: flex; flex-direction: column; }
+.meus-resumo span { font-size: .8rem; color: var(--apagado); }
+.meus-resumo b { font-family: var(--titulo); font-size: 1.5rem; color: var(--roxo-tinta); }
+.meus-resumo .alerta { border-color: var(--roxo); background: var(--roxo-suave); }
+.meus-resumo .alerta b { color: var(--roxo); }
+.pedido-cliente { border-left: 5px solid var(--linha-l) !important; }
+.pedido-cliente.aviso { border-left-color: #e0a630 !important; } .pedido-cliente.info { border-left-color: var(--info) !important; }
+.pedido-cliente.marca { border-left-color: var(--roxo) !important; } .pedido-cliente.ok { border-left-color: #1f9d5a !important; }
+.pedido-titulo { font-family: var(--titulo); font-size: 1.05rem; color: var(--roxo-tinta); }
+.pedido-valor { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.pedido-valor b { font-size: 1.2rem; color: var(--roxo-tinta); }
+.pedido-dica { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; border-radius: 12px; padding: 9px 12px; background: var(--fundo); color: var(--roxo-tinta); font-size: .92rem; }
+.pedido-dica span { font-size: .7rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--roxo); }
+.pedido-dica.marca { background: var(--roxo-suave); } .pedido-dica.ok { background: #e3f7e8; } .pedido-dica.aviso { background: #fff3d6; }
+.pagamento-caixa { border: 1.5px dashed var(--roxo) !important; background: #fff !important; }
+.pedido-itens summary, .pedido-cliente details summary { cursor: pointer; color: var(--roxo); font-weight: 600; }
+@media (max-width: 560px) { .pedido-valor { align-items: flex-start; } }

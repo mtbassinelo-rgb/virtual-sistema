@@ -12,7 +12,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!/^[0-9a-f-]{36}$/i.test(id)) return new Response("Não encontrado.", { status: 404 });
   const t = await comUsuario(u.id, async (db) =>
     (await db.query("select arquivo, mime, nome_original from app.pedido_trocas where id = $1", [id])).rows[0]);
-  if (!t) return new Response("Não encontrado.", { status: 404 });
+  if (!t || !t.arquivo) return new Response("Não encontrado.", { status: 404 });
   const nome = path.basename(String(t.arquivo));
   const bytes = await readFile(path.join(pastaArquivos(), nome));
   return new Response(new Uint8Array(bytes), {

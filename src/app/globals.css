@@ -420,3 +420,88 @@ table.dre tfoot th { border-top: 2px solid var(--linha); }
 /* ---------- WhatsApp: conversa ---------- */
 .conversa-grade { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); gap: 16px; align-items: start; }
 @media (max-width: 900px) { .conversa-grade { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- Pedido: etapas, próximo passo e itens com troca ---------- */
+.aviso-caixa.info { background: var(--info-suave); border-color: transparent; }
+.passos-pedido { gap: 10px; }
+.passos { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; counter-reset: p; }
+.passos li { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; font-size: .78rem; color: var(--suave); position: relative; }
+.passos li::before { content: ""; position: absolute; top: 13px; left: calc(-50% + 14px); right: calc(50% + 14px); height: 2px; background: var(--linha); }
+.passos li:first-child::before { display: none; }
+.passos li.feito::before, .passos li.atual::before { background: var(--ok); }
+.passo-ponto { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--afundado); border: 2px solid var(--linha); font-weight: 700; font-size: .8rem; position: relative; z-index: 1; }
+.passos li.feito { color: var(--ok); font-weight: 600; }
+.passos li.feito .passo-ponto { background: var(--ok); border-color: var(--ok); color: #fff; }
+.passos li.atual { color: var(--marca); font-weight: 700; }
+.passos li.atual .passo-ponto { border-color: var(--marca); color: var(--marca); background: var(--marca-suave); box-shadow: 0 0 0 4px var(--marca-suave); }
+.proximo-passo { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; background: var(--marca-suave); border-radius: 8px; padding: 9px 12px; }
+.proximo-passo span { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--marca); }
+@media (max-width: 640px) { .passos li span:last-child { font-size: .66rem; } .passo-ponto { width: 22px; height: 22px; font-size: .7rem; } .passos li::before { top: 10px; } }
+
+.itens-ped { display: flex; flex-direction: column; gap: 0; }
+.itens-ped > .aviso-caixa { margin-bottom: 10px; }
+.item-ped { display: grid; grid-template-columns: minmax(0, 1fr) 110px 110px 120px minmax(150px, auto); gap: 10px; align-items: center; padding: 10px 8px; }
+.item-ped.cabeca { font-size: .75rem; font-weight: 600; color: var(--suave); background: var(--afundado); border-radius: 8px 8px 0 0; padding-block: 7px; }
+.item-ped.rodape { border-top: 2px solid var(--linha); }
+.item-ped .num { text-align: right; }
+.item-bloco { border-bottom: 1px solid var(--linha); transition: background .15s; }
+.item-bloco:hover { background: #fafbfc; }
+.item-bloco.aberto { background: var(--marca-suave); border-radius: 8px; border-bottom-color: transparent; margin: 4px 0; }
+.item-bloco.faltou .item-nome b, .item-bloco.faltou .num { text-decoration: line-through; color: var(--suave); }
+.item-nome { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.item-nome .selo { align-self: flex-start; }
+.item-acoes { display: flex; gap: 6px; justify-content: flex-end; align-items: center; flex-wrap: wrap; }
+.item-qtd { width: 70px; text-align: right; }
+.chip { display: inline-flex; flex-direction: row; align-items: center; gap: 5px; border: 1px solid var(--linha); border-radius: 999px; padding: 4px 10px; font-size: .8rem; color: var(--texto); background: var(--superficie); cursor: pointer; white-space: nowrap; }
+.chip input { width: auto; margin: 0; }
+.chip small { color: var(--suave); font-size: .7rem; margin-left: 4px; }
+.chip.ativo { background: var(--marca); color: #fff; border-color: var(--marca); } .chip.ativo small { color: #f0e3f6; }
+.chip.ativo-erro { background: var(--erro-suave); color: var(--erro); border-color: var(--erro); }
+.chip.sem { opacity: .65; }
+.troca-painel { padding: 4px 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.troca-form { display: flex; flex-direction: column; gap: 10px; background: var(--superficie); border: 1px solid var(--linha); border-radius: 10px; padding: 12px; }
+.troca-sugestoes { display: flex; flex-direction: column; gap: 6px; }
+.troca-campos { display: grid; grid-template-columns: minmax(220px, 2fr) 110px minmax(150px, 1fr) minmax(170px, 1fr); gap: 10px; align-items: end; }
+.troca-tirar { background: var(--superficie); border-radius: 10px; padding: 8px; }
+button.link-botao { border: none; background: none; padding: 0; color: var(--erro); text-decoration: underline; align-self: flex-start; }
+@media (max-width: 760px) {
+  .item-ped.cabeca { display: none; }
+  .item-ped { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .item-ped .item-nome, .item-ped .item-acoes { grid-column: 1 / -1; }
+  .item-ped .item-acoes { justify-content: flex-start; }
+  .item-ped [data-rot]::before { content: attr(data-rot) " "; font-family: var(--fonte); font-size: .7rem; color: var(--suave); display: block; }
+  .item-ped .num { text-align: left; }
+  .troca-campos { grid-template-columns: 1fr 1fr; } .troca-campos .troca-produto { grid-column: 1 / -1; }
+}
+
+/* ---------- Fila de pedidos por etapa (painel e lista de pedidos) ---------- */
+.fila { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.fila-etapa { border: 1px solid var(--linha); border-top: 4px solid var(--suave); border-radius: 10px; background: var(--superficie); display: flex; flex-direction: column; overflow: hidden; }
+.fila-etapa.aviso { border-top-color: #d99a25; } .fila-etapa.info { border-top-color: var(--info); } .fila-etapa.marca { border-top-color: var(--marca); }
+.fila-etapa.erro { border-top-color: var(--erro); } .fila-etapa.ok { border-top-color: var(--ok); }
+.fila-etapa.vazia { opacity: .55; }
+.fila-topo { display: flex; gap: 10px; align-items: center; padding: 10px 12px; text-decoration: none; color: var(--texto); }
+.fila-topo small { display: block; font-size: .72rem; color: var(--suave); font-weight: 400; }
+.fila-n { font-size: 1.6rem; font-weight: 750; min-width: 34px; font-variant-numeric: tabular-nums; }
+.fila-etapa.aviso .fila-n { color: #b07812; } .fila-etapa.info .fila-n { color: var(--info); } .fila-etapa.marca .fila-n { color: var(--marca); }
+.fila-etapa.erro .fila-n { color: var(--erro); } .fila-etapa.ok .fila-n { color: var(--ok); }
+.fila-item { display: flex; justify-content: space-between; gap: 8px; padding: 6px 12px; border-top: 1px solid var(--linha); text-decoration: none; color: var(--texto); font-size: .82rem; }
+.fila-item span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fila-item:hover, .fila-topo:hover { background: var(--afundado); }
+.fila-mais { padding: 6px 12px; border-top: 1px solid var(--linha); font-size: .78rem; text-decoration: none; }
+
+/* ---------- Painel da vendedora ---------- */
+.kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.kpi { background: var(--superficie); border: 1px solid var(--linha); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; text-decoration: none; color: var(--texto); }
+.kpi .rotulo { font-size: .78rem; color: var(--suave); }
+.kpi .valor { font-size: 1.35rem; font-weight: 750; font-variant-numeric: tabular-nums; }
+.kpi.marca { background: linear-gradient(135deg, #6b2387, #8c3bb0); color: #fff; border-color: transparent; } .kpi.marca .rotulo, .kpi.marca .pequeno { color: #ecdcf4; }
+a.kpi:hover { border-color: var(--marca); }
+.crm { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; align-items: start; }
+.crm-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.crm-lista li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--linha); }
+.crm-lista li:first-child { border-top: none; }
+.crm-lista .crm-quem { display: flex; flex-direction: column; min-width: 0; color: var(--texto); font-size: .88rem; }
+.crm-lista .crm-quem small { color: var(--suave); font-size: .75rem; }
+.botao.mini { padding: 4px 10px; font-size: .78rem; }
+.contador-grande { font-size: 2rem; font-weight: 750; color: var(--marca); line-height: 1; }
