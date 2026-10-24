@@ -8,6 +8,7 @@
 --   Farmax   óleo de rícino 100 ml 10,21 · óleo rosa mosqueta 100 ml 5,93 (com ST, NF 8169555)
 --   Sexy Fantasy perfume Phero 5,70 · Bio Instinto spray condicionante selante 10 benefícios 5,49
 --   Soul     esfoliante Bumbum Perfeito 300 g 4,70
+--   Mary Life spray condicionante Uso Eterno 20 benefícios 130 ml (2407203001) 9,52
 -- =====================================================================
 create temporary table _custos_out (id uuid, custo numeric) on commit drop;
 
@@ -20,6 +21,7 @@ select p.id, r.custo
       when p.codigo = '2407203016' then 10.21
       when p.codigo = '2407202667' then 5.93
       when p.codigo = '2407202815' then 4.70
+      when p.codigo = '2407203001' then 9.52
       when m like '%RHENUKS%' and n like '%KIT%' and n ~ '(DESLIZA|MEU LISO|FRIZZ THERAP|LISO THERAP|BANHO BRILHANTE)' then 14.40
       when m like '%RHENUKS%' and n like '%FOR MEN%' then 3.78
       when m like '%PHALLE%' and n like '%ROSA MOSQUETA%' and n ~ '\m30 ?ML\M' then 6.99
