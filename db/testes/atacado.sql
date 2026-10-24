@@ -65,6 +65,9 @@ select teste.ok((select preco_tabela from app.portal_catalogo('sessao-1') where 
 select teste.ok((select destaque from app.portal_catalogo('sessao-1') where codigo = 'RHE-001') = 'recompra', 'Produto já comprado aparece como recompra');
 select teste.ok((select preco from app.portal_catalogo('sessao-1') where codigo = 'RHE-001') = 6500, 'Preço VIP em Gs para o cliente VIP');
 select teste.ok((select disponibilidade from app.portal_catalogo('sessao-1') where codigo = 'RHE-001') = 'disponivel', 'Disponibilidade sem mostrar quantidade');
+select teste.ok((select situacao from app.portal_situacao_estoque('sessao-1') where produto_id = '00000000-0000-0000-0000-0000000000b1') = 'retirar',
+  'Bolinha verde: tem na unidade do cliente');
+select teste.ok((select count(*) from app.portal_situacao_estoque('sessao-inexistente')) = 0, 'Sem sessão não mostra disponibilidade');
 
 \echo '== Pedido do cliente =='
 select app.portal_criar_pedido('sessao-1', '[{"produto_id":"00000000-0000-0000-0000-0000000000b2","quantidade":999}]') as p_mais \gset

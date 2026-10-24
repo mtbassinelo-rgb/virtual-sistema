@@ -626,3 +626,10 @@
 .banner.so-imagem img { position: static; display: block; width: 100%; height: auto; object-fit: contain; }
 .banner.so-imagem .banner-texto { position: absolute; left: 0; right: 0; bottom: 0; }
 .banners-compacta .banner.so-imagem { min-height: 0; }
+
+/* Bolinha de disponibilidade na loja */
+.bolinha-estoque { display: inline-flex; align-items: center; gap: 5px; margin-right: 6px; }
+.bolinha-estoque i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: none; }
+.bolinha-estoque.retirar i { background: #22a447; }
+.bolinha-estoque.solicitar i { background: #2f6fdf; }
+.bolinha-estoque.indisponivel i { background: #d83a3a; }

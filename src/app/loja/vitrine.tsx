@@ -21,7 +21,9 @@ type Preco = {
   produto_id: string; preco: string; preco_tabela: string; desconto_pct: string | null; limite_qtd: string | null;
   disponibilidade: "disponivel" | "ultimas" | "indisponivel"; disponivel_abastecedor: boolean; prazo_abastecimento: string | null;
   ultima_compra: string | null; destaque: "promocao" | "recompra" | "sugestao" | null;
+  situacao?: Situacao;
 };
+type Situacao = "retirar" | "solicitar" | "indisponivel";
 type Extra = { produto_id: string; vendidos_90d: string; promo_pct: string | null; promo_fim: string | null; destaque: boolean };
 type Produto = Publico & { linha: string; extras?: string[]; subManual?: string | null; catManual?: string[] | null; marcaNome: string | null; p?: Preco; x?: Extra; grupo?: string | null; variante?: string | null; variantes?: Produto[] };
 
@@ -58,6 +60,11 @@ export async function Vitrine({ f, cabecalho }: { f: Filtros; cabecalho?: Cabeca
   let chegaram: { produto_id: string; nome: string }[] = [];
   if (cliente && token) {
     for (const r of (await pool.query("select * from app.portal_catalogo($1)", [sha256(token)])).rows as Preco[]) precos.set(r.produto_id, r);
+    // bolinha: verde = tem na unidade do cliente, azul = tem na outra sede, vermelho = não tem
+    for (const r of (await pool.query("select produto_id, situacao from app.portal_situacao_estoque($1)", [sha256(token)])).rows as { produto_id: string; situacao: Situacao }[]) {
+      const pr = precos.get(r.produto_id);
+      if (pr) pr.situacao = r.situacao;
+    }
     meta = (await pool.query("select * from app.portal_meta($1)", [sha256(token)])).rows[0] ?? null;
     chegaram = (await pool.query("select produto_id, nome from app.portal_chegaram($1)", [sha256(token)])).rows as { produto_id: string; nome: string }[];
   }
@@ -375,12 +382,14 @@ function Cartao({ p, moeda, cliente, t, vendeUnidade }: { p: Produto; moeda: Moe
         {promo && p.x?.promo_fim && <PrazoPromo fim={p.x.promo_fim} es={t.verAgora === "Ver productos"} />}
         {p.unidades_caixa && <div className="caixa-info">{t.caixaCom(p.unidades_caixa)}</div>}
         <Precos p={p} moeda={moeda} cliente={cliente} t={t} />
-        {pr && (
+        {pr && (pr.situacao ? (
+          <div className="estoque"><Bolinha s={pr.situacao} t={t} />{pr.situacao === "retirar" && pr.disponibilidade === "ultimas" && <> · {t.ultimas}</>}</div>
+        ) : (
           <div className="estoque">
             {pr.disponibilidade === "disponivel" && t.emEstoque}
             {pr.disponibilidade === "ultimas" && t.ultimas}
           </div>
-        )}
+        ))}
         {pr?.ultima_compra && <div className="estoque">{t.comprouEm(data(pr.ultima_compra))}</div>}
         {/* sem estoque: o cliente não vê "esgotado"; o pedido entra e a vendedora confere */}
         <Comprar p={p} item={item} vendeUnidade={vendeUnidade} t={t} rotulo={cliente ? t.adicionarPedido : t.adicionar} />
@@ -441,6 +450,7 @@ function CartaoGrupo({ p, moeda, cliente, t, vendeUnidade, linha }: { p: Produto
                     {cliente && v.p && <strong className="var-un">{dinheiro(Number(v.p.preco), moeda)}<small>/{t.un}</small></strong>}
                   </div>
                   <span>
+                    {v.p?.situacao ? <Bolinha s={v.p.situacao} t={t} curta /> : null}
                     {!esg && v.p?.disponibilidade === "ultimas" ? <span className="etiqueta-mini">{t.ultimas}</span> : null}
                     {cliente && pv != null && v.unidades_caixa ? <span className="var-preco">{t.cxAbrev} {dinheiro(pv, moeda)}</span> : null}
                   </span>
@@ -523,4 +533,14 @@ function PrazoPromo({ fim, es }: { fim: string; es: boolean }) {
 /** Texto alternativo da foto (o Google lê): nome do produto, caixa e "atacado". */
 function altFoto(p: Produto): string {
   return [p.nome, p.unidades_caixa ? `caixa com ${p.unidades_caixa}` : null, "atacado"].filter(Boolean).join(", ");
+}
+
+/** Bolinha de disponibilidade (sem quantidade): verde retira já, azul pode solicitar, vermelho não tem. */
+function Bolinha({ s, t, curta }: { s: Situacao; t: Textos; curta?: boolean }) {
+  const texto = t.bolinha[s];
+  return (
+    <span className={`bolinha-estoque ${s}`} title={texto}>
+      <i aria-hidden="true" />{curta ? <span className="sr-only">{texto}</span> : texto}
+    </span>
+  );
 }
