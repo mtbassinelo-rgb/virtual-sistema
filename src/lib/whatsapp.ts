@@ -35,18 +35,44 @@ export const AJUSTES_CONEXAO = {
   rejectCall: false, msgCall: "", groupsIgnore: true, alwaysOnline: false, readMessages: false, readStatus: false, syncFullHistory: true,
 };
 
-/** Cria a instância (se ainda não existe) e devolve o QR Code em imagem (data:image/png;base64,...). */
-export async function gerarQr(instancia: string): Promise<string | null> {
+/** Cria a instância no servidor de WhatsApp, se ainda não existe, com os ajustes do sistema. */
+async function garantirInstancia(instancia: string) {
   try {
     await evo("/instance/create", "POST", { instanceName: instancia, integration: "WHATSAPP-BAILEYS", qrcode: true, ...AJUSTES_CONEXAO });
   } catch (e) {
     if (!/already|in use|existe|exists|403/i.test(String((e as Error).message))) throw e;
   }
   await evo(`/settings/set/${instancia}`, "POST", AJUSTES_CONEXAO).catch(() => undefined);
-  const r = await evo<{ base64?: string; qrcode?: { base64?: string } }>(`/instance/connect/${instancia}`);
-  const b64 = r?.base64 ?? r?.qrcode?.base64 ?? null;
-  if (!b64) return null;
-  return b64.startsWith("data:") ? b64 : `data:image/png;base64,${b64}`;
+}
+
+const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Cria a instância (se ainda não existe) e devolve o QR Code em imagem (data:image/png;base64,...).
+ *  O servidor às vezes demora alguns segundos para gerar o primeiro QR: tenta de novo antes de desistir. */
+export async function gerarQr(instancia: string): Promise<string | null> {
+  await garantirInstancia(instancia);
+  for (let i = 0; i < 4; i++) {
+    const r = await evo<{ base64?: string; qrcode?: { base64?: string } }>(`/instance/connect/${instancia}`);
+    const b64 = r?.base64 ?? r?.qrcode?.base64 ?? null;
+    if (b64) return b64.startsWith("data:") ? b64 : `data:image/png;base64,${b64}`;
+    await esperar(2500);
+  }
+  return null;
+}
+
+/** Entrar por código (sem câmera): o WhatsApp do celular pede um código de 8 letras em
+ *  Dispositivos conectados → Conectar com número de telefone. Número com DDI (595… ou 55…). */
+export async function gerarCodigo(instancia: string, numero: string): Promise<string> {
+  const num = numero.replace(/\D/g, "");
+  if (num.length < 10 || num.length > 15) throw new Error("Informe o número com DDI e DDD, só números. Ex.: 595981123456 ou 5545999123456.");
+  await garantirInstancia(instancia);
+  for (let i = 0; i < 4; i++) {
+    const r = await evo<{ pairingCode?: string | null }>(`/instance/connect/${instancia}?number=${num}`);
+    const c = r?.pairingCode?.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+    if (c) return c.length === 8 ? `${c.slice(0, 4)}-${c.slice(4)}` : c;
+    await esperar(2500);
+  }
+  throw new Error("O servidor de WhatsApp não devolveu o código. Tente de novo em alguns segundos.");
 }
 
 /** Estado atual no servidor de WhatsApp: open (conectado), connecting, close. E o número, quando conectado. */

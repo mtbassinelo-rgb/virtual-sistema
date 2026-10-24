@@ -6,7 +6,7 @@ import { randomBytes } from "node:crypto";
 import { exigirUsuario } from "@/lib/auth";
 import { comUsuario, mensagemErro, pool } from "@/lib/db";
 import { texto } from "@/lib/formato";
-import { converterMensagem, evo, gerarQr, type MensagemZap } from "@/lib/whatsapp";
+import { converterMensagem, evo, gerarCodigo, gerarQr, type MensagemZap } from "@/lib/whatsapp";
 
 const VOLTA = "/whatsapp/conexoes";
 const voltar = (ok: string | null, erro: string | null, extra = "") => {
@@ -27,17 +27,41 @@ export async function criarConexao(fd: FormData) {
   const nome = texto(fd, "nome");
   const slug = nome.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "numero";
   const instancia = `vc-${slug}-${randomBytes(2).toString("hex")}`;
-  let erro: string | null = null, id = "";
+  let erro: string | null = null, id = "", codigo = "";
   try {
     id = await comUsuario(u.id, async (c) => (await c.query(
       `insert into app.whatsapp_conexoes (nome, instancia, pais, vendedora_id) values ($1, $2, $3, nullif($4, '')::uuid) returning id`,
       [nome, instancia, texto(fd, "pais") || "PY", texto(fd, "vendedora_id")])).rows[0].id);
-    const qr = await gerarQr(instancia);
-    await pool.query("select app.whatsapp_estado($1, 'aguardando_qr', null, $2)", [instancia, qr]);
+    const numero = texto(fd, "numero").replace(/\D/g, "");
+    if (numero) {
+      codigo = await gerarCodigo(instancia, numero);
+      await pool.query("select app.whatsapp_estado($1, 'aguardando_qr', $2, null)", [instancia, numero]);
+    } else {
+      const qr = await gerarQr(instancia);
+      await pool.query("select app.whatsapp_estado($1, 'aguardando_qr', null, $2)", [instancia, qr]);
+      if (!qr) erro = "Conexão criada, mas o servidor de WhatsApp ainda não gerou o QR Code. Toque em \"Gerar novo QR Code\" ou use \"Entrar por código\".";
+    }
   } catch (e) {
     erro = mensagemErro(e);
   }
-  voltar("Conexão criada. Escaneie o QR Code com o celular do número.", erro, id ? `&qr=${id}` : "");
+  voltar(codigo ? "Conexão criada. Digite o código no celular do número." : "Conexão criada. Escaneie o QR Code com o celular do número.", erro,
+    id ? (codigo ? `&codigo=${encodeURIComponent(codigo)}&cid=${id}` : `&qr=${id}`) : "");
+}
+
+/** Entrar por código: gera o código de 8 letras para digitar no celular (Conectar com número de telefone). */
+export async function codigoConexao(fd: FormData) {
+  const u = await exigirUsuario();
+  const id = texto(fd, "id");
+  let erro: string | null = null, codigo = "";
+  try {
+    const w = await conexao(u.id, id);
+    const numero = texto(fd, "numero").replace(/\D/g, "");
+    codigo = await gerarCodigo(w.instancia, numero);
+    await pool.query("select app.whatsapp_estado($1, 'aguardando_qr', $2, null)", [w.instancia, numero]);
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  voltar("Código gerado. Digite no celular do número.", erro, codigo ? `&codigo=${encodeURIComponent(codigo)}&cid=${id}` : "");
 }
 
 export async function novoQr(fd: FormData) {
@@ -48,6 +72,7 @@ export async function novoQr(fd: FormData) {
     const w = await conexao(u.id, id);
     const qr = await gerarQr(w.instancia);
     await pool.query("select app.whatsapp_estado($1, 'aguardando_qr', null, $2)", [w.instancia, qr]);
+    if (!qr) throw new Error("O servidor de WhatsApp ainda não gerou o QR Code. Tente de novo em alguns segundos ou use \"Entrar por código\".");
   } catch (e) {
     erro = mensagemErro(e);
   }

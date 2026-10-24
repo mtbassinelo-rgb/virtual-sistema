@@ -5,7 +5,7 @@ import { dataHora } from "@/lib/formato";
 import { contatoLegivel, estadoAtual, whatsappInstalado } from "@/lib/whatsapp";
 import { Avisos, Selo } from "../../avisos";
 import { AtualizarSozinho } from "../atualizar-sozinho";
-import { criarConexao, desconectar, editarConexao, importarHistorico, novoQr, removerConexao } from "./acoes";
+import { criarConexao, desconectar, editarConexao, importarHistorico, novoQr, removerConexao, codigoConexao } from "./acoes";
 
 export const metadata = { title: "Conexões do WhatsApp" };
 
@@ -21,7 +21,7 @@ const ESTADOS: Record<string, { t: string; cor: string }> = {
   desconectado: { t: "Desconectado", cor: "erro" },
 };
 
-export default async function Conexoes({ searchParams }: { searchParams: Promise<{ ok?: string; erro?: string; qr?: string }> }) {
+export default async function Conexoes({ searchParams }: { searchParams: Promise<{ ok?: string; erro?: string; qr?: string; codigo?: string; cid?: string }> }) {
   const u = await exigirUsuario();
   const f = await searchParams;
   const instalado = whatsappInstalado();
@@ -102,6 +102,29 @@ export default async function Conexoes({ searchParams }: { searchParams: Promise
               )}
             </div>
 
+            {f.codigo && f.cid === w.id && w.estado !== "conectado" && (
+              <div className="linha" style={{ gap: 24, alignItems: "flex-start", flexWrap: "wrap", marginTop: 16 }}>
+                <div style={{ fontSize: 36, fontWeight: 700, letterSpacing: 4, padding: "16px 24px", background: "#fff", color: "#111", borderRadius: 8, border: "2px solid var(--marca)" }}>
+                  {f.codigo}
+                </div>
+                <ol className="pequeno" style={{ maxWidth: 400, lineHeight: 1.7 }}>
+                  <li>No celular do número, abra o <b>WhatsApp</b>.</li>
+                  <li>Toque em <b>⋮</b> (Android) ou <b>Configurações</b> (iPhone) → <b>Dispositivos conectados</b> → <b>Conectar um dispositivo</b>.</li>
+                  <li>Toque em <b>Conectar com número de telefone</b> e digite este código.</li>
+                  <li>Pronto: esta tela muda para <b>Conectado</b> sozinha.</li>
+                  <li className="suave">O código vale poucos minutos. Se expirar, gere outro.</li>
+                </ol>
+              </div>
+            )}
+
+            {instalado && w.estado !== "conectado" && (
+              <form action={codigoConexao} className="linha" style={{ gap: 6, flexWrap: "wrap", marginTop: 10 }}>
+                <input type="hidden" name="id" value={w.id} />
+                <input name="numero" inputMode="tel" required defaultValue={w.numero ?? ""} placeholder="Número com DDI: 595981… ou 5545…" style={{ minWidth: 240 }} aria-label="Número do WhatsApp" />
+                <button>Entrar por código (sem câmera)</button>
+              </form>
+            )}
+
             {mostrarQr && (
               <div className="linha" style={{ gap: 24, alignItems: "flex-start", flexWrap: "wrap", marginTop: 16 }}>
                 <img src={w.qr!} alt="QR Code para conectar o WhatsApp" width={260} height={260} style={{ background: "#fff", padding: 8, borderRadius: 8 }} />
@@ -143,9 +166,11 @@ export default async function Conexoes({ searchParams }: { searchParams: Promise
           <label>Vendedora deste número<select name="vendedora_id" defaultValue="">
             <option value="">Nenhuma (número da empresa)</option>{vendedoras.map((v) => <option key={v.id} value={v.id}>{v.nome}</option>)}
           </select></label>
-          <button className="principal" disabled={!instalado}>Criar e mostrar QR Code</button>
+          <label>Número (opcional: para entrar por código)<input name="numero" inputMode="tel" placeholder="595981… ou 5545…" /></label>
+          <button className="principal" disabled={!instalado}>Criar e conectar</button>
         </form>
-        <p className="pequeno suave" style={{ margin: 0 }}>O número não precisa ser digitado: o sistema descobre sozinho quando o QR Code for escaneado.
+        <p className="pequeno suave" style={{ margin: 0 }}>Sem número: aparece o QR Code para escanear. Com o número (DDI + DDD): aparece um código de 8 letras para digitar no celular, em
+          Dispositivos conectados → Conectar com número de telefone.
           Grupos são ignorados. O sistema não marca mensagens como lidas e o celular continua recebendo as notificações.</p>
       </section>
     </>
