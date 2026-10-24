@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { exigirUsuario } from "@/lib/auth";
+import { ehGestao, exigirUsuario } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
 import { data, dataHora, dinheiro, STATUS_COMERCIAL, type Moeda } from "@/lib/formato";
 import { contatoLegivel, TIPO_MSG } from "@/lib/whatsapp";
-import { Selo } from "../../avisos";
+import { Avisos, Selo } from "../../avisos";
+import { atribuirConversa } from "../acoes";
 import { AtualizarSozinho } from "../atualizar-sozinho";
 
 export const metadata = { title: "Conversa do WhatsApp" };
@@ -13,7 +14,7 @@ type Msg = { id: string; enviada: boolean; tipo: string; texto: string | null; e
 type Cli = { id: string; nome: string; moeda: Moeda | null; categoria_preco: string; vendedora: string; cidade: string | null };
 type Ped = { id: string; data_pedido: string; valor_total: string; moeda: Moeda; status_comercial: string; bling_numero: string | null };
 
-export default async function Conversa({ searchParams }: { searchParams: Promise<{ w?: string; c?: string; tudo?: string }> }) {
+export default async function Conversa({ searchParams }: { searchParams: Promise<{ w?: string; c?: string; tudo?: string; ok?: string; erro?: string }> }) {
   const u = await exigirUsuario();
   const f = await searchParams;
   if (!f.w || !/^[0-9a-f-]{36}$/i.test(f.w) || !f.c) notFound();
@@ -21,8 +22,8 @@ export default async function Conversa({ searchParams }: { searchParams: Promise
 
   const r = await comUsuario(u.id, async (c) => {
     const k = (await c.query(`
-      select k.contato, k.nome, k.primeira_em, w.nome as conexao, w.pais from app.whatsapp_contatos k join app.whatsapp_conexoes w on w.id = k.conexao_id
-       where k.conexao_id = $1 and k.contato = $2`, [f.w, f.c])).rows[0] as { contato: string; nome: string | null; primeira_em: string; conexao: string; pais: string } | undefined;
+      select k.contato, k.nome, k.primeira_em, k.vendedora_id as assumida_por, w.nome as conexao, w.pais from app.whatsapp_contatos k join app.whatsapp_conexoes w on w.id = k.conexao_id
+       where k.conexao_id = $1 and k.contato = $2`, [f.w, f.c])).rows[0] as { contato: string; nome: string | null; primeira_em: string; conexao: string; pais: string; assumida_por: string | null } | undefined;
     if (!k) return null;
     const msgs = ((await c.query(`select id::text, enviada, tipo, texto, em from app.whatsapp_mensagens
        where conexao_id = $1 and contato = $2 order by em desc limit $3`, [f.w, f.c, limite])).rows as Msg[]).reverse();
@@ -35,10 +36,17 @@ export default async function Conversa({ searchParams }: { searchParams: Promise
        where cliente_id = $1 and status_comercial <> 'cancelado' order by data_pedido desc, criado_em desc limit 10`, [cli.id])).rows as Ped[] : [];
     const tot = cli ? (await c.query(`select moeda, count(*)::int as n, sum(valor_total) as valor from app.pedidos
        where cliente_id = $1 and status_comercial <> 'cancelado' and data_pedido >= current_date - 365 group by moeda`, [cli.id])).rows as { moeda: Moeda; n: number; valor: string }[] : [];
-    return { k, msgs, total, cli, pedidos, tot };
+    const vendedoras = (await c.query(`select v.id, v.nome from app.vendedoras v where v.ativo and v.nome <> 'Marketplace' order by v.nome`)).rows as { id: string; nome: string }[];
+    const resp = (await c.query("select vendedora_id, atribuicao from app.whatsapp_responsavel($1, $2)",
+      [f.w, f.c])).rows[0] as { vendedora_id: string | null; atribuicao: string | null } | undefined;
+    return { k, msgs, total, cli, pedidos, tot, vendedoras, resp };
   });
   if (!r) notFound();
-  const { k, msgs, total, cli, pedidos, tot } = r;
+  const { k, msgs, total, cli, pedidos, tot, vendedoras, resp } = r;
+  const gestao = ehGestao(u);
+  const volta = `/whatsapp/conversa?w=${f.w}&c=${encodeURIComponent(f.c!)}`;
+  const nomeResp = vendedoras.find((v) => v.id === resp?.vendedora_id)?.nome;
+  const COMO: Record<string, string> = { assumida: "assumiu a conversa", cliente: "dona do cliente no cadastro", numero: "única vendedora do número" };
   const enviadas = msgs.filter((m) => m.enviada).length;
 
   let diaAnterior = "";
@@ -84,6 +92,24 @@ export default async function Conversa({ searchParams }: { searchParams: Promise
         </section>
 
         <aside className="painel">
+          <Avisos ok={f.ok} erro={f.erro} />
+          <h2 style={{ marginTop: 0 }}>Vendedora responsável</h2>
+          <p className="pequeno">{nomeResp ? <><b>{nomeResp}</b> <span className="suave">({COMO[resp?.atribuicao ?? ""] ?? ""})</span></> : <Selo cor="aviso">Sem vendedora</Selo>}</p>
+          {gestao ? (
+            <form action={atribuirConversa} className="linha" style={{ gap: 6, marginBottom: 16 }}>
+              <input type="hidden" name="conexao_id" value={f.w} /><input type="hidden" name="contato" value={k.contato} /><input type="hidden" name="volta" value={volta} />
+              <select name="vendedora_id" defaultValue={k.assumida_por ?? ""}>
+                <option value="">Automático (cadastro do cliente)</option>{vendedoras.map((v) => <option key={v.id} value={v.id}>{v.nome}</option>)}
+              </select>
+              <button>Salvar</button>
+            </form>
+          ) : !resp?.vendedora_id && u.vendedora_id ? (
+            <form action={atribuirConversa} style={{ marginBottom: 16 }}>
+              <input type="hidden" name="conexao_id" value={f.w} /><input type="hidden" name="contato" value={k.contato} /><input type="hidden" name="volta" value={volta} />
+              <input type="hidden" name="assumir" value="1" />
+              <button className="principal">Assumir esta conversa</button>
+            </form>
+          ) : null}
           {cli ? (
             <>
               <h2 style={{ marginTop: 0 }}>Cliente</h2>

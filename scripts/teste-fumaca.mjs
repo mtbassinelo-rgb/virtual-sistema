@@ -121,6 +121,11 @@ for (const tela of ["/whatsapp", "/whatsapp?p=30&f=aguardando&o=espera", "/whats
   ok(r.status === 200 && !r.html.includes("Application error"), `Gerente: ${tela} abre`);
 }
 ok(semAcesso(await abrir("/whatsapp/conexoes", await sessao("keila@teste.local"))), "Vendedora não abre as conexões do WhatsApp");
+for (const tela of ["/desempenho", "/desempenho?p=30&o=resposta", "/desempenho?v="]) {
+  const r = await abrir(tela, await sessao("gerente@teste.local"));
+  ok(r.status === 200 && !r.html.includes("Application error"), `Gerente: ${tela} abre`);
+}
+ok(semAcesso(await abrir("/desempenho", await sessao("keila@teste.local"))), "Vendedora não abre o desempenho das vendedoras");
 {
   const r = await fetch(base + "/whatsapp/exportar", { headers: { cookie: await sessao("gerente@teste.local") } });
   ok(r.status === 200 && (await r.text()).includes("Quem escreveu"), "Gerente baixa a planilha de conversas do WhatsApp");

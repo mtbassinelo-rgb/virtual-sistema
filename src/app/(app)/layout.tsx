@@ -51,6 +51,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
     { id: "vendas", titulo: "Vendas", icone: "vendas", itens: [
       { href: "/pedidos", texto: "Pedidos", contador: n.pedidos_abertos, dica: "Pedidos abertos: em separação ou aguardando" },
       { href: "/pedidos/novo", texto: "Novo pedido" },
+      ...(gestao ? [{ href: "/desempenho", texto: "Desempenho das vendedoras", dica: "Pelo WhatsApp de cada número: atendimento, tempo de resposta, quem chamou, fechamento e vendas" }] : []),
       { href: "/orcamentos", texto: "Orçamentos", dica: "Orçamento para cliente (ou para quem ainda não é): WhatsApp, depois vira pedido" },
       { href: "/caixa", texto: "Caixa do dia", dica: "Abrir e fechar o caixa, vender no balcão e receber pedidos" },
       { href: "/caixa/contas", texto: "Contas da unidade", dica: "Contas a pagar da unidade em que você trabalha (ex.: CDE)" },

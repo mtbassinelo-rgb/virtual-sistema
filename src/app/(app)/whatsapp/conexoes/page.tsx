@@ -10,7 +10,7 @@ import { criarConexao, desconectar, editarConexao, importarHistorico, novoQr, re
 export const metadata = { title: "Conexões do WhatsApp" };
 
 type Conexao = {
-  id: string; nome: string; instancia: string; pais: string; vendedora_id: string | null; vendedora: string | null; numero: string | null;
+  id: string; nome: string; instancia: string; pais: string; vendedora_id: string | null; vendedora: string | null; atendem: string[]; numero: string | null;
   estado: string; qr: string | null; qr_em: string | null; conectado_em: string | null; ultima_mensagem_em: string | null; mensagens: number;
 };
 
@@ -26,7 +26,11 @@ export default async function Conexoes({ searchParams }: { searchParams: Promise
   const f = await searchParams;
   const instalado = whatsappInstalado();
   const carregar = () => comUsuario(u.id, async (c) => (await c.query(`
-    select w.id, w.nome, w.instancia, w.pais, w.vendedora_id, v.nome as vendedora, w.numero, w.estado, w.qr, w.qr_em, w.conectado_em, w.ultima_mensagem_em,
+    select w.id, w.nome, w.instancia, w.pais, w.vendedora_id,
+           array(select x.vendedora_id from app.whatsapp_conexao_vendedoras x where x.conexao_id = w.id
+                 union select w.vendedora_id where w.vendedora_id is not null) as atendem,
+           (select string_agg(z.nome, ' e ' order by z.nome) from app.vendedoras z
+             where z.id = w.vendedora_id or z.id in (select x.vendedora_id from app.whatsapp_conexao_vendedoras x where x.conexao_id = w.id)) as vendedora, w.numero, w.estado, w.qr, w.qr_em, w.conectado_em, w.ultima_mensagem_em,
            (select count(*) from app.whatsapp_mensagens m where m.conexao_id = w.id)::int as mensagens
       from app.whatsapp_conexoes w left join app.vendedoras v on v.id = w.vendedora_id
      where w.ativo order by w.nome`)).rows as Conexao[]);
@@ -79,7 +83,7 @@ export default async function Conexoes({ searchParams }: { searchParams: Promise
                 <h2 style={{ margin: 0 }}>{w.nome} <Selo cor={e.cor}>{e.t}</Selo></h2>
                 <div className="pequeno suave">
                   {w.numero ? contatoLegivel(w.numero) : "Número aparece depois de escanear o QR"} · {w.pais === "PY" ? "Paraguai" : "Brasil"}
-                  {w.vendedora ? ` · ${w.vendedora}` : " · sem vendedora ligada"}
+                  {w.vendedora ? ` · atendem: ${w.vendedora}` : " · sem vendedora ligada"}
                 </div>
                 <div className="pequeno suave">
                   {w.mensagens.toLocaleString("pt-BR")} mensagens no sistema
@@ -145,9 +149,13 @@ export default async function Conexoes({ searchParams }: { searchParams: Promise
                 <input type="hidden" name="id" value={w.id} />
                 <label>Nome<input name="nome" defaultValue={w.nome} required maxLength={60} /></label>
                 <label>País<select name="pais" defaultValue={w.pais}><option value="PY">Paraguai (Gs)</option><option value="BR">Brasil (R$)</option></select></label>
-                <label>Vendedora deste número<select name="vendedora_id" defaultValue={w.vendedora_id ?? ""}>
-                  <option value="">Nenhuma (número da empresa)</option>{vendedoras.map((v) => <option key={v.id} value={v.id}>{v.nome}</option>)}
-                </select></label>
+                <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
+                  <legend className="pequeno">Vendedoras que atendem este número</legend>
+                  <div className="linha" style={{ gap: 12 }}>{vendedoras.map((v) => (
+                    <label key={v.id} className="linha" style={{ gap: 4 }}>
+                      <input type="checkbox" name="vendedoras" value={v.id} defaultChecked={w.atendem.includes(v.id)} />{v.nome}</label>))}
+                  </div>
+                </fieldset>
                 <button>Salvar</button>
               </form>
               <form action={removerConexao} style={{ marginTop: 8 }}>

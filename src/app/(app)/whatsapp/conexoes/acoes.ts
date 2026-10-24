@@ -88,9 +88,16 @@ export async function editarConexao(fd: FormData) {
   const u = await exigirUsuario();
   let erro: string | null = null;
   try {
-    await comUsuario(u.id, (c) => c.query(
-      `update app.whatsapp_conexoes set nome = $2, pais = $3, vendedora_id = nullif($4, '')::uuid, atualizado_em = now() where id = $1`,
-      [texto(fd, "id"), texto(fd, "nome"), texto(fd, "pais") || "PY", texto(fd, "vendedora_id")]));
+    // Um número pode ser atendido por várias vendedoras (marcadas na lista)
+    const ids = [...new Set(fd.getAll("vendedoras").map(String).filter((x) => /^[0-9a-f-]{36}$/i.test(x)))];
+    await comUsuario(u.id, async (c) => {
+      const id = texto(fd, "id");
+      await c.query(
+        `update app.whatsapp_conexoes set nome = $2, pais = $3, vendedora_id = $4::uuid, atualizado_em = now() where id = $1`,
+        [id, texto(fd, "nome"), texto(fd, "pais") || "PY", ids.length === 1 ? ids[0] : null]);
+      await c.query("delete from app.whatsapp_conexao_vendedoras where conexao_id = $1 and not (vendedora_id = any($2::uuid[]))", [id, ids]);
+      await c.query("insert into app.whatsapp_conexao_vendedoras select $1, unnest($2::uuid[]) on conflict do nothing", [id, ids]);
+    });
   } catch (e) {
     erro = mensagemErro(e);
   }

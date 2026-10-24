@@ -43,4 +43,36 @@ select teste.como(:'YESSICA');
 select teste.ok((select count(*) from app.whatsapp_mensagens) = 0, 'Outra vendedora não vê as mensagens');
 select teste.ok((select count(*) from app.whatsapp_conexoes) = 0, 'Outra vendedora não vê a conexão');
 reset role;
+
+-- Desempenho: número atendido por duas vendedoras
+\echo '== Desempenho pelo WhatsApp =='
+select teste.ok(app.minutos_comerciais('2025-10-20 19:40-03', '2025-10-21 08:30-03') = 30, 'Mensagem de noite começa a contar quando a loja abre');
+select teste.ok(app.minutos_comerciais('2025-10-25 11:00-03', '2025-10-27 08:10-03') = 70, 'Sábado fecha ao meio-dia e domingo não conta');
+insert into app.whatsapp_conexao_vendedoras values
+  ('00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000a1'),
+  ('00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000a2') on conflict do nothing;
+update app.whatsapp_conexoes set vendedora_id = null;
+set role vc_app;
+select teste.como(:'GERENTE');
+select teste.ok((select vendedora_id from app.whatsapp_conversas('2025-10-01', '2026-12-31') where contato = '595981123456') = '00000000-0000-0000-0000-0000000000a1',
+  'Cliente cadastrado conta para a vendedora dona do cliente');
+select teste.ok((select vendedora_id is null from app.whatsapp_conversas('2025-10-01', '2026-12-31') where contato = '595971999888'),
+  'Lead de número compartilhado fica sem vendedora');
+select teste.ok((select quem_iniciou = false and sem_resposta from app.whatsapp_conversas('2025-10-01', '2026-12-31') where contato = '595971999888'),
+  'Lead chamou e está sem resposta');
+select teste.como(:'YESSICA');
+select teste.ok((select count(*) from app.whatsapp_mensagens) = 3, 'Vendedora que atende o número compartilhado vê as mensagens');
+select app.whatsapp_atribuir('00000000-0000-0000-0000-0000000000d1', '595971999888', '00000000-0000-0000-0000-0000000000a2');
+select teste.ok((select vendedora_id = '00000000-0000-0000-0000-0000000000a2' and atribuicao = 'assumida'
+                   from app.whatsapp_conversas('2025-10-01', '2026-12-31') where contato = '595971999888'), 'Vendedora assume o lead');
+select teste.como(:'KEILA');
+select teste.falha($$select app.whatsapp_atribuir('00000000-0000-0000-0000-0000000000d1', '595971999888', '00000000-0000-0000-0000-0000000000a1')$$,
+  'outra vendedora', 'Outra vendedora não toma a conversa já assumida');
+select teste.falha($$select app.whatsapp_atribuir('00000000-0000-0000-0000-0000000000d1', '595981123456', '00000000-0000-0000-0000-0000000000a2')$$,
+  'gerente', 'Vendedora não passa conversa para outra');
+select teste.como(:'GERENTE');
+select app.whatsapp_atribuir('00000000-0000-0000-0000-0000000000d1', '595971999888', '00000000-0000-0000-0000-0000000000a1');
+select teste.ok((select vendedora_id from app.whatsapp_contatos where contato = '595971999888') = '00000000-0000-0000-0000-0000000000a1', 'Gerente troca a vendedora da conversa');
+reset role;
+select teste.ok((select count(*) from app.auditoria where tabela = 'whatsapp_contatos') >= 2, 'Troca de vendedora fica na auditoria');
 \echo '== Testes do WhatsApp passaram =='
