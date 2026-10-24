@@ -21,7 +21,7 @@ export async function GET(req: Request) {
   const gs = (v: unknown) => (v == null ? "" : String(Math.round(Number(v))));
   const q = (s: unknown) => `"${String(s ?? "").replace(/"/g, '""')}"`;
   const linhas = [
-    ["Código", "Produto", "Marca", "Peças por caixa", "Estoque CDE", "Paraguai Normal (referência)", "Paraguai VIP (referência)",
+    ["Código", "Produto", "Marca", "Peças por caixa", "Estoque CDE", "CD Principal Normal (referência)", "CD Principal VIP (referência)",
       "CDE Normal (Gs)", "CDE VIP (Gs)"].map(q).join(";"),
     ...rows.map((r) => [q(r.codigo), q(r.nome), q(r.marca), r.unidades_caixa ?? "", Math.round(Number(r.estoque_cde)),
       gs(r.py_normal), gs(r.py_vip), gs(r.cde_normal), gs(r.cde_vip)].join(";")),
