@@ -9,6 +9,7 @@ export const metadata = { title: "Tabela de preços" };
 
 const COLUNAS: Record<string, string> = {
   "py normal (gs)": "py_normal", "py vip (gs)": "py_vip", "br normal (r$)": "br_normal", "br vip (r$)": "br_vip",
+  "cde normal (gs)": "cde_normal", "cde vip (gs)": "cde_vip",
 };
 
 /** "20.000" → 20000 · "39,90" → 39.9 · "39.90" → 39.9 */

@@ -41,6 +41,15 @@ export default async function PrecosCde({ searchParams }: { searchParams: Promis
       </section>
       <Avisos ok={f.ok} erro={f.erro} />
 
+      <section className="painel linha entre" style={{ flexWrap: "wrap" }}>
+        <span className="pequeno">Prefere trabalhar no Excel? Baixe a planilha com todos os produtos{f.marca ? ` da marca ${f.marca}` : ""}, preencha
+          <b> CDE Normal (Gs)</b> e <b>CDE VIP (Gs)</b> (preço da unidade) e envie de volta. Célula vazia não muda nada.</span>
+        <span className="linha">
+          <a className="botao principal" href={`/produtos/precos-cde/planilha${f.marca ? `?marca=${encodeURIComponent(f.marca)}` : ""}`}>Baixar planilha da loja CDE</a>
+          <Link className="botao" href="/estoque/precos">Enviar planilha preenchida</Link>
+        </span>
+      </section>
+
       <form className="painel linha" method="get" style={{ flexWrap: "wrap", alignItems: "end" }}>
         <input type="hidden" name="ver" value={ver} />
         <label>Marca<select name="marca" defaultValue={f.marca ?? ""}><option value="">Todas</option>{d.marcas.map((m) => <option key={m}>{m}</option>)}</select></label>
