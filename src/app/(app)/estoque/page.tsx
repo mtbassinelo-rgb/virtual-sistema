@@ -2,7 +2,7 @@ import Link from "next/link";
 import { exigirUsuario, ehGestao } from "@/lib/auth";
 import { unidadeSistema } from "@/lib/unidade-sistema";
 import { comUsuario } from "@/lib/db";
-import { dataHora, STATUS_TRANSFERENCIA } from "@/lib/formato";
+import { dataHora, dinheiro, STATUS_TRANSFERENCIA } from "@/lib/formato";
 import { Avisos, Selo } from "../avisos";
 import {
   ajustarEstoque, cancelarTransferencia, criarTransferencia, definirKit, entradaCompra, enviarTransferencia, receberTransferencia, reprocessarPendencias,
@@ -47,7 +47,27 @@ export default async function Estoque({ searchParams }: { searchParams: Promise<
         group by t.id, o.nome, de.nome, uc.nome
         order by case t.status when 'enviada' then 0 when 'rascunho' then 1 else 2 end, t.numero desc limit 50`)).rows;
     const produtos = (await c.query("select id, codigo, nome from app.produtos where ativo and not marketplace order by nome")).rows;
-    return { depositos, saldos, transferencias, produtos, pendencias, kits, kitsTodos };
+    // Quanto vale o estoque de cada sede: no custo e no preço de venda (tabela normal e VIP do país da sede)
+    const valor = ehGestao(u) ? (await c.query(`
+      with pr as (select distinct on (produto_id, tabela) produto_id, tabela, valor from app.precos
+                   where vigente_desde <= current_date order by produto_id, tabela, vigente_desde desc),
+           s as (select s.deposito_id, s.produto_id, s.quantidade, app.custo_produto(s.produto_id) custo
+                   from app.estoque_saldos s where s.quantidade > 0
+                    and s.produto_id not in (select kit_id from app.kit_componentes))
+      select d.id, d.nome, d.pais::text pais, sum(s.quantidade)::float unidades, count(*)::int produtos,
+             coalesce(sum(s.quantidade * s.custo), 0)::float custo,
+             count(*) filter (where s.custo is null)::int sem_custo,
+             coalesce(sum(s.quantidade * n.valor), 0)::float venda,
+             coalesce(sum(s.quantidade * v.valor), 0)::float venda_vip,
+             count(*) filter (where n.valor is null)::int sem_preco,
+             coalesce(sum(s.quantidade * s.custo) filter (where n.valor is not null), 0)::float custo_com_preco,
+             coalesce(sum(s.quantidade * s.custo) filter (where v.valor is not null), 0)::float custo_com_vip,
+             app.param('cambio_custo_gs')::float cambio
+        from app.depositos d join s on s.deposito_id = d.id
+        left join pr n on n.produto_id = s.produto_id and n.tabela = case when d.pais = 'PY' then 'py_normal' else 'br_normal' end
+        left join pr v on v.produto_id = s.produto_id and v.tabela = case when d.pais = 'PY' then 'py_vip' else 'br_vip' end
+       where d.ativo group by d.id, d.nome, d.pais, d.tipo order by d.tipo, d.nome`)).rows as ValorSede[] : [];
+    return { depositos, saldos, transferencias, produtos, pendencias, kits, kitsTodos, valor };
   });
 
   // Tabela: uma linha por produto, uma coluna por depósito
@@ -106,6 +126,7 @@ export default async function Estoque({ searchParams }: { searchParams: Promise<
         </div>
       </section>
       <Avisos ok={f.ok} erro={f.erro} />
+      {d.valor.length > 0 && <ValorEstoque sedes={d.valor} />}
 
       <form className="painel linha" method="get">
         <label style={{ flex: 1 }}>Produto<input name="q" defaultValue={f.q} placeholder="Código ou nome" /></label>
@@ -326,5 +347,48 @@ export default async function Estoque({ searchParams }: { searchParams: Promise<
         </div>
       )}
     </>
+  );
+}
+
+type ValorSede = {
+  id: string; nome: string; pais: string; unidades: number; produtos: number; custo: number; sem_custo: number;
+  venda: number; venda_vip: number; sem_preco: number; custo_com_preco: number; custo_com_vip: number; cambio: number;
+};
+
+/** Investimento (custo) e quanto vira se vender tudo (tabela normal e VIP), por sede. */
+function ValorEstoque({ sedes }: { sedes: ValorSede[] }) {
+  const pct = (lucro: number, venda: number) => (venda > 0 ? `${Math.round((lucro / venda) * 100)}%` : "—");
+  const totalCusto = sedes.reduce((t, x) => t + x.custo, 0);
+  return (
+    <section className="painel">
+      <div className="linha entre" style={{ flexWrap: "wrap" }}>
+        <h2 style={{ margin: 0 }}>Quanto vale o estoque</h2>
+        <span className="suave">Investido no total (custo): <b>{dinheiro(totalCusto, "BRL")}</b></span>
+      </div>
+      <div className="tabela"><table>
+        <thead><tr><th>Sede</th><th className="num">Peças</th><th className="num">Investido (custo)</th><th className="num">Venda · tabela normal</th>
+          <th className="num">Lucro se vender tudo</th><th className="num">Venda · VIP</th><th className="num">Lucro no VIP</th></tr></thead>
+        <tbody>{sedes.map((x) => {
+          const gs = x.pais === "PY";
+          const moeda = gs ? "GS" : "BRL";
+          // venda em Gs vira R$ pelo câmbio de custo para comparar com o investido
+          const emRs = (v: number) => (gs ? (x.cambio > 0 ? v / x.cambio : 0) : v);
+          const lucro = emRs(x.venda) - x.custo_com_preco, lucroVip = emRs(x.venda_vip) - x.custo_com_vip;
+          return (
+            <tr key={x.id}>
+              <td><b>{x.nome}</b><div className="pequeno suave">{x.produtos} produtos com saldo</div></td>
+              <td className="num">{x.unidades.toLocaleString("pt-BR")}</td>
+              <td className="num"><b>{dinheiro(x.custo, "BRL")}</b>{x.sem_custo > 0 && <div className="pequeno"><Selo cor="aviso">{x.sem_custo} sem custo</Selo></div>}</td>
+              <td className="num">{dinheiro(x.venda, moeda)}{gs && <div className="pequeno suave">≈ {dinheiro(emRs(x.venda), "BRL")}</div>}
+                {x.sem_preco > 0 && <div className="pequeno"><Selo cor="aviso">{x.sem_preco} sem preço</Selo></div>}</td>
+              <td className="num">{dinheiro(lucro, "BRL")}<div className="pequeno suave">margem {pct(lucro, emRs(x.venda))}</div></td>
+              <td className="num">{dinheiro(x.venda_vip, moeda)}{gs && <div className="pequeno suave">≈ {dinheiro(emRs(x.venda_vip), "BRL")}</div>}</td>
+              <td className="num">{dinheiro(lucroVip, "BRL")}<div className="pequeno suave">margem {pct(lucroVip, emRs(x.venda_vip))}</div></td>
+            </tr>);
+        })}</tbody>
+      </table></div>
+      <p className="pequeno suave" style={{ marginBottom: 0 }}>Custo e lucro em R$. A loja de CDE vende em guaranis: o valor em Gs é convertido pelo câmbio de custo cadastrado ({sedes.find((x) => x.pais === "PY")?.cambio.toLocaleString("pt-BR") ?? "—"} Gs por R$).
+        O lucro considera só os produtos que têm preço; produtos sem custo entram como custo zero.</p>
+    </section>
   );
 }
