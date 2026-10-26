@@ -97,6 +97,14 @@ export default async function Caixa({ searchParams }: { searchParams: Promise<{ 
             <div className="atalho"><b>{vendas}</b><span>venda(s) no balcão</span></div>
             <div className="atalho"><b>{dinheiro(d.esperadoGs, "GS")}</b><span>dinheiro na gaveta (Gs)</span></div>
             <div className="atalho"><b>{dinheiro(d.esperadoBrl, "BRL")}</b><span>dinheiro na gaveta (R$)</span></div>
+            {(["GS", "BRL"] as Moeda[]).map((m) => {
+              const cofre = d.movs.filter((x) => x.tipo === "sangria" && x.destino === "cofre" && x.moeda === m).reduce((t, x) => t + Number(x.valor), 0);
+              const transf = d.movs.filter((x) => ["venda", "recebimento"].includes(x.tipo) && x.modalidade !== "efetivo" && x.moeda === m).reduce((t, x) => t + Number(x.valor), 0);
+              return cofre || transf ? (
+                <div key={m} className="atalho"><b>{dinheiro(cofre, m)}</b>
+                  <span>enviado ao cofre ({m === "GS" ? "Gs" : "R$"}) · {dinheiro(transf, m)} em transferência/Pix</span></div>
+              ) : null;
+            })}
           </section>
           <VendaBalcao caixa={d.caixa.id} produtos={d.produtos} clientes={d.clientes} moedaPadrao={d.dep.pais === "PY" ? "GS" : "BRL"} contas={contasAtivas} />
           <div className="grade-2">

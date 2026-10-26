@@ -39,15 +39,33 @@ function Pagamentos({ total, moeda, linhas, setLinhas, contas }: { total: number
   const efetivo = linhas.filter((l) => l.modalidade === "efetivo").reduce((s, l) => s + num(l.valor), 0);
   const troco = num(entregue) - efetivo;
   const falta = total - pago;
+  const txt = (v: number) => (v > 0 ? String(moeda === "GS" ? Math.round(v) : v.toFixed(2).replace(".", ",")) : "");
+  // Pagamento dividido em duas formas: ao digitar a primeira, a segunda completa sozinha o que falta
+  const mudarValor = (i: number, v: string) => setLinhas(linhas.map((x, k) =>
+    k === i ? { ...x, valor: v } : linhas.length === 2 && i === 0 && k === 1 && total > 0 ? { ...x, valor: txt(Math.max(total - num(v), 0)) } : x));
+  const formas = [
+    { t: "Tudo em dinheiro", l: [{ modalidade: "efetivo", valor: txt(total) }] },
+    { t: "Tudo transferência", l: [{ modalidade: "transferencia", valor: txt(total) }] },
+    { t: "Transferência + dinheiro", l: [{ modalidade: "transferencia", valor: "" }, { modalidade: "efetivo", valor: txt(total) }] },
+  ];
   return (
     <div className="pdv-pagamentos">
+      {total > 0 && (
+        <div className="filtros" role="group" aria-label="Como o cliente vai pagar">
+          {formas.map((x) => (
+            <a key={x.t} href="#" onClick={(e) => { e.preventDefault(); setLinhas(x.l); }}
+              className={linhas.length === x.l.length && linhas.every((l, k) => l.modalidade === x.l[k].modalidade) ? "ativo" : ""}>{x.t}</a>
+          ))}
+        </div>
+      )}
+      {linhas.length === 2 && <small className="suave">Pagamento dividido: digite o valor da primeira forma e a segunda completa o que falta.</small>}
       {linhas.map((l, i) => (
         <div key={i} className="linha" style={{ flexWrap: "nowrap" }}>
           <select value={l.modalidade} onChange={(e) => setLinhas(linhas.map((x, k) => k === i ? { ...x, modalidade: e.target.value } : x))} aria-label="Forma de pagamento">
             {MODALIDADES.map(([k, t]) => <option key={k} value={k}>{t}</option>)}
           </select>
           <input value={l.valor} inputMode="decimal" placeholder="Valor" aria-label="Valor"
-                 onChange={(e) => setLinhas(linhas.map((x, k) => k === i ? { ...x, valor: e.target.value } : x))} />
+                 onChange={(e) => mudarValor(i, e.target.value)} />
           {linhas.length > 1 && <button type="button" className="discreto" onClick={() => setLinhas(linhas.filter((_, k) => k !== i))} aria-label="Tirar">×</button>}
           {BANCARIA.includes(l.modalidade) && contas.length > 0 && (<>
             <select value={l.conta ?? ""} onChange={(e) => setLinhas(linhas.map((x, k) => k === i ? { ...x, conta: e.target.value } : x))} aria-label="Conta que recebeu" required>
@@ -60,8 +78,7 @@ function Pagamentos({ total, moeda, linhas, setLinhas, contas }: { total: number
       ))}
       {linhas.some((l) => BANCARIA.includes(l.modalidade)) && <small className="suave">Transferência fica "a confirmar" até o gerente conferir no extrato da conta escolhida.</small>}
       <div className="linha">
-        <button type="button" className="discreto" onClick={() => setLinhas([...linhas, { modalidade: "pix", valor: falta > 0 ? String(moeda === "GS" ? Math.round(falta) : falta.toFixed(2).replace(".", ",")) : "" }])}>+ outra forma</button>
-        {falta > 0.009 && <button type="button" className="discreto" onClick={() => setLinhas([{ modalidade: "efetivo", valor: String(moeda === "GS" ? Math.round(total) : total.toFixed(2).replace(".", ",")) }])}>Tudo em dinheiro</button>}
+        <button type="button" className="discreto" onClick={() => setLinhas([...linhas, { modalidade: "transferencia", valor: txt(falta) }])}>+ outra forma de pagamento</button>
       </div>
       {efetivo > 0 && (
         <label>Cliente entregou em dinheiro (para calcular o troco)
