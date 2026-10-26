@@ -8,6 +8,11 @@ begin
     select id into v_box from app.produtos where codigo = par[1];
     select id into v_un from app.produtos where codigo = par[2];
     continue when v_box is null or v_un is null;
+    -- pedidos ainda abertos que pediram o BOX a preço de unidade: passam para a unidade (mesma quantidade e preço)
+    update app.pedido_itens i set produto_id = v_un, codigo = par[2], descricao = replace(i.descricao, coalesce((select nome from app.produtos where id = v_box), ''), (select nome from app.produtos where id = v_un))
+      from app.pedidos p
+     where p.id = i.pedido_id and i.produto_id = v_box and not coalesce(p.estoque_baixado, false)
+       and p.status_comercial::text in ('aguardando_cliente','aguardando_aprovacao','em_separacao');
     for s in select deposito_id, quantidade from app.estoque_saldos where produto_id = v_box and quantidade > 0 loop
       perform app._lancar(s.deposito_id, v_box, 'ajuste_saida', s.quantidade, 'juntar_produtos', v_un::text, 'BOX de 24 vira unidades');
       perform app._lancar(s.deposito_id, v_un, 'ajuste_entrada', s.quantidade * 24, 'juntar_produtos', v_box::text, 'BOX de 24 vira unidades');

@@ -72,7 +72,8 @@ select teste.ok((select count(*) from app.portal_situacao_estoque('sessao-inexis
 \echo '== Pedido do cliente =='
 select app.portal_criar_pedido('sessao-1', '[{"produto_id":"00000000-0000-0000-0000-0000000000b2","quantidade":999}]') as p_mais \gset
 reset role;
-select teste.ok((select count(*) from app.pedido_itens where pedido_id = :'p_mais' and descricao like '%SEM ESTOQUE%') = 1, 'Pedido acima do estoque entra; o excedente fica marcado para a vendedora');
+select teste.ok((select count(*) from app.pedido_itens where pedido_id = :'p_mais' and descricao not like '%SEM ESTOQUE%') >= 1
+  and not exists (select 1 from app.pedido_itens where pedido_id = :'p_mais' and descricao like '%SEM ESTOQUE%'), 'Pedido acima do estoque entra sem dividir a linha (a expedição marca o que faltar)');
 select teste.ok((select sum(quantidade) from app.pedido_itens where pedido_id = :'p_mais') = 999, 'Quantidade pedida mantida inteira');
 delete from app.pedido_itens where pedido_id = :'p_mais'; delete from app.pedidos where id = :'p_mais';
 set role vc_app;

@@ -271,7 +271,7 @@ set role vc_app;
 select teste.como('');
 select app.portal_criar_pedido(:'ses_enc', format('[{"produto_id":"%s","quantidade":12,"encomenda":true}]', :'prod_enc')::jsonb) as ped_enc \gset
 reset role;
-select teste.ok((select descricao from app.pedido_itens where pedido_id = :'ped_enc') like '%SEM ESTOQUE%', 'Produto esgotado entra no pedido marcado SEM ESTOQUE');
+select teste.ok((select sum(quantidade) from app.pedido_itens where pedido_id = :'ped_enc') = 12, 'Produto esgotado entra inteiro no pedido (a expedição marca Não tem)');
 \echo '== Acompanhamento do pedido =='
 set role vc_app;
 select teste.como(:'GERENTE');
