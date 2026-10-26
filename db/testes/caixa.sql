@@ -23,6 +23,8 @@ select teste.falha(format($$select app.venda_balcao(%L, null, 'GS', '[{"produto_
   'Falta receber', 'Cliente avulso precisa pagar a venda inteira');
 select teste.falha(format($$select app.venda_balcao(%L, null, 'GS', '[{"produto_id":"%s","quantidade":2}]', '[{"modalidade":"efetivo","valor":99000}]')$$, :'caixa', :'PROD2'),
   'maior que o total', 'Não recebe mais que o total (o troco sai do caixa)');
+select teste.falha(format($$select app.venda_balcao(%L, null, 'GS', '[{"produto_id":"%s","quantidade":1,"preco":16000}]', '[{"modalidade":"efetivo","valor":16000}]')$$, :'caixa', :'PROD2'),
+  'abaixo da tabela', 'No balcão a vendedora não vende abaixo da tabela');
 select app.venda_balcao(:'caixa', null, 'GS', format('[{"produto_id":"%s","quantidade":2}]', :'PROD2')::jsonb,
   '[{"modalidade":"efetivo","valor":20000},{"modalidade":"pix","valor":14000}]'::jsonb) as venda \gset
 select teste.ok((select status_comercial::text from app.pedidos where id = :'venda') = 'entregue', 'Venda de balcão já sai entregue');

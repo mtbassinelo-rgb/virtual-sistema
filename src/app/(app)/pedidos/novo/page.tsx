@@ -68,7 +68,7 @@ export default async function NovoPedido({ searchParams }: { searchParams: Promi
         </label>
         <label>Previsão de envio<input name="previsao_envio" type="date" defaultValue={hojeISO(2)} /></label>
         <div className="largo tabela" style={{ overflow: "visible" }}>
-          <LinhasItens opcoes={opcoesProdutos} />
+          <LinhasItens opcoes={opcoesProdutos} podeBaixar={ehGestao(u)} />
         </div>
         <label className="largo">Observações<textarea name="observacoes" /></label>
         <label className="largo linha"><input type="checkbox" name="para_cliente" value="1" />

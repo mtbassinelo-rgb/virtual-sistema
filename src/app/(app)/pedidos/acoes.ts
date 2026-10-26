@@ -154,14 +154,16 @@ export async function criarPedido(fd: FormData) {
   try {
     const cliente = texto(fd, "cliente_id");
     if (!cliente) throw new Error("Escolha o cliente.");
-    const itens: { produto_id: string; quantidade?: number; caixas?: number }[] = [];
+    const itens: { produto_id: string; quantidade?: number; caixas?: number; preco?: number }[] = [];
     for (let i = 0; i < 300; i++) {
       const produto = texto(fd, `produto_${i}`);
       const cx = numero(fd, `cx_${i}`);
       const qtd = numero(fd, `qtd_${i}`);
+      const preco = numero(fd, `preco_${i}`);
       if (!produto) continue;
-      if (qtd && qtd > 0) itens.push({ produto_id: produto, quantidade: qtd });
-      else if (cx && cx > 0) itens.push({ produto_id: produto, caixas: cx });
+      const extra = preco && preco > 0 ? { preco } : {};
+      if (qtd && qtd > 0) itens.push({ produto_id: produto, quantidade: qtd, ...extra });
+      else if (cx && cx > 0) itens.push({ produto_id: produto, caixas: cx, ...extra });
     }
     if (itens.length === 0) throw new Error("Inclua pelo menos um produto com caixas ou peças.");
     const moeda = ["GS", "BRL"].includes(texto(fd, "moeda")) ? texto(fd, "moeda") : null;
@@ -315,4 +317,16 @@ export async function decidirRemocao(fd: FormData) {
     await comUsuario(uid, (c) => c.query("select app.decidir_remocao_item($1, $2, nullif($3,''))",
       [texto(fd, "remocao_id"), aprovar, texto(fd, "motivo_decisao")]));
   });
+}
+
+/** Preço de tabela (por peça) do produto para o cliente: o mínimo que a vendedora pode cobrar. */
+export async function precoTabela(cliente: string, moeda: string, produto: string): Promise<{ preco: number | null; moeda: "GS" | "BRL" | null }> {
+  const u = await exigirUsuario();
+  const ok = (v: string) => /^[0-9a-f-]{36}$/i.test(v);
+  if (!ok(cliente) || !ok(produto)) return { preco: null, moeda: null };
+  const r = await comUsuario(u.id, (c) => c.query(
+    `select app.preco_tabela_cliente($1, $2, nullif($3, '')::app.moeda) as preco, coalesce(nullif($3, '')::app.moeda, (select moeda from app.clientes where id = $1)) as moeda`,
+    [cliente, produto, ["GS", "BRL"].includes(moeda) ? moeda : ""]));
+  const x = r.rows[0];
+  return { preco: x?.preco == null ? null : Number(x.preco), moeda: x?.moeda ?? null };
 }
