@@ -4,6 +4,7 @@ import { comUsuario } from "@/lib/db";
 import { unidadeSistema } from "@/lib/unidade-sistema";
 import { Avisos } from "../../../avisos";
 import { solicitarTransferencia } from "../acoes";
+import { EscolherUnidades, ListaPedido } from "./lista";
 
 export const metadata = { title: "Pedir mercadoria" };
 
@@ -54,8 +55,7 @@ export default async function NovaSolicitacao({ searchParams }: {
   if (!d.destino) return <div className="painel">Você não está ligada a nenhuma unidade. Peça ao gerente para marcar em Equipe.</div>;
   if (!d.origem) return <div className="painel">Não há outra unidade para pedir mercadoria.</div>;
   const ver = f.ver ?? (d.pedido ? "pedido" : "falta");
-  const termo = (f.q ?? "").toLowerCase();
-  let linhas = d.linhas.filter((l) => (!f.marca || l.marca === f.marca) && (!termo || `${l.nome} ${l.codigo}`.toLowerCase().includes(termo)));
+  let linhas = [...d.linhas];
   if (ver === "falta") linhas = linhas.filter((l) => l.destino <= 0);
   else if (ver === "pouco") linhas = linhas.filter((l) => l.destino <= 0 || (l.vendas30 > 0 && l.destino < l.vendas30 / 2) || (l.caixa != null && l.destino < l.caixa));
   else if (ver === "pedido") linhas = linhas.filter((l) => l.sugerido != null);
@@ -63,7 +63,7 @@ export default async function NovaSolicitacao({ searchParams }: {
   linhas.sort((a, b) => ordem === "nome" ? a.nome.localeCompare(b.nome, "pt-BR") : ordem === "origem" ? b.origem - a.origem
     : b.vendas30 - a.vendas30 || a.nome.localeCompare(b.nome, "pt-BR"));
   const faltaTotal = d.linhas.filter((l) => l.destino <= 0).length;
-  const base = { origem: d.origem.id, destino: d.destino.id, ...(f.pedido ? { pedido: f.pedido } : {}), ...(f.marca ? { marca: f.marca } : {}), ...(f.q ? { q: f.q } : {}) };
+  const base = { origem: d.origem.id, destino: d.destino.id, ...(f.pedido ? { pedido: f.pedido } : {}) };
   const href = (o: Record<string, string>) => "/estoque/transferencias/nova?" + new URLSearchParams({ ...base, ver, ordem, ...o });
   const volta = href({});
 
@@ -79,48 +79,26 @@ export default async function NovaSolicitacao({ searchParams }: {
       <Avisos erro={f.erro} />
       {d.pedido && <div className="aviso-caixa">Repondo os itens do pedido {d.pedido.bling_numero ? `nº ${d.pedido.bling_numero}` : ""} de {d.pedido.cliente ?? "cliente"} ({d.pedido.status_comercial}). Ajuste as quantidades e acrescente o que mais precisar.</div>}
 
-      <form className="painel linha" method="get" style={{ flexWrap: "wrap", alignItems: "end" }}>
-        {d.pedido && <input type="hidden" name="pedido" value={d.pedido.id} />}
-        <input type="hidden" name="ver" value={ver} /><input type="hidden" name="ordem" value={ordem} />
-        <label>Pedir de<select name="origem" defaultValue={d.origem.id}>{d.deps.filter((x) => x.id !== d.destino!.id).map((x) => <option key={x.id} value={x.id}>{x.nome}</option>)}</select></label>
-        <label>Para<select name="destino" defaultValue={d.destino.id}>{d.deps.map((x) => <option key={x.id} value={x.id}>{x.nome}</option>)}</select></label>
-        <label>Marca<select name="marca" defaultValue={f.marca ?? ""}><option value="">Todas</option>{d.marcas.map((m) => <option key={m}>{m}</option>)}</select></label>
-        <label>Buscar<input name="q" defaultValue={f.q ?? ""} placeholder="nome ou código" /></label>
-        <button>Filtrar</button>
-      </form>
-
-      <nav className="filtros">
-        <Link href={href({ ver: "falta" })} className={ver === "falta" ? "ativo" : ""}>Tem em {d.origem.nome} e não tem em {d.destino.nome} ({faltaTotal})</Link>
-        <Link href={href({ ver: "pouco" })} className={ver === "pouco" ? "ativo" : ""}>Acabando em {d.destino.nome}</Link>
-        <Link href={href({ ver: "todos" })} className={ver === "todos" ? "ativo" : ""}>Tudo que tem em {d.origem.nome}</Link>
-        {d.pedido && <Link href={href({ ver: "pedido" })} className={ver === "pedido" ? "ativo" : ""}>Itens do pedido</Link>}
-        <span className="suave pequeno" style={{ alignSelf: "center" }}>Ordenar:</span>
-        {[["vendas", "Mais vendidos"], ["origem", "Mais estoque lá"], ["nome", "Nome"]].map(([k, t]) => <Link key={k} href={href({ ordem: k })} className={ordem === k ? "ativo" : ""}>{t}</Link>)}
-      </nav>
+      <section className="painel">
+        <EscolherUnidades deps={d.deps.map((x) => ({ id: x.id, nome: x.nome }))} origem={d.origem.id} destino={d.destino.id}
+          extra={{ ver, ordem, ...(d.pedido ? { pedido: d.pedido.id } : {}) }} />
+        <nav className="filtros">
+          <Link href={href({ ver: "falta" })} className={ver === "falta" ? "ativo" : ""}>Falta em {d.destino.nome} ({faltaTotal})</Link>
+          <Link href={href({ ver: "pouco" })} className={ver === "pouco" ? "ativo" : ""}>Acabando em {d.destino.nome}</Link>
+          <Link href={href({ ver: "todos" })} className={ver === "todos" ? "ativo" : ""}>Tudo que tem em {d.origem.nome}</Link>
+          {d.pedido && <Link href={href({ ver: "pedido" })} className={ver === "pedido" ? "ativo" : ""}>Itens do pedido</Link>}
+          <span className="suave pequeno" style={{ alignSelf: "center", marginLeft: 8 }}>Ordenar:</span>
+          {[["vendas", "Mais vendidos"], ["origem", "Mais estoque lá"], ["nome", "Nome"]].map(([k, t]) => <Link key={k} href={href({ ordem: k })} className={ordem === k ? "ativo" : ""}>{t}</Link>)}
+        </nav>
+      </section>
 
       <form action={solicitarTransferencia} className="painel">
         <input type="hidden" name="origem" value={d.origem.id} /><input type="hidden" name="destino" value={d.destino.id} />
         <input type="hidden" name="volta" value={volta} />
         {d.pedido && <input type="hidden" name="pedido" value={d.pedido.id} />}
-        {linhas.length === 0 ? <div className="vazio">Nenhum produto com esses filtros.</div> : (
-          <div className="tabela"><table>
-            <thead><tr><th>Produto</th><th>Marca</th><th className="num">Em {d.origem.nome}</th><th className="num">Em {d.destino.nome}</th><th className="num">Vendido 30 dias ({d.destino.nome})</th><th>Pedir</th></tr></thead>
-            <tbody>{linhas.slice(0, 400).map((l) => (
-              <tr key={l.id}>
-                <td>{l.nome}<div className="pequeno suave">{l.codigo}{l.caixa ? ` · caixa com ${l.caixa}` : ""}</div></td>
-                <td>{l.marca}</td>
-                <td className="num">{l.origem.toLocaleString("pt-BR")}</td>
-                <td className="num" style={l.destino <= 0 ? { color: "var(--erro)", fontWeight: 700 } : undefined}>{l.destino.toLocaleString("pt-BR")}</td>
-                <td className="num">{l.vendas30 ? l.vendas30.toLocaleString("pt-BR") : "—"}</td>
-                <td><input name={`q:${l.id}`} inputMode="decimal" style={{ width: 90 }} defaultValue={l.sugerido != null ? String(Math.min(l.sugerido, Math.max(l.origem, 0)) || l.sugerido) : ""}
-                  placeholder={l.caixa ? String(l.caixa) : ""} aria-label={`Quantidade de ${l.nome}`} /></td>
-              </tr>))}</tbody>
-          </table></div>
-        )}
-        {linhas.length > 400 && <p className="pequeno suave">Mostrando 400 de {linhas.length}: use os filtros.</p>}
-        <label style={{ marginTop: 10 }}>Observação (cliente, urgência…)<input name="obs" maxLength={500} placeholder={d.pedido ? `Repor pedido de ${d.pedido.cliente ?? ""}` : "Ex.: para cliente Ana, precisa até sexta"} /></label>
-        <div className="linha" style={{ marginTop: 10 }}><button className="principal">Enviar pedido para {d.origem.nome}</button>
-          <span className="pequeno suave">Só vão os produtos com quantidade preenchida. Kits: peça os componentes.</span></div>
+        <ListaPedido key={`${d.origem.id}-${d.destino.id}-${ver}-${ordem}`} linhas={linhas} marcas={d.marcas} origemNome={d.origem.nome} destinoNome={d.destino.nome} />
+        <label>Observação (cliente, urgência…)<input name="obs" maxLength={500} placeholder={d.pedido ? `Repor pedido de ${d.pedido.cliente ?? ""}` : "Ex.: para cliente Ana, precisa até sexta"} /></label>
+        <span className="pequeno suave">Os botões somam uma caixa por vez; dá para digitar a quantidade em unidades. Kits: peça os componentes.</span>
       </form>
     </>
   );

@@ -525,3 +525,30 @@ a.kpi:hover { border-color: var(--marca); }
   .indicador .valor { font-size: 1rem; }
   * { box-shadow: none !important; }
 }
+
+/* ---------- Pedir mercadoria entre unidades ---------- */
+.rota-unidades { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 12px; align-items: end; }
+.rota-unidades label span { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--marca); }
+.rota-unidades select { font-size: 1rem; font-weight: 600; padding: 10px 12px; }
+.rota-inverter { width: 44px; height: 44px; justify-content: center; font-size: 1.2rem; border-radius: 50%; }
+.pedir-busca { display: grid; grid-template-columns: minmax(0, 2fr) minmax(160px, 1fr) auto; gap: 10px; align-items: center; }
+.pedir-busca input[type=search] { font-size: 1rem; padding: 10px 12px; }
+.pedir-lista { display: flex; flex-direction: column; border: 1px solid var(--linha); border-radius: 10px; overflow: hidden; }
+.pedir-item { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.4fr) auto; gap: 12px; align-items: center; padding: 10px 12px; border-top: 1px solid var(--linha); }
+.pedir-item:first-child { border-top: none; }
+.pedir-item.escolhido { background: var(--marca-suave); }
+.pedir-nome { display: flex; flex-direction: column; min-width: 0; }
+.pedir-estoques { display: flex; gap: 12px; flex-wrap: wrap; font-size: .82rem; }
+.pedir-estoques .zerado b { color: var(--erro); }
+.pedir-qtd { display: flex; align-items: center; gap: 4px; }
+.pedir-qtd button { padding: 6px 10px; min-width: 40px; justify-content: center; font-weight: 700; }
+.pedir-qtd input { width: 70px; text-align: center; font-weight: 700; }
+.pedir-barra { position: sticky; bottom: 0; z-index: 4; display: flex; gap: 12px; align-items: center; justify-content: flex-end; flex-wrap: wrap;
+  background: var(--superficie); border: 1px solid var(--linha); border-radius: 10px; padding: 10px 14px; box-shadow: 0 -4px 14px rgba(0,0,0,.06); }
+.pedir-barra > span:first-child { margin-right: auto; }
+@media (max-width: 760px) {
+  .rota-unidades { grid-template-columns: minmax(0, 1fr) auto; } .rota-unidades label:last-child { grid-column: 1 / -1; }
+  .pedir-busca { grid-template-columns: 1fr; }
+  .pedir-item { grid-template-columns: minmax(0, 1fr) auto; } .pedir-estoques { grid-column: 1 / 2; grid-row: 2; }
+  .pedir-qtd { grid-row: 1 / 3; grid-column: 2; }
+}
