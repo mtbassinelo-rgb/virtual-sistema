@@ -505,3 +505,21 @@ a.kpi:hover { border-color: var(--marca); }
 .crm-lista .crm-quem small { color: var(--suave); font-size: .75rem; }
 .botao.mini { padding: 4px 10px; font-size: .78rem; }
 .contador-grande { font-size: 2rem; font-weight: 750; color: var(--marca); line-height: 1; }
+
+/* ---------- Impressão: tudo cabe na folha (A4 ou carta), sem cortar as laterais ---------- */
+@page { margin: 10mm; }
+@media print {
+  html, body { width: auto !important; min-width: 0 !important; background: #fff !important; font-size: 11px; }
+  .casca, .principal-area, main.conteudo { display: block !important; width: auto !important; max-width: none !important; min-width: 0 !important; margin: 0 !important; padding: 0 !important; }
+  .lateral, .barra-topo, .abrir-menu, .menu-fundo, .nao-imprimir, .filtro-tabela, button { display: none !important; }
+  .painel { border: none !important; padding: 0 !important; gap: 8px; }
+  .tabela { overflow: visible !important; border: 1px solid #ccc !important; }
+  table { min-width: 0 !important; width: 100% !important; }
+  th, td { padding: 4px 6px !important; overflow-wrap: anywhere; }
+  tr { break-inside: avoid; }
+  .linha { flex-wrap: wrap; }
+  .indicadores { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 6px; }
+  .indicador { padding: 6px 8px; break-inside: avoid; }
+  .indicador .valor { font-size: 1rem; }
+  * { box-shadow: none !important; }
+}
