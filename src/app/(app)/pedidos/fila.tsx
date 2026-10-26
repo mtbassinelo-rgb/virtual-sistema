@@ -30,14 +30,15 @@ export const ETAPA_POR_ID = Object.fromEntries(ETAPAS.map((e) => [e.id, e]));
 
 type ItemFila = { id: string; etapa: string; cliente: string | null; valor: string; moeda: Moeda; dias: number };
 
-export async function carregarFila(c: PoolClient): Promise<ItemFila[]> {
+export async function carregarFila(c: PoolClient, deposito?: string | null): Promise<ItemFila[]> {
   return (await c.query(
     `select v.id, ${etapaSql("v", "p")} etapa, v.cliente_nome cliente, v.valor_total valor, v.moeda,
             (current_date - v.data_pedido)::int dias
        from app.v_pedidos v join app.pedidos p on p.id = v.id
       where v.status_comercial::text in ('aguardando_cliente','aguardando_aprovacao','em_separacao','enviado','aguardando_retirada')
         and not exists (select 1 from app.canais k where k.codigo = v.canal and k.marketplace)
-      order by v.data_pedido, v.criado_em limit 500`)).rows as ItemFila[];
+        and ($1::uuid is null or v.deposito_id = $1::uuid)
+      order by v.data_pedido, v.criado_em limit 500`, [deposito ?? null])).rows as ItemFila[];
 }
 
 /** Quadro dos pedidos abertos por etapa: quantos, quem e quanto. Clica e abre a lista filtrada. */

@@ -159,7 +159,7 @@ export default async function Pedidos({ searchParams }: { searchParams: Promise<
          group by 1, 2 order by 1`, [hoje])).rows;
       resumo = { hoje, site, siteSolic, mk, geral };
     }
-    const fila = await carregarFila(c);
+    const fila = await carregarFila(c, f.deposito || null);
     return { pedidos, vendedoras, canais, depositos, resumo, fila };
   });
 

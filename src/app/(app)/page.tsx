@@ -5,6 +5,7 @@ import { dinheiro, data, dataHora, linkWhatsApp, MODALIDADES, telefone, type Moe
 import { Selo } from "./avisos";
 import { apagarPedidosSite, marcarPedidoSiteAtendido } from "./acoes-site";
 import { carregarFila, FilaPedidos } from "./pedidos/fila";
+import { unidadeSistema } from "@/lib/unidade-sistema";
 
 type Recompra = { cliente_id: string; nome: string; whatsapp: string | null; vendedora: string; atraso_dias: number; dias_desde: number; alto_valor: boolean; moeda: Moeda; valor_medio: string | null };
 type Carrinho = { cliente_id: string; cliente: string; whatsapp: string | null; vendedora: string; itens: number; atualizado_em: string };
@@ -15,6 +16,11 @@ export const metadata = { title: "Hoje" };
 export default async function Hoje() {
   const u = await exigirUsuario();
   const gestao = ehGestao(u);
+  // unidade escolhida no topo (Todas / CD Foz / CD CDE): os números e pedidos são só dela
+  const { atual } = await unidadeSistema(u);
+  const dep = atual && /^[0-9a-f-]{36}$/i.test(atual.id) ? atual.id : null;
+  const naUnidade = (alias: string) => dep ? `and ${alias}.deposito_id = '${dep}'` : "";
+  const itemNaUnidade = dep ? `and pedido_id in (select id from app.pedidos where deposito_id = '${dep}')` : "";
 
   const d = await comUsuario(u.id, async (c) => {
     const aConferir = gestao
@@ -35,10 +41,10 @@ export default async function Hoje() {
          order by g.conferido_em desc limit 20`)).rows;
     const envioAtrasado = (await c.query(`
         select id, cliente_nome, previsao_envio, valor_total, moeda, vendedora_nome
-          from app.v_pedidos where envio_atrasado order by previsao_envio limit 30`)).rows;
+          from app.v_pedidos where envio_atrasado ${dep ? `and deposito_id = '${dep}'` : ""} order by previsao_envio limit 30`)).rows;
     const pagAtrasado = (await c.query(`
         select id, cliente_nome, vencimento, saldo, moeda, vendedora_nome
-          from app.v_pedidos where status_pagamento = 'atrasado' order by vencimento limit 30`)).rows;
+          from app.v_pedidos where status_pagamento = 'atrasado' ${dep ? `and deposito_id = '${dep}'` : ""} order by vencimento limit 30`)).rows;
     const metasPerto = (await c.query(`
         select id, cliente_nome, falta, dias_restantes, moeda, percentual
           from app.v_metas where status = 'aprovada' and not meta_batida and dias_restantes <= 10
@@ -73,9 +79,9 @@ export default async function Hoje() {
     // Destaques do mês para gerente e administrativo: quem vendeu mais e menos, produto que mais e menos lucrou, contas
     const destaques = gestao ? {
       vendedoras: (await c.query(`select vendedora_nome nome, moeda, sum(receita) receita from app.v_itens_lucro
-          where data_pedido >= date_trunc('month', current_date) group by 1, 2 order by 2, 3 desc`)).rows,
+          where data_pedido >= date_trunc('month', current_date) ${itemNaUnidade} group by 1, 2 order by 2, 3 desc`)).rows,
       produtos: (await c.query(`select produto nome, moeda, sum(quantidade) qtd, sum(lucro) lucro from app.v_itens_lucro
-          where data_pedido >= date_trunc('month', current_date) and lucro is not null group by 1, 2 order by 2, 4 desc`)).rows,
+          where data_pedido >= date_trunc('month', current_date) and lucro is not null ${itemNaUnidade} group by 1, 2 order by 2, 4 desc`)).rows,
       procuras: (await c.query(`select coalesce(sum(novos), 0)::int novos, count(*) filter (where novos > 0)::int produtos
           from app.v_procuras_resumo`)).rows[0] as { novos: number; produtos: number },
       contas: (await c.query(`select moeda, count(*) filter (where situacao = 'vencida')::int vencidas,
@@ -92,8 +98,8 @@ export default async function Hoje() {
        where i.descricao ilike '%SEM ESTOQUE%' and p.status_comercial::text in ('aguardando_cliente','aguardando_aprovacao','em_separacao')
        group by p.id, cl.nome, v.nome, p.data_pedido order by p.data_pedido desc limit 30`).catch(() => ({ rows: [] }))).rows as
       { id: string; cliente: string; vendedora: string; data_pedido: string; itens: string }[];
-    const fila = await carregarFila(c);
-    const meu = gestao ? "" : "and v.vendedora_id = app.minha_vendedora()";
+    const fila = await carregarFila(c, dep);
+    const meu = (gestao ? "" : "and v.vendedora_id = app.minha_vendedora()") + " " + naUnidade("v");
     const mes = (await c.query(`select v.moeda, coalesce(sum(v.valor_total), 0) vendido, count(*)::int n
         from app.v_pedidos v where v.status_comercial <> 'cancelado' and v.data_pedido >= date_trunc('month', current_date) ${meu}
           and not exists (select 1 from app.canais k where k.codigo = v.canal and k.marketplace)
@@ -121,7 +127,7 @@ export default async function Hoje() {
       <section className="linha entre">
         <div>
           <h1>Bom trabalho, {u.nome.split(" ")[0]}</h1>
-          <div className="suave">{gestao ? "O que precisa de atenção hoje." : "Seu painel: pedidos, clientes para chamar e conversas esperando."}</div>
+          <div className="suave">{gestao ? "O que precisa de atenção hoje." : "Seu painel: pedidos, clientes para chamar e conversas esperando."}{atual ? <> Mostrando só <b>{atual.nome}</b>.</> : ""}</div>
         </div>
         <Link className="botao principal" href="/pedidos/novo">+ Novo pedido</Link>
       </section>
