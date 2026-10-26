@@ -21,8 +21,8 @@ select teste.como(:'YESSICA');
 select set_config('teste.t1', app.solicitar_transferencia(:'cd', :'cde', format('[{"produto_id":"%s","quantidade":10}]', :'UP1')::jsonb, 'para cliente Ana')::text, false);
 select teste.ok((select status = 'solicitada' from app.transferencias where id = current_setting('teste.t1')::uuid), 'Vendedora de CDE pede ao CD Foz');
 select teste.falha(format($$select app.separar_transferencia(%L, '[]')$$, current_setting('teste.t1')), 'estoque de origem', 'Quem pediu não separa no CD Foz');
-select teste.falha(format($$select app.solicitar_transferencia(%L, %L, '[{"produto_id":"%s","quantidade":1}]')$$, :'cde', :'cd', :'UP1'),
-  'não trabalha', 'Só pede para a unidade em que trabalha');
+select teste.ok(app.solicitar_transferencia(:'cde', :'cd', format('[{"produto_id":"%s","quantidade":1}]', :'UP1')::jsonb) is not null,
+  'Também pede PARA a outra unidade a partir da unidade em que trabalha');
 
 select teste.como(:'EST');
 select teste.falha(format($$select app.separar_transferencia(%L, '[{"produto_id":"%s","quantidade":80}]')$$, current_setting('teste.t1'), :'UP1'),

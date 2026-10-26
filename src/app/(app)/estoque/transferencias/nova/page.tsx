@@ -19,7 +19,8 @@ export default async function NovaSolicitacao({ searchParams }: {
     const deps = (await c.query("select id, nome, codigo, abastecido_por, app.trabalha_na_unidade(id) trabalha from app.depositos where ativo order by tipo, nome")).rows as
       { id: string; nome: string; codigo: string; abastecido_por: string | null; trabalha: boolean }[];
     // destino: o escolhido, senão a unidade do topo (se trabalha nela), senão a primeira em que trabalha que é abastecida por outra
-    const destino = deps.find((x) => x.id === f.destino && x.trabalha) ?? deps.find((x) => x.id === atual?.id && x.trabalha && x.abastecido_por)
+    const algumaUnidade = deps.some((x) => x.trabalha);
+    const destino = deps.find((x) => x.id === f.destino && (x.trabalha || algumaUnidade)) ?? deps.find((x) => x.id === atual?.id && x.trabalha && x.abastecido_por)
       ?? deps.find((x) => x.trabalha && x.abastecido_por) ?? deps.find((x) => x.trabalha) ?? null;
     if (!destino) return { deps, destino: null, origem: null, linhas: [] as Linha[], marcas: [] as string[], pedido: null };
     const origem = deps.find((x) => x.id === f.origem && x.id !== destino.id) ?? deps.find((x) => x.id === destino.abastecido_por) ?? deps.find((x) => x.id !== destino.id) ?? null;
@@ -82,7 +83,7 @@ export default async function NovaSolicitacao({ searchParams }: {
         {d.pedido && <input type="hidden" name="pedido" value={d.pedido.id} />}
         <input type="hidden" name="ver" value={ver} /><input type="hidden" name="ordem" value={ordem} />
         <label>Pedir de<select name="origem" defaultValue={d.origem.id}>{d.deps.filter((x) => x.id !== d.destino!.id).map((x) => <option key={x.id} value={x.id}>{x.nome}</option>)}</select></label>
-        <label>Para<select name="destino" defaultValue={d.destino.id}>{d.deps.filter((x) => x.trabalha).map((x) => <option key={x.id} value={x.id}>{x.nome}</option>)}</select></label>
+        <label>Para<select name="destino" defaultValue={d.destino.id}>{d.deps.map((x) => <option key={x.id} value={x.id}>{x.nome}</option>)}</select></label>
         <label>Marca<select name="marca" defaultValue={f.marca ?? ""}><option value="">Todas</option>{d.marcas.map((m) => <option key={m}>{m}</option>)}</select></label>
         <label>Buscar<input name="q" defaultValue={f.q ?? ""} placeholder="nome ou código" /></label>
         <button>Filtrar</button>
