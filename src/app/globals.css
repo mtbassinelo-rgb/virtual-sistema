@@ -507,10 +507,12 @@ a.kpi:hover { border-color: var(--marca); }
 .contador-grande { font-size: 2rem; font-weight: 750; color: var(--marca); line-height: 1; }
 
 /* ---------- Impressão: tudo cabe na folha (A4 ou carta), sem cortar as laterais ---------- */
-@page { margin: 10mm; }
+@page { size: A4; margin: 8mm; }
 @media print {
   html, body { width: auto !important; min-width: 0 !important; background: #fff !important; font-size: 11px; }
-  .casca, .principal-area, main.conteudo { display: block !important; width: auto !important; max-width: none !important; min-width: 0 !important; margin: 0 !important; padding: 0 !important; }
+  .casca, .principal-area { display: block !important; width: auto !important; max-width: none !important; min-width: 0 !important; margin: 0 !important; padding: 0 !important; }
+  /* folga própria: mesmo com "Margens: nenhuma" na janela de impressão, nada encosta na borda do papel */
+  main.conteudo { display: block !important; width: auto !important; max-width: none !important; min-width: 0 !important; margin: 0 !important; padding: 6mm 9mm !important; }
   .lateral, .barra-topo, .abrir-menu, .menu-fundo, .nao-imprimir, .filtro-tabela, button { display: none !important; }
   .painel { border: none !important; padding: 0 !important; gap: 8px; }
   .tabela { overflow: visible !important; border: 1px solid #ccc !important; }
