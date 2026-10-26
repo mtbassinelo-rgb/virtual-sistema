@@ -192,4 +192,15 @@ update app.produtos set unidades_caixa_fornecedor = null where codigo = 'CX-6';
 select teste.ok((select unidades_caixa is null from app.produtos where codigo = 'CX-6'), 'Sem caixa do fornecedor: vende por unidade');
 
 reset role;
+
+\echo '== Juntar produtos duplicados =='
+reset role;
+insert into app.produtos (id, codigo, nome) values ('00000000-0000-0000-0000-0000000d0b01', 'JUN-A', 'Junta A'), ('00000000-0000-0000-0000-0000000d0b02', 'JUN-B', 'Junta A dup');
+select app._lancar(:'cd', '00000000-0000-0000-0000-0000000d0b01', 'entrada_compra', 5, 'teste', 'jun', null);
+select app._lancar(:'cd', '00000000-0000-0000-0000-0000000d0b02', 'entrada_compra', 3, 'teste', 'jun', null);
+select app.juntar_produtos('00000000-0000-0000-0000-0000000d0b01', '00000000-0000-0000-0000-0000000d0b02', 'teste');
+select teste.ok((select quantidade from app.estoque_saldos where deposito_id = :'cd' and produto_id = '00000000-0000-0000-0000-0000000d0b01') = 8, 'Estoque do duplicado soma no que fica');
+select teste.ok((select quantidade from app.estoque_saldos where deposito_id = :'cd' and produto_id = '00000000-0000-0000-0000-0000000d0b02') = 0, 'Duplicado fica zerado');
+select teste.ok(app.produto_por_codigo('JUN-B') = '00000000-0000-0000-0000-0000000d0b01'::uuid, 'Código antigo aponta para o que fica');
+select teste.ok(not (select ativo from app.produtos where id = '00000000-0000-0000-0000-0000000d0b02'), 'Duplicado fica inativo');
 \echo '== Testes das unidades passaram =='
