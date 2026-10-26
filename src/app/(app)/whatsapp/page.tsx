@@ -6,6 +6,7 @@ import { pode } from "@/lib/permissoes";
 import { contatoLegivel, resumoMsg } from "@/lib/whatsapp";
 import { Selo } from "../avisos";
 import { AtualizarSozinho } from "./atualizar-sozinho";
+import { FiltroCalendario } from "./filtro-calendario";
 
 export const metadata = { title: "WhatsApp" };
 
@@ -193,12 +194,14 @@ export default async function WhatsApp({ searchParams }: {
         </section>
       ) : (
         <>
-          <nav className="filtros" aria-label="Período">
-            {Object.entries(PERIODOS).map(([k, v]) => <a key={k} href={url({ p: k, de: undefined, ate: undefined })} className={per === k ? "ativo" : ""}>{v.t}</a>)}
-            {conexoes.length > 1 && <span className="pequeno suave" style={{ alignSelf: "center", marginLeft: 8 }}>Número:</span>}
-            {conexoes.length > 1 && <a href={url({ w: undefined })} className={!f.w ? "ativo" : ""}>Todos</a>}
-            {conexoes.length > 1 && conexoes.map((w) => <a key={w.id} href={url({ w: w.id })} className={f.w === w.id ? "ativo" : ""}>{w.nome}</a>)}
-          </nav>
+          <FiltroCalendario caminho="/whatsapp" de={de} ate={ate} manter={{ w: f.w, f: filtro === "todas" ? undefined : filtro, o: ordem === "recente" ? undefined : ordem, q: f.q }} />
+          {conexoes.length > 1 && (
+            <nav className="filtros" aria-label="Número">
+              <span className="pequeno suave" style={{ alignSelf: "center" }}>Número:</span>
+              <a href={url({ w: undefined })} className={!f.w ? "ativo" : ""}>Todos</a>
+              {conexoes.map((w) => <a key={w.id} href={url({ w: w.id })} className={f.w === w.id ? "ativo" : ""}>{w.nome}</a>)}
+            </nav>
+          )}
           {conexoes.filter((w) => w.estado !== "conectado").map((w) => (
             <div key={w.id} className="aviso-caixa erro" role="alert">
               {w.nome}: desconectado. As mensagens deste número não estão chegando.{" "}
@@ -262,13 +265,11 @@ export default async function WhatsApp({ searchParams }: {
           )}
 
           <form className="painel filtros" method="get">
-            {per === "custom" || !PERIODOS[per] ? null : <input type="hidden" name="p" value={per} />}
+            <input type="hidden" name="de" value={de} /><input type="hidden" name="ate" value={ate} />
             {f.w && <input type="hidden" name="w" value={f.w} />}
             <label className="filtro-busca">Buscar (nome, número ou mensagem)<input name="q" defaultValue={f.q ?? ""} /></label>
             <label>Mostrar<select name="f" defaultValue={filtro}>{Object.entries(FILTROS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
             <label>Ordenar por<select name="o" defaultValue={ordem}>{Object.entries(ORDENS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
-            <label>De<input type="date" name="de" defaultValue={per === "custom" ? de : ""} /></label>
-            <label>Até<input type="date" name="ate" defaultValue={per === "custom" ? ate : ""} /></label>
             <div className="filtro-botoes"><button className="principal">Filtrar</button><a className="botao" href="/whatsapp">Limpar</a></div>
           </form>
 

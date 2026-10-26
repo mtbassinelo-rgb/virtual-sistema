@@ -5,6 +5,7 @@ import { data, dataHora, dinheiro, hojeISO, type Moeda } from "@/lib/formato";
 import { contatoLegivel } from "@/lib/whatsapp";
 import { Avisos, Barra, Selo } from "../avisos";
 import { atribuirConversa } from "../whatsapp/acoes";
+import { FiltroCalendario } from "../whatsapp/filtro-calendario";
 
 export const metadata = { title: "Desempenho das vendedoras" };
 
@@ -159,17 +160,18 @@ export default async function Desempenho({ searchParams }: {
       </section>
       <Avisos ok={f.ok} erro={f.erro} />
 
-      <nav className="filtros" aria-label="Período">
-        {Object.entries(PERIODOS).map(([k, v]) => <a key={k} href={url({ p: k, de: undefined, ate: undefined })} className={per === k ? "ativo" : ""}>{v.t}</a>)}
-        {conexoes.length > 1 && <span className="pequeno suave" style={{ alignSelf: "center", marginLeft: 8 }}>Número:</span>}
-        {conexoes.length > 1 && <a href={url({ w: undefined })} className={!f.w ? "ativo" : ""}>Todos</a>}
-        {conexoes.length > 1 && conexoes.map((w) => <a key={w.id} href={url({ w: w.id })} className={f.w === w.id ? "ativo" : ""}>{w.nome}</a>)}
-      </nav>
+      <FiltroCalendario caminho="/desempenho" de={de} ate={ate} manter={{ w: f.w, v: f.v, o: ordem === "valor" ? undefined : ordem }} />
+      {conexoes.length > 1 && (
+        <nav className="filtros" aria-label="Número">
+          <span className="pequeno suave" style={{ alignSelf: "center" }}>Número:</span>
+          <a href={url({ w: undefined })} className={!f.w ? "ativo" : ""}>Todos</a>
+          {conexoes.map((w) => <a key={w.id} href={url({ w: w.id })} className={f.w === w.id ? "ativo" : ""}>{w.nome}</a>)}
+        </nav>
+      )}
       <form className="painel filtros" method="get">
         {f.v !== undefined && <input type="hidden" name="v" value={f.v} />}
         {f.w && <input type="hidden" name="w" value={f.w} />}
-        <label>De<input type="date" name="de" defaultValue={de} /></label>
-        <label>Até<input type="date" name="ate" defaultValue={ate} /></label>
+        <input type="hidden" name="de" value={de} /><input type="hidden" name="ate" value={ate} />
         <label>Ordenar ranking por<select name="o" defaultValue={ordem}>{Object.entries(ORDENS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
         <div className="filtro-botoes"><button className="principal">Filtrar</button><a className="botao" href="/desempenho">Limpar</a></div>
       </form>
