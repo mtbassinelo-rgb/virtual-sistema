@@ -7,6 +7,7 @@ import { hojeISO } from "@/lib/formato";
 import { Avisos } from "../../avisos";
 import { criarPedido } from "../acoes";
 import { BuscaLista } from "../../busca-lista";
+import { LinhasItens } from "./linhas-itens";
 
 export const metadata = { title: "Novo pedido" };
 
@@ -28,7 +29,6 @@ export default async function NovoPedido({ searchParams }: { searchParams: Promi
             where vd.vendedora_id = $1 and d.ativo order by vd.padrao desc, d.nome`,
       ehGestao(u) ? [] : [u.vendedora_id])).rows,
   }));
-  const linhas = Array.from({ length: 10 }, (_, i) => i);
   const opcoesProdutos = d.produtos.map((p) => ({ v: String(p.id), t: `${p.nome}`,
     d: `${p.codigo}${p.unidades_caixa ? ` · caixa com ${p.unidades_caixa}` : ""}` }));
 
@@ -68,21 +68,7 @@ export default async function NovoPedido({ searchParams }: { searchParams: Promi
         </label>
         <label>Previsão de envio<input name="previsao_envio" type="date" defaultValue={hojeISO(2)} /></label>
         <div className="largo tabela" style={{ overflow: "visible" }}>
-          <table style={{ minWidth: 420 }} data-sem-filtro>
-            <thead><tr><th>Produto</th><th style={{ width: 110 }}>Caixas</th><th style={{ width: 110 }}>ou peças</th></tr></thead>
-            <tbody>
-              {linhas.map((i) => (
-                <tr key={i}>
-                  <td>
-                    <BuscaLista name={`produto_${i}`} opcoes={opcoesProdutos} ariaLabel={`Produto ${i + 1}`}
-                      placeholder="Digite nome ou código (ex.: sha%uva)" />
-                  </td>
-                  <td><input name={`cx_${i}`} inputMode="numeric" aria-label={`Caixas ${i + 1}`} /></td>
-                  <td><input name={`qtd_${i}`} inputMode="decimal" aria-label={`Peças ${i + 1}`} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <LinhasItens opcoes={opcoesProdutos} />
         </div>
         <label className="largo">Observações<textarea name="observacoes" /></label>
         <label className="largo linha"><input type="checkbox" name="para_cliente" value="1" />

@@ -155,7 +155,7 @@ export async function criarPedido(fd: FormData) {
     const cliente = texto(fd, "cliente_id");
     if (!cliente) throw new Error("Escolha o cliente.");
     const itens: { produto_id: string; quantidade?: number; caixas?: number }[] = [];
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 300; i++) {
       const produto = texto(fd, `produto_${i}`);
       const cx = numero(fd, `cx_${i}`);
       const qtd = numero(fd, `qtd_${i}`);
