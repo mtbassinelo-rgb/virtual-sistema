@@ -27,4 +27,13 @@ reset role;
 select teste.ok((select depois->>'senha_hash' from app.auditoria where tabela='usuarios' and depois ? 'senha_hash' order by id desc limit 1) = '(senha alterada)',
   'Auditoria registra a troca de senha sem guardar a senha');
 select app.encerrar_sessao('hash-token-1');
+\echo '== Senha provisória =='
+set role vc_app;
+select teste.como('00000000-0000-0000-0000-000000000002');
+select teste.ok(app.definir_senha_pessoa(:'KEILA', repeat('h', 40)) is not null, 'Gerente define senha provisória da vendedora');
+select teste.falha(format($$select app.definir_senha_pessoa(%L, %L)$$, :'DONO', repeat('h', 40)), 'Só o dono', 'Gerente não define senha do dono');
+select teste.como(:'KEILA');
+select teste.falha(format($$select app.definir_senha_pessoa(%L, %L)$$, :'KEILA', repeat('h', 40)), 'gerente ou dono', 'Vendedora não define senha');
+reset role;
+select teste.ok((select senha_hash = repeat('h', 40) from app.usuarios where id = :'KEILA'), 'Senha provisória gravada');
 \echo '== Testes de sessões passaram =='
