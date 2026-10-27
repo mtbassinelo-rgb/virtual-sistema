@@ -14,6 +14,7 @@ export default async function NovaSolicitacao({ searchParams }: {
   searchParams: Promise<{ origem?: string; destino?: string; ver?: string; marca?: string; q?: string; pedido?: string; ordem?: string; erro?: string }>;
 }) {
   const u = await exigirUsuario();
+  const gestao = u.perfil === "dono" || u.perfil === "gerente";
   const f = await searchParams;
   const { atual } = await unidadeSistema(u);
   const d = await comUsuario(u.id, async (c) => {
@@ -59,7 +60,7 @@ export default async function NovaSolicitacao({ searchParams }: {
   if (ver === "falta") linhas = linhas.filter((l) => l.destino <= 0);
   else if (ver === "pouco") linhas = linhas.filter((l) => l.destino <= 0 || (l.vendas30 > 0 && l.destino < l.vendas30 / 2) || (l.caixa != null && l.destino < l.caixa));
   else if (ver === "pedido") linhas = linhas.filter((l) => l.sugerido != null);
-  const ordem = f.ordem ?? "vendas";
+  const ordem = f.ordem ?? (gestao ? "vendas" : "nome");
   linhas.sort((a, b) => ordem === "nome" ? a.nome.localeCompare(b.nome, "pt-BR") : ordem === "origem" ? b.origem - a.origem
     : b.vendas30 - a.vendas30 || a.nome.localeCompare(b.nome, "pt-BR"));
   const faltaTotal = d.linhas.filter((l) => l.destino <= 0).length;
@@ -88,7 +89,7 @@ export default async function NovaSolicitacao({ searchParams }: {
           <Link href={href({ ver: "todos" })} className={ver === "todos" ? "ativo" : ""}>Tudo que tem em {d.origem.nome}</Link>
           {d.pedido && <Link href={href({ ver: "pedido" })} className={ver === "pedido" ? "ativo" : ""}>Itens do pedido</Link>}
           <span className="suave pequeno" style={{ alignSelf: "center", marginLeft: 8 }}>Ordenar:</span>
-          {[["vendas", "Mais vendidos"], ["origem", "Mais estoque lá"], ["nome", "Nome"]].map(([k, t]) => <Link key={k} href={href({ ordem: k })} className={ordem === k ? "ativo" : ""}>{t}</Link>)}
+          {(gestao ? [["vendas", "Mais vendidos"], ["origem", "Mais estoque lá"], ["nome", "Nome"]] : [["origem", "Mais estoque lá"], ["nome", "Nome"]]).map(([k, t]) => <Link key={k} href={href({ ordem: k })} className={ordem === k ? "ativo" : ""}>{t}</Link>)}
         </nav>
       </section>
 
@@ -96,7 +97,7 @@ export default async function NovaSolicitacao({ searchParams }: {
         <input type="hidden" name="origem" value={d.origem.id} /><input type="hidden" name="destino" value={d.destino.id} />
         <input type="hidden" name="volta" value={volta} />
         {d.pedido && <input type="hidden" name="pedido" value={d.pedido.id} />}
-        <ListaPedido key={`${d.origem.id}-${d.destino.id}-${ver}-${ordem}`} linhas={linhas} marcas={d.marcas} origemNome={d.origem.nome} destinoNome={d.destino.nome} />
+        <ListaPedido key={`${d.origem.id}-${d.destino.id}-${ver}-${ordem}`} linhas={gestao ? linhas : linhas.map((l) => ({ ...l, vendas30: 0 }))} marcas={d.marcas} origemNome={d.origem.nome} destinoNome={d.destino.nome} />
         <label>Observação (cliente, urgência…)<input name="obs" maxLength={500} placeholder={d.pedido ? `Repor pedido de ${d.pedido.cliente ?? ""}` : "Ex.: para cliente Ana, precisa até sexta"} /></label>
         <span className="pequeno suave">Os botões somam uma caixa por vez; dá para digitar a quantidade em unidades. Kits: peça os componentes.</span>
       </form>

@@ -13,6 +13,7 @@ const quando = (d: string | null) => d ? new Date(d).toLocaleString("pt-BR", { d
 
 export default async function Transferencia({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ ok?: string; erro?: string }> }) {
   const u = await exigirUsuario();
+  const gestao = u.perfil === "dono" || u.perfil === "gerente";
   const { id } = await params;
   const f = await searchParams;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
@@ -80,7 +81,7 @@ export default async function Transferencia({ params, searchParams }: { params: 
         <section className="painel">
           <h2>Itens</h2>
           <div className="tabela"><table>
-            <thead><tr><th>Produto</th><th className="num">Pedido</th><th className="num">Separado / enviado</th><th className="num">Recebido</th><th className="num">Custo un.</th></tr></thead>
+            <thead><tr><th>Produto</th><th className="num">Pedido</th><th className="num">Separado / enviado</th><th className="num">Recebido</th>{gestao && <th className="num">Custo un.</th>}</tr></thead>
             <tbody>{itens.map((i) => {
               const ped = Number(i.quantidade_solicitada ?? i.quantidade_enviada), env = Number(i.quantidade_enviada);
               return (
@@ -89,11 +90,11 @@ export default async function Transferencia({ params, searchParams }: { params: 
                   <td className="num">{ped.toLocaleString("pt-BR")}</td>
                   <td className="num">{t.status === "solicitada" ? "—" : env === 0 ? <Selo cor="erro">não tem</Selo> : <>{env.toLocaleString("pt-BR")}{env < ped && <span className="pequeno" style={{ color: "var(--aviso)" }}> (faltou {(ped - env).toLocaleString("pt-BR")})</span>}</>}</td>
                   <td className="num">{i.quantidade_recebida != null ? Number(i.quantidade_recebida).toLocaleString("pt-BR") : "—"}</td>
-                  <td className="num">{i.custo_unit != null ? dinheiro(i.custo_unit, "BRL") : "—"}</td>
+                  {gestao && <td className="num">{i.custo_unit != null ? dinheiro(i.custo_unit, "BRL") : "—"}</td>}
                 </tr>);
             })}</tbody>
           </table></div>
-          <p className="pequeno suave" style={{ margin: 0 }}>{pedidas.toLocaleString("pt-BR")} peças pedidas{t.status !== "solicitada" ? ` · ${enviadas.toLocaleString("pt-BR")} separadas` : ""}{t.valor_custo != null ? ` · custo enviado ${dinheiro(t.valor_custo, "BRL")}` : ""}</p>
+          <p className="pequeno suave" style={{ margin: 0 }}>{pedidas.toLocaleString("pt-BR")} peças pedidas{t.status !== "solicitada" ? ` · ${enviadas.toLocaleString("pt-BR")} separadas` : ""}{gestao && t.valor_custo != null ? ` · custo enviado ${dinheiro(t.valor_custo, "BRL")}` : ""}</p>
         </section>
       )}
       {t.status === "solicitada" && !t.opera_origem && <div className="aviso-caixa">Aguardando o estoquista de {t.origem} separar.</div>}

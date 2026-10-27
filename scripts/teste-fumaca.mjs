@@ -44,8 +44,10 @@ const clienteKeila = (await db.query(
 
 for (const [email, quem] of [["gerente@teste.local", "Gerente"], ["keila@teste.local", "Keila"]]) {
   const cookie = await sessao(email);
-  for (const tela of ["/", "/pedidos", "/pedidos?pagamento=aguardando", "/pedidos/novo", "/caixa", "/estoque/inventario", "/pedidos?desconto=pendente", "/catalogo?marca=Rhenuks", "/relatorios?aba=site", "/loja/esqueci", `/pedidos/${pedidoKeila}`,
-                      "/clientes", `/clientes/${clienteKeila}`, "/metas", "/estoque", "/estoque?situacao=zerado", "/estoque?situacao=com"]) {
+  // vendedora só tem a área dela: sem estoque geral nem relatórios da empresa
+  const soGestao = ["/relatorios?aba=site", "/estoque", "/estoque?situacao=zerado", "/estoque?situacao=com"];
+  for (const tela of ["/", "/pedidos", "/pedidos?pagamento=aguardando", "/pedidos/novo", "/caixa", "/estoque/inventario", "/pedidos?desconto=pendente", "/catalogo?marca=Rhenuks", "/loja/esqueci", `/pedidos/${pedidoKeila}`,
+                      "/clientes", `/clientes/${clienteKeila}`, "/metas", ...(quem === "Gerente" ? soGestao : [])]) {
     const r = await abrir(tela, cookie);
     ok(r.status === 200 && !r.html.includes("Application error"), `${quem}: ${tela} abre`);
   }
@@ -115,6 +117,9 @@ const impKeila = await abrir("/estoque/importar", await sessao("keila@teste.loca
 const semAcesso = (r) => (r.status >= 300 && r.status < 400 && r.local.includes("/sem-permissao")) || r.html.includes("Sem acesso a esta área") || r.html.includes("Só gerente ou dono");
 ok(semAcesso(impKeila), "Vendedora não importa produtos");
 ok(semAcesso(await abrir("/equipe", await sessao("keila@teste.local"))), "Vendedora não abre Equipe e acessos");
+for (const tela of ["/estoque", "/relatorios", "/estoque/historico"]) {
+  ok(semAcesso(await abrir(tela, await sessao("keila@teste.local"))), `Vendedora não abre ${tela}`);
+}
 // WhatsApp: gerente abre o acompanhamento e as conexões; vendedora não abre por padrão; webhook exige a chave
 for (const tela of ["/whatsapp", "/whatsapp?p=30&f=aguardando&o=espera", "/whatsapp/conexoes"]) {
   const r = await abrir(tela, await sessao("gerente@teste.local"));

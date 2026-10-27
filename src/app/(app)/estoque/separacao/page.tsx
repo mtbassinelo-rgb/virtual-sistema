@@ -9,6 +9,7 @@ export const metadata = { title: "Área do estoquista" };
 
 export default async function Separacao({ searchParams }: { searchParams: Promise<{ ordem?: string; ok?: string; erro?: string }> }) {
   const u = await exigirUsuario();
+  const gestao = u.perfil === "dono" || u.perfil === "gerente";
   const f = await searchParams;
   const { atual } = await unidadeSistema(u);
   const d = await comUsuario(u.id, async (c) => {
@@ -77,7 +78,7 @@ export default async function Separacao({ searchParams }: { searchParams: Promis
         </div>
         {d.pedidos.length === 0 ? <div className="vazio">Nada para separar. 🎉</div> : (
           <div className="tabela"><table>
-            <thead><tr><th>Pedido</th><th>Cliente</th><th>Vendedora</th><th className="num">Itens</th><th>Enviar até</th><th className="num">Total</th><th></th></tr></thead>
+            <thead><tr><th>Pedido</th><th>Cliente</th><th>Vendedora</th><th className="num">Itens</th><th>Enviar até</th>{gestao && <th className="num">Total</th>}<th></th></tr></thead>
             <tbody>{d.pedidos.map((p) => (
               <tr key={p.id}>
                 <td>{new Date(p.criado_em).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}{p.bling_numero && <div className="pequeno suave">nº {p.bling_numero}</div>}
@@ -86,7 +87,7 @@ export default async function Separacao({ searchParams }: { searchParams: Promis
                 <td>{p.vendedora}</td>
                 <td className="num">{p.itens} · {Number(p.pecas).toLocaleString("pt-BR")} pç</td>
                 <td>{p.previsao_envio ? <span style={atrasado(p) ? { color: "var(--erro)", fontWeight: 700 } : undefined}>{new Date(p.previsao_envio).toLocaleDateString("pt-BR", { timeZone: "UTC" })}</span> : "—"}</td>
-                <td className="num">{dinheiro(p.valor_total, p.moeda as Moeda)}</td>
+                {gestao && <td className="num">{dinheiro(p.valor_total, p.moeda as Moeda)}</td>}
                 <td><Link className="botao principal" href={`/estoque/separacao/${p.id}`}>Separar</Link></td>
               </tr>))}</tbody>
           </table></div>

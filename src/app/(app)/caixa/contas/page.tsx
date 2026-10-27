@@ -10,6 +10,7 @@ export const metadata = { title: "Contas da unidade" };
 
 export default async function ContasUnidade({ searchParams }: { searchParams: Promise<{ u?: string; ver?: string; mes?: string; ok?: string; erro?: string }> }) {
   const u = await exigirUsuario();
+  const gestao = u.perfil === "dono" || u.perfil === "gerente";
   const f = await searchParams;
   const { atual } = await unidadeSistema(u);
   const mes = /^\d{4}-\d{2}$/.test(f.mes ?? "") ? f.mes! : hojeISO().slice(0, 7);
@@ -47,8 +48,8 @@ export default async function ContasUnidade({ searchParams }: { searchParams: Pr
         {d.resumo.map((r) => (
           <div key={r.moeda} className="indicador"><span className="rotulo">A pagar ({r.moeda === "GS" ? "Gs" : "R$"})</span><span className="valor num">{dinheiro(r.a_pagar, r.moeda)}</span>
             <span className="pequeno suave">vencido {dinheiro(r.vencido, r.moeda)} · pago no mês {dinheiro(r.pago_mes, r.moeda)}</span></div>))}
-        <div className="indicador"><span className="rotulo">Mercadoria recebida no mês (custo)</span><span className="valor num">{dinheiro(d.transf.custo, "BRL")}</span>
-          <Link className="pequeno" href="/estoque/transferencias?ver=recebidas">{d.transf.n} envio(s) →</Link></div>
+        {gestao && <div className="indicador"><span className="rotulo">Mercadoria recebida no mês (custo)</span><span className="valor num">{dinheiro(d.transf.custo, "BRL")}</span>
+          <Link className="pequeno" href="/estoque/transferencias?ver=recebidas">{d.transf.n} envio(s) →</Link></div>}
       </section>
       <div className="linha" style={{ flexWrap: "wrap" }}>
         <nav className="filtros"><Link href={q({ ver: "abertas" })} className={ver === "abertas" ? "ativo" : ""}>A pagar</Link><Link href={q({ ver: "pagas" })} className={ver === "pagas" ? "ativo" : ""}>Pagas no mês</Link></nav>

@@ -82,7 +82,7 @@ export default async function Produto({ params, searchParams }: {
             <label>Unidade<input name="unidade" defaultValue={p?.unidade ?? "UN"} disabled={!pode} /></label>
             <label>Código de barras<input name="gtin" defaultValue={p?.gtin ?? ""} disabled={!pode} inputMode="numeric" /></label>
             <label>Peças na caixa do fornecedor <span className="pequeno suave">(o cliente compra sempre caixa com 12)</span><input name="unidades_caixa" defaultValue={p?.unidades_caixa_fornecedor ?? ""} disabled={!pode} inputMode="numeric" placeholder="Ex.: 12" /></label>
-            <label>Custo (R$)<input name="custo" defaultValue={p?.custo != null ? Number(p.custo).toFixed(2).replace(".", ",") : ""} disabled={!pode} inputMode="decimal" /></label>
+            {pode && <label>Custo (R$)<input name="custo" defaultValue={p?.custo != null ? Number(p.custo).toFixed(2).replace(".", ",") : ""} disabled={!pode} inputMode="decimal" /></label>}
             <label style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <input type="checkbox" name="ativo" defaultChecked={p ? p.ativo : true} disabled={!pode} style={{ width: "auto" }} /> Ativo (vende no sistema)
             </label>

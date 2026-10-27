@@ -45,7 +45,8 @@ const PADRAO: Record<Perfil, string[]> = {
   dono: TODAS,
   gerente: TODAS,
   consulta: TODAS.filter((c) => c !== "caixa" && c !== "equipe" && c !== "rh"),
-  vendedora: ["pedidos", "caixa", "clientes", "metas", "promocoes", "catalogo", "procuras", "produtos", "estoque", "separacao", "inventario", "relatorios", "comissoes", "site", "calendario"],
+  // Vendedora: só a área dela (pedidos e clientes dela, metas, comissão, catálogo e produtos sem custo). Sem estoque geral nem relatórios da empresa.
+  vendedora: ["pedidos", "caixa", "clientes", "metas", "promocoes", "catalogo", "procuras", "produtos", "separacao", "inventario", "comissoes", "calendario"],
   // Estoquista: só balanço de estoque e separação (confere e confirma; não altera pedido)
   estoquista: ["separacao", "inventario"],
 };

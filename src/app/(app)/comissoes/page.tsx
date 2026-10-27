@@ -22,11 +22,14 @@ export default async function Comissoes({ searchParams }: { searchParams: Promis
   const seguinte = new Date(Date.UTC(a, m, 1)).toISOString().slice(0, 7);
 
   const d = await comUsuario(u.id, async (c) => ({
-    linhas: (await c.query("select * from app.comissoes(($1 || '-01')::date)", [mes])).rows as Linha[],
+    // vendedora vê só a própria linha e a própria regra
+    linhas: ((await c.query("select * from app.comissoes(($1 || '-01')::date)", [mes])).rows as Linha[])
+      .filter((l) => gestao || l.vendedora_id === u.vendedora_id),
     regras: (await c.query(
       `select r.*, v.nome as vendedora, u.nome as quem from app.comissao_regras r
          join app.vendedoras v on v.id = r.vendedora_id left join app.usuarios u on u.id = r.definido_por
-        order by v.nome, r.vigente_desde desc`)).rows,
+        where $1::boolean or r.vendedora_id = $2::uuid
+        order by v.nome, r.vigente_desde desc`, [gestao, u.vendedora_id])).rows,
     vendedoras: gestao ? (await c.query("select id, nome from app.vendedoras where ativo order by nome")).rows : [],
   }));
   const total = (moeda: Moeda) => d.linhas.filter((l) => l.moeda === moeda).reduce((t, l) => t + Number(l.comissao ?? 0), 0);
@@ -61,22 +64,22 @@ export default async function Comissoes({ searchParams }: { searchParams: Promis
         </div>
         {d.linhas.length === 0 ? <div className="vazio">Nenhuma venda neste mês.</div> : (
           <div className="tabela"><table>
-            <thead><tr><th>Vendedora</th><th>Regra</th><th>Vendido</th><th>Recebido</th><th>Lucro</th><th>Base</th><th>Comissão</th></tr></thead>
+            <thead><tr><th>Vendedora</th><th>Regra</th><th>Vendido</th><th>Recebido</th>{gestao && <th>Lucro</th>}<th>Base</th><th>Comissão</th></tr></thead>
             <tbody>{d.linhas.map((l) => (
               <tr key={l.vendedora_id + l.moeda}>
                 <td>{l.vendedora} <span className="suave pequeno">{l.moeda === "GS" ? "Gs" : "R$"}</span></td>
                 <td>{l.base ? `${Number(l.percentual).toLocaleString("pt-BR")}% ${BASE_COMISSAO[l.base]}` : <Selo cor="aviso">sem regra</Selo>}</td>
                 <td className="num">{dinheiro(l.vendido, l.moeda)}</td>
                 <td className="num">{dinheiro(l.recebido, l.moeda)}</td>
-                <td className="num">{dinheiro(l.lucro, l.moeda)}
-                  {l.itens_sem_custo > 0 && <div className="pequeno suave">{l.itens_sem_custo} itens sem custo</div>}</td>
+                {gestao && <td className="num">{dinheiro(l.lucro, l.moeda)}
+                  {l.itens_sem_custo > 0 && <div className="pequeno suave">{l.itens_sem_custo} itens sem custo</div>}</td>}
                 <td className="num">{l.valor_base == null ? "—" : dinheiro(l.valor_base, l.moeda)}</td>
                 <td className="num"><b>{l.comissao == null ? "—" : dinheiro(l.comissao, l.moeda)}</b></td>
               </tr>))}</tbody>
           </table></div>
         )}
         <p className="suave pequeno" style={{ margin: 0 }}>Vendido: pedidos confirmados do mês. Recebido: pagamentos conferidos com data no mês.
-          Lucro: venda menos o custo dos itens (itens sem custo cadastrado ficam de fora).</p>
+          {gestao ? "Lucro: venda menos o custo dos itens (itens sem custo cadastrado ficam de fora)." : ""}</p>
       </section>
 
       {gestao && (
