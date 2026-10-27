@@ -365,7 +365,7 @@ function Cartao({ p, moeda, cliente, t, vendeUnidade }: { p: Produto; moeda: Moe
   const promo = pr?.desconto_pct ?? p.x?.promo_pct;
   return (
     <article className="cartao">
-      <div className="rotulo" style={{ background: cor.fundo, color: cor.tinta }}>
+      <div className={`rotulo ${p.foto ? "com-foto" : ""}`} style={{ background: cor.fundo, color: cor.tinta }}>
         {p.foto ? <img src={p.foto} alt={altFoto(p)} loading="lazy" /> : (
           <>
             <span className="rotulo-nome">{p.marcaNome ?? t.linhas[p.linha]}</span>
@@ -424,7 +424,7 @@ function CartaoGrupo({ p, moeda, cliente, t, vendeUnidade, linha }: { p: Produto
   const menorUn = unitarios.length ? Math.min(...unitarios) : null;
   return (
     <article className={`cartao cartao-grupo ${linha ? "em-lista" : ""}`}>
-      <div className="rotulo" style={{ background: cor.fundo, color: cor.tinta }}>
+      <div className={`rotulo ${p.foto ? "com-foto" : ""}`} style={{ background: cor.fundo, color: cor.tinta }}>
         {p.foto ? <img src={p.foto} alt={altFoto(p)} loading="lazy" /> : <span className="rotulo-nome">{p.marcaNome ?? t.linhas[p.linha]}</span>}
         {promo > 0 && <span className="etiqueta-promo">−{promo}%</span>}
       </div>
