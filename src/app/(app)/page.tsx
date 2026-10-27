@@ -156,7 +156,7 @@ export default async function Hoje() {
           <span className="valor">{d.esperando.length}</span><span className="pequeno suave">últimos 3 dias</span></Link>
       </div>
 
-      {d.confirmar.length > 0 && (
+      {!gestao && d.confirmar.length > 0 && (
         <section className="painel" style={{ borderColor: d.confirmar.some((x) => x.faltas > 0) ? "var(--erro)" : "var(--ok)" }}>
           <h2>Separados pela expedição: confirme com o cliente ({d.confirmar.length})</h2>
           <ul className="crm-lista">{d.confirmar.map((x) => (

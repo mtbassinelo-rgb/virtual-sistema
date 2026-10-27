@@ -24,6 +24,8 @@ export const PERMISSOES: Permissao[] = [
   { chave: "estoque", nome: "Estoque (saldos, movimentos, compras)", rotas: ["/estoque"] },
   { chave: "separacao", nome: "Área do estoquista: separar pedidos e pedidos entre unidades", rotas: ["/estoque/separacao", "/estoque/transferencias"] },
   { chave: "inventario", nome: "Balanço de estoque (contagem)", rotas: ["/estoque/inventario"] },
+  { chave: "estoque_historico", nome: "Histórico de movimentos do estoque (inclui vendas)", rotas: ["/estoque/historico"] },
+  { chave: "marketplace", nome: "Vendas Shopee / Mercado Livre", rotas: ["/estoque/marketplace"] },
   { chave: "estoque_importar", nome: "Importar estoque do Bling", rotas: ["/estoque/importar"], gestao: true },
   { chave: "estoque_notas", nome: "Notas a chegar (entrada de compra)", rotas: ["/estoque/notas"], gestao: true },
   { chave: "relatorios", nome: "Relatórios", rotas: ["/relatorios"] },
@@ -47,8 +49,8 @@ const PADRAO: Record<Perfil, string[]> = {
   consulta: TODAS.filter((c) => c !== "caixa" && c !== "equipe" && c !== "rh"),
   // Vendedora: só a área dela (pedidos e clientes dela, metas, comissão, catálogo e produtos sem custo). Sem estoque geral nem relatórios da empresa.
   vendedora: ["pedidos", "caixa", "clientes", "metas", "promocoes", "catalogo", "procuras", "produtos", "separacao", "inventario", "comissoes", "calendario"],
-  // Estoquista: só balanço de estoque e separação (confere e confirma; não altera pedido)
-  estoquista: ["separacao", "inventario"],
+  // Estoquista: funções de estoque (saldos, entrada, transferências, separação, balanço), sem vendas, custo nem histórico de movimentos
+  estoquista: ["estoque", "separacao", "inventario"],
 };
 
 /** Só o dono pode ligar ou desligar esta área para alguém. */

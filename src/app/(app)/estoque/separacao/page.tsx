@@ -42,8 +42,8 @@ export default async function Separacao({ searchParams }: { searchParams: Promis
 
   if (!d) return <div className="painel">Não foi possível carregar a área do estoquista.</div>;
   if (!d.deps.length) return (
-    <div className="painel">Você ainda não é responsável por nenhum estoque. O gerente marca em <b>Equipe → acessos</b> quais estoques você separa
-      (em CDE, a própria vendedora é a responsável).</div>);
+    <div className="painel">Você ainda não está ligado a nenhum estoque. Peça ao gerente para marcar em <b>Equipe e acessos → Acessos e horários →
+      Unidades em que mexe no estoque</b> (ex.: CD Principal).</div>);
   const atrasado = (p: { previsao_envio: string | null }) => p.previsao_envio && new Date(p.previsao_envio) < new Date(new Date().toDateString());
 
   return (

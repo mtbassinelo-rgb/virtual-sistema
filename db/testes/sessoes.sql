@@ -36,4 +36,7 @@ select teste.como(:'KEILA');
 select teste.falha(format($$select app.definir_senha_pessoa(%L, %L)$$, :'KEILA', repeat('h', 40)), 'gerente ou dono', 'Vendedora não define senha');
 reset role;
 select teste.ok((select senha_hash = repeat('h', 40) from app.usuarios where id = :'KEILA'), 'Senha provisória gravada');
+insert into app.usuarios (id, nome, email, perfil) values ('00000000-0000-0000-0000-0000000000e9', 'Estoquista Teste', 'est@t', 'estoquista');
+select teste.ok(exists (select 1 from app.deposito_responsaveis r join app.depositos d on d.id = r.deposito_id
+                        where r.usuario_id = '00000000-0000-0000-0000-0000000000e9' and d.codigo = 'cd-foz'), 'Estoquista novo já é responsável pelo CD Principal');
 \echo '== Testes de sessões passaram =='
