@@ -64,15 +64,15 @@ export default async function Transferencia({ params, searchParams }: { params: 
           <input type="hidden" name="id" value={t.id} />
           <h2>Separar</h2>
           <p className="pequeno suave" style={{ margin: 0 }}>Confira cada produto na prateleira. Separou menos? Ajuste a quantidade. Não tem? Marque "Não tem". O estoque só sai quando o envio for aprovado.</p>
-          <div className="tabela"><table>
+          <div className="tabela cartoes"><table>
             <thead><tr><th>Produto</th><th className="num">Pedido</th><th className="num">Tem aqui</th><th>Separado</th><th>Não tem</th></tr></thead>
             <tbody>{itens.map((i) => (
               <tr key={i.produto_id}>
-                <td>{i.nome}<div className="pequeno suave">{i.codigo}{i.gtin ? ` · ${i.gtin}` : ""}{i.marca ? ` · ${i.marca}` : ""}</div></td>
-                <td className="num">{Number(i.quantidade_solicitada ?? i.quantidade_enviada).toLocaleString("pt-BR")}</td>
-                <td className="num" style={i.saldo_origem < Number(i.quantidade_solicitada ?? 0) ? { color: "var(--erro)" } : undefined}>{i.saldo_origem.toLocaleString("pt-BR")}</td>
-                <td><input name={`s:${i.produto_id}`} inputMode="decimal" style={{ width: 90 }} defaultValue={String(Math.min(Number(i.quantidade_enviada), Math.max(i.saldo_origem, 0)))} aria-label={`Separado de ${i.nome}`} /></td>
-                <td><input type="checkbox" name={`f:${i.produto_id}`} defaultChecked={i.saldo_origem <= 0} aria-label={`Não tem ${i.nome}`} style={{ width: "auto" }} /></td>
+                <td className="titulo">{i.nome}<div className="pequeno suave">{i.codigo}{i.gtin ? ` · ${i.gtin}` : ""}{i.marca ? ` · ${i.marca}` : ""}</div></td>
+                <td className="num" data-rot="Pedido">{Number(i.quantidade_solicitada ?? i.quantidade_enviada).toLocaleString("pt-BR")}</td>
+                <td className="num" data-rot="Tem aqui" style={i.saldo_origem < Number(i.quantidade_solicitada ?? 0) ? { color: "var(--erro)" } : undefined}>{i.saldo_origem.toLocaleString("pt-BR")}</td>
+                <td data-rot="Separado"><input name={`s:${i.produto_id}`} inputMode="decimal" style={{ width: 90 }} defaultValue={String(Math.min(Number(i.quantidade_enviada), Math.max(i.saldo_origem, 0)))} aria-label={`Separado de ${i.nome}`} /></td>
+                <td data-rot="Não tem"><input type="checkbox" name={`f:${i.produto_id}`} defaultChecked={i.saldo_origem <= 0} aria-label={`Não tem ${i.nome}`} style={{ width: "auto" }} /></td>
               </tr>))}</tbody>
           </table></div>
           <button className="principal">Separação conferida</button>
@@ -80,17 +80,17 @@ export default async function Transferencia({ params, searchParams }: { params: 
       ) : (
         <section className="painel">
           <h2>Itens</h2>
-          <div className="tabela"><table>
+          <div className="tabela cartoes"><table>
             <thead><tr><th>Produto</th><th className="num">Pedido</th><th className="num">Separado / enviado</th><th className="num">Recebido</th>{gestao && <th className="num">Custo un.</th>}</tr></thead>
             <tbody>{itens.map((i) => {
               const ped = Number(i.quantidade_solicitada ?? i.quantidade_enviada), env = Number(i.quantidade_enviada);
               return (
                 <tr key={i.produto_id}>
-                  <td>{i.nome}<div className="pequeno suave">{i.codigo}{i.marca ? ` · ${i.marca}` : ""}</div></td>
-                  <td className="num">{ped.toLocaleString("pt-BR")}</td>
-                  <td className="num">{t.status === "solicitada" ? "—" : env === 0 ? <Selo cor="erro">não tem</Selo> : <>{env.toLocaleString("pt-BR")}{env < ped && <span className="pequeno" style={{ color: "var(--aviso)" }}> (faltou {(ped - env).toLocaleString("pt-BR")})</span>}</>}</td>
-                  <td className="num">{i.quantidade_recebida != null ? Number(i.quantidade_recebida).toLocaleString("pt-BR") : "—"}</td>
-                  {gestao && <td className="num">{i.custo_unit != null ? dinheiro(i.custo_unit, "BRL") : "—"}</td>}
+                  <td className="titulo">{i.nome}<div className="pequeno suave">{i.codigo}{i.marca ? ` · ${i.marca}` : ""}</div></td>
+                  <td className="num" data-rot="Pedido">{ped.toLocaleString("pt-BR")}</td>
+                  <td className="num" data-rot="Separado / enviado">{t.status === "solicitada" ? "—" : env === 0 ? <Selo cor="erro">não tem</Selo> : <>{env.toLocaleString("pt-BR")}{env < ped && <span className="pequeno" style={{ color: "var(--aviso)" }}> (faltou {(ped - env).toLocaleString("pt-BR")})</span>}</>}</td>
+                  <td className="num" data-rot="Recebido">{i.quantidade_recebida != null ? Number(i.quantidade_recebida).toLocaleString("pt-BR") : "—"}</td>
+                  {gestao && <td className="num" data-rot="Custo un.">{i.custo_unit != null ? dinheiro(i.custo_unit, "BRL") : "—"}</td>}
                 </tr>);
             })}</tbody>
           </table></div>
@@ -112,11 +112,11 @@ export default async function Transferencia({ params, searchParams }: { params: 
         <form action={receberSolicitacao} className="painel" style={{ borderColor: "var(--ok)" }}>
           <input type="hidden" name="id" value={t.id} />
           <h2>Chegou? Confira e receba</h2>
-          <div className="tabela"><table>
+          <div className="tabela cartoes"><table>
             <thead><tr><th>Produto</th><th className="num">Enviado</th><th>Chegou</th></tr></thead>
             <tbody>{itens.filter((i) => Number(i.quantidade_enviada) > 0).map((i) => (
-              <tr key={i.produto_id}><td>{i.nome}</td><td className="num">{Number(i.quantidade_enviada).toLocaleString("pt-BR")}</td>
-                <td><input name={`r:${i.produto_id}`} inputMode="decimal" defaultValue={String(Number(i.quantidade_enviada))} style={{ width: 90 }} aria-label={`Chegou de ${i.nome}`} /></td></tr>))}</tbody>
+              <tr key={i.produto_id}><td className="titulo">{i.nome}</td><td className="num" data-rot="Enviado">{Number(i.quantidade_enviada).toLocaleString("pt-BR")}</td>
+                <td data-rot="Chegou"><input name={`r:${i.produto_id}`} inputMode="decimal" defaultValue={String(Number(i.quantidade_enviada))} style={{ width: 90 }} aria-label={`Chegou de ${i.nome}`} /></td></tr>))}</tbody>
           </table></div>
           <label>Observação<input name="obs" maxLength={300} /></label>
           <button className="principal">Receber no estoque de {t.destino}</button>

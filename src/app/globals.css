@@ -552,3 +552,24 @@ a.kpi:hover { border-color: var(--marca); }
   .pedir-item { grid-template-columns: minmax(0, 1fr) auto; } .pedir-estoques { grid-column: 1 / 2; grid-row: 2; }
   .pedir-qtd { grid-row: 1 / 3; grid-column: 2; }
 }
+
+/* ---------- Estoquista no tablet (também navegadores antigos): tabelas viram cartões, sem arrastar para o lado ---------- */
+.menu-fundo { top: 0; right: 0; bottom: 0; left: 0; }
+@media (max-width: 1100px) {
+  .tabela.cartoes { border: 0; background: transparent; overflow: visible; }
+  .tabela.cartoes table { min-width: 0; width: 100%; }
+  .tabela.cartoes table, .tabela.cartoes tbody, .tabela.cartoes tr, .tabela.cartoes td { display: block; }
+  .tabela.cartoes thead { display: none; }
+  .tabela.cartoes tr { background: var(--superficie); border: 1px solid var(--linha); border-radius: 10px; margin-bottom: 10px; padding: 10px 14px; }
+  .tabela.cartoes td { border: 0; padding: 6px 0; display: block; text-align: right; font-size: 1rem; overflow: hidden; line-height: 2.2; }
+  .tabela.cartoes td::before { content: attr(data-rot); float: left; color: var(--suave); font-size: .85rem; text-align: left; margin-right: 12px; font-family: var(--fonte); }
+  .tabela.cartoes td.titulo { display: block; text-align: left; line-height: 1.4; font-size: 1.02rem; padding-bottom: 8px; border-bottom: 1px solid var(--linha); margin-bottom: 4px; }
+  .tabela.cartoes td.titulo::before, .tabela.cartoes td.acao::before { display: none; content: none; }
+  .tabela.cartoes td.acao { padding-top: 10px; }
+  .tabela.cartoes td.acao .botao { padding: 10px 22px; font-size: 1rem; }
+  .tabela.cartoes td input:not([type=checkbox]) { width: 130px !important; max-width: 50%; font-size: 1.15rem; padding: 10px 12px; text-align: center; }
+  .tabela.cartoes td input[type=checkbox] { width: 22px !important; height: 22px; }
+  .tabela.cartoes td .chip { padding: 8px 14px; font-size: .95rem; }
+  .tabela.cartoes td > div { text-align: right; line-height: 1.4; }
+  .tabela.cartoes td.titulo > div { text-align: left; }
+}

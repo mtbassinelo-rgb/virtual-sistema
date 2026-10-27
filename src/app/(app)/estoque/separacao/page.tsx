@@ -77,18 +77,18 @@ export default async function Separacao({ searchParams }: { searchParams: Promis
           </nav>
         </div>
         {d.pedidos.length === 0 ? <div className="vazio">Nada para separar. 🎉</div> : (
-          <div className="tabela"><table>
+          <div className="tabela cartoes"><table>
             <thead><tr><th>Pedido</th><th>Cliente</th><th>Vendedora</th><th className="num">Itens</th><th>Enviar até</th>{gestao && <th className="num">Total</th>}<th></th></tr></thead>
             <tbody>{d.pedidos.map((p) => (
               <tr key={p.id}>
-                <td>{new Date(p.criado_em).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}{p.bling_numero && <div className="pequeno suave">nº {p.bling_numero}</div>}
+                <td data-rot="Pedido em">{new Date(p.criado_em).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}{p.bling_numero && <div className="pequeno suave">nº {p.bling_numero}</div>}
                   {!atual && d.deps.length > 1 && <div className="pequeno suave">{p.deposito}</div>}</td>
-                <td>{p.cliente ?? "Cliente avulso"}{p.origem === "portal" && <> <Selo cor="info">site</Selo></>}</td>
-                <td>{p.vendedora}</td>
-                <td className="num">{p.itens} · {Number(p.pecas).toLocaleString("pt-BR")} pç</td>
-                <td>{p.previsao_envio ? <span style={atrasado(p) ? { color: "var(--erro)", fontWeight: 700 } : undefined}>{new Date(p.previsao_envio).toLocaleDateString("pt-BR", { timeZone: "UTC" })}</span> : "—"}</td>
-                {gestao && <td className="num">{dinheiro(p.valor_total, p.moeda as Moeda)}</td>}
-                <td><Link className="botao principal" href={`/estoque/separacao/${p.id}`}>Separar</Link></td>
+                <td className="titulo">{p.cliente ?? "Cliente avulso"}{p.origem === "portal" && <> <Selo cor="info">site</Selo></>}</td>
+                <td data-rot="Vendedora">{p.vendedora}</td>
+                <td className="num" data-rot="Itens">{p.itens} · {Number(p.pecas).toLocaleString("pt-BR")} pç</td>
+                <td data-rot="Enviar até">{p.previsao_envio ? <span style={atrasado(p) ? { color: "var(--erro)", fontWeight: 700 } : undefined}>{new Date(p.previsao_envio).toLocaleDateString("pt-BR", { timeZone: "UTC" })}</span> : "—"}</td>
+                {gestao && <td className="num" data-rot="Total">{dinheiro(p.valor_total, p.moeda as Moeda)}</td>}
+                <td className="acao"><Link className="botao principal" href={`/estoque/separacao/${p.id}`}>Separar</Link></td>
               </tr>))}</tbody>
           </table></div>
         )}
@@ -97,16 +97,16 @@ export default async function Separacao({ searchParams }: { searchParams: Promis
       <section className="painel">
         <h2>Pedidos de outra unidade</h2>
         {d.transf.length === 0 ? <div className="vazio">Nenhuma unidade pediu mercadoria.</div> : (
-          <div className="tabela"><table>
+          <div className="tabela cartoes"><table>
             <thead><tr><th>Nº</th><th>Pedido em</th><th>Para</th><th className="num">Itens</th><th>Quem pediu</th><th></th></tr></thead>
             <tbody>{d.transf.map((t) => (
               <tr key={t.id}>
-                <td className="num">#{t.numero}</td>
-                <td>{new Date(t.criada_em).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}</td>
-                <td><b>{t.destino}</b>{t.observacao && <div className="pequeno suave">{t.observacao}</div>}</td>
-                <td className="num">{t.itens} · {Number(t.pecas).toLocaleString("pt-BR")} pç</td>
-                <td>{t.quem}</td>
-                <td><Link className="botao principal" href={`/estoque/transferencias/${t.id}`}>Separar</Link></td>
+                <td className="num" data-rot="Nº">#{t.numero}</td>
+                <td data-rot="Pedido em">{new Date(t.criada_em).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}</td>
+                <td className="titulo">Para <b>{t.destino}</b>{t.observacao && <div className="pequeno suave">{t.observacao}</div>}</td>
+                <td className="num" data-rot="Itens">{t.itens} · {Number(t.pecas).toLocaleString("pt-BR")} pç</td>
+                <td data-rot="Quem pediu">{t.quem}</td>
+                <td className="acao"><Link className="botao principal" href={`/estoque/transferencias/${t.id}`}>Separar</Link></td>
               </tr>))}</tbody>
           </table></div>
         )}
