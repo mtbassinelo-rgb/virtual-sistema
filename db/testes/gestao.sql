@@ -76,6 +76,17 @@ select teste.falha($$select app.criar_pedido_vendedora('00000000-0000-0000-0000-
   '[{"produto_id": "00000000-0000-0000-0000-00000000ab01", "quantidade": 1}]', false)$$,
   'Cliente não encontrado', 'Vendedora não cria pedido para cliente de outra');
 
+reset role;
+update app.usuarios set permissoes = permissoes || '{"preco_abaixo": true}' where id = :'KEILA';
+set role vc_app;
+select teste.como(:'KEILA');
+select set_config('teste.p6', app.criar_pedido_vendedora(:'CG', 'GS', :'DG', null, null,
+  jsonb_build_array(jsonb_build_object('produto_id', :'G1', 'quantidade', 1, 'preco', 12000)), false)::text, false);
+select teste.ok((select valor_total = 12000 from app.pedidos where id = current_setting('teste.p6')::uuid), 'Vendedora liberada pelo gerente vende abaixo da tabela');
+reset role;
+update app.usuarios set permissoes = permissoes - 'preco_abaixo' where id = :'KEILA';
+set role vc_app;
+
 \echo '== Separação pelo estoquista =='
 select teste.como(:'KEILA');
 select set_config('teste.p5', app.criar_pedido_vendedora(:'CG', 'GS', :'DG', null, null,

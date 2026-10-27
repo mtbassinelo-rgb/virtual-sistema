@@ -24,6 +24,8 @@ export const PERMISSOES: Permissao[] = [
   { chave: "estoque", nome: "Estoque (saldos, movimentos, compras)", rotas: ["/estoque"] },
   { chave: "separacao", nome: "Área do estoquista: separar pedidos e pedidos entre unidades", rotas: ["/estoque/separacao", "/estoque/transferencias"] },
   { chave: "inventario", nome: "Balanço de estoque (contagem)", rotas: ["/estoque/inventario"] },
+  // Não é uma tela: libera vender abaixo do preço de tabela (novo pedido e balcão). Gerente e dono sempre podem.
+  { chave: "preco_abaixo", nome: "Pode vender abaixo da tabela (dar desconto no preço)", rotas: [] },
   { chave: "estoque_historico", nome: "Histórico de movimentos do estoque (inclui vendas)", rotas: ["/estoque/historico"] },
   { chave: "marketplace", nome: "Vendas Shopee / Mercado Livre", rotas: ["/estoque/marketplace"] },
   { chave: "estoque_importar", nome: "Importar estoque do Bling", rotas: ["/estoque/importar"], gestao: true },

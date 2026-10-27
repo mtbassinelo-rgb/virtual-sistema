@@ -8,6 +8,7 @@ import { Avisos } from "../../avisos";
 import { criarPedido } from "../acoes";
 import { BuscaLista } from "../../busca-lista";
 import { LinhasItens } from "./linhas-itens";
+import { pode } from "@/lib/permissoes";
 
 export const metadata = { title: "Novo pedido" };
 
@@ -68,7 +69,7 @@ export default async function NovoPedido({ searchParams }: { searchParams: Promi
         </label>
         <label>Previsão de envio<input name="previsao_envio" type="date" defaultValue={hojeISO(2)} /></label>
         <div className="largo tabela" style={{ overflow: "visible" }}>
-          <LinhasItens opcoes={opcoesProdutos} podeBaixar={ehGestao(u)} />
+          <LinhasItens opcoes={opcoesProdutos} podeBaixar={ehGestao(u) || pode(u, "preco_abaixo")} />
         </div>
         <label className="largo">Observações<textarea name="observacoes" /></label>
         <label className="largo linha"><input type="checkbox" name="para_cliente" value="1" />
