@@ -5,7 +5,7 @@ import { unidadeSistema } from "@/lib/unidade-sistema";
 import { comUsuario } from "@/lib/db";
 import { hojeISO } from "@/lib/formato";
 import { Avisos } from "../../avisos";
-import { criarPedido } from "../acoes";
+import { FormPedido } from "./form-pedido";
 import { BuscaLista } from "../../busca-lista";
 import { LinhasItens } from "./linhas-itens";
 import { pode } from "@/lib/permissoes";
@@ -47,7 +47,7 @@ export default async function NovoPedido({ searchParams }: { searchParams: Promi
       {d.depositos.length === 0 && !ehGestao(u) && (
         <div className="aviso-caixa aviso">Você ainda não tem depósito liberado para vender. Peça ao gerente.</div>
       )}
-      <form action={criarPedido} className="painel campos">
+      <FormPedido>
         <label className="largo">Cliente
           <BuscaLista name="cliente_id" required defaultValue={f.cliente ?? ""} ariaLabel="Cliente"
             placeholder="Digite o nome do cliente (use % como coringa)"
@@ -75,7 +75,7 @@ export default async function NovoPedido({ searchParams }: { searchParams: Promi
         <label className="largo linha"><input type="checkbox" name="para_cliente" value="1" />
           Mandar para o cliente conferir e confirmar as caixas por link (WhatsApp) antes de separar</label>
         <button className="principal">Criar pedido</button>
-      </form>
+      </FormPedido>
     </>
   );
 }

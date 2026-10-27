@@ -148,6 +148,15 @@ export async function registrarAtendimento(fd: FormData) {
 }
 
 export async function criarPedido(fd: FormData) {
+  const r = await criarPedidoSemPerder(fd);
+  if (r?.erro) redirect(`/pedidos/novo?erro=${encodeURIComponent(r.erro)}`);
+}
+
+/**
+ * Cria o pedido. Se der erro, devolve a mensagem SEM recarregar a página:
+ * a vendedora não perde as quantidades que já digitou.
+ */
+export async function criarPedidoSemPerder(fd: FormData): Promise<{ erro?: string }> {
   const u = await exigirUsuario();
   let erro: string | null = null;
   let id: string | null = null;
@@ -174,7 +183,7 @@ export async function criarPedido(fd: FormData) {
   } catch (e) {
     erro = mensagemErro(e);
   }
-  if (erro || !id) redirect(`/pedidos/novo?erro=${encodeURIComponent(erro ?? "Não foi possível criar o pedido.")}`);
+  if (erro || !id) return { erro: erro ?? "Não foi possível criar o pedido." };
   revalidatePath("/pedidos");
   if (texto(fd, "para_cliente") === "1") {
     let token: string | null = null;
