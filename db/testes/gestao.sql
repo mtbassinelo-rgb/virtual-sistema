@@ -76,6 +76,33 @@ select teste.falha($$select app.criar_pedido_vendedora('00000000-0000-0000-0000-
   '[{"produto_id": "00000000-0000-0000-0000-00000000ab01", "quantidade": 1}]', false)$$,
   'Cliente não encontrado', 'Vendedora não cria pedido para cliente de outra');
 
+\echo '== Separação pelo estoquista =='
+select teste.como(:'KEILA');
+select set_config('teste.p5', app.criar_pedido_vendedora(:'CG', 'GS', :'DG', null, null,
+  jsonb_build_array(jsonb_build_object('produto_id', :'G1', 'quantidade', 12)), false)::text, false);
+select set_config('teste.i5', (select id::text from app.pedido_itens where pedido_id = current_setting('teste.p5')::uuid), false);
+select teste.falha(format($$select app.confirmar_separacao_estoque(%L, '[{"item_id":"%s","quantidade":12}]', 1)$$, current_setting('teste.p5'), current_setting('teste.i5')),
+  'expedição', 'Quem não é responsável pelo estoque não confere');
+reset role;
+insert into app.deposito_responsaveis (deposito_id, usuario_id) values (:'DG', :'KEILA') on conflict do nothing;
+set role vc_app;
+select teste.como(:'KEILA');
+select teste.falha(format($$select app.confirmar_separacao_estoque(%L, '[]', 1)$$, current_setting('teste.p5')), 'Confirme a quantidade', 'Precisa confirmar todos os itens');
+select teste.falha(format($$select app.confirmar_separacao_estoque(%L, '[{"item_id":"%s","quantidade":13}]', 1)$$, current_setting('teste.p5'), current_setting('teste.i5')),
+  'não pode ser aumentado', 'Separação não aumenta o pedido');
+select teste.falha(format($$select app.confirmar_separacao_estoque(%L, '[{"item_id":"%s","quantidade":10}]', null)$$, current_setting('teste.p5'), current_setting('teste.i5')),
+  'total de caixas', 'Precisa informar o total de caixas');
+select app.confirmar_separacao_estoque(current_setting('teste.p5')::uuid, format('[{"item_id":"%s","quantidade":10}]', current_setting('teste.i5'))::jsonb, 1);
+select teste.ok((select caixas_separadas = 1 and separacao_conferida_em is not null and valor_total = 130000 from app.pedidos where id = current_setting('teste.p5')::uuid),
+  'Separação conferida com 10 de 12, 1 caixa, total recalculado');
+select teste.ok((select quantidade_faltou = 2 from app.pedido_itens_indisponiveis where pedido_id = current_setting('teste.p5')::uuid), 'O que faltou fica registrado para a vendedora');
+select teste.ok((select pedida = 12 and separada = 10 from app.pedido_separacao where pedido_id = current_setting('teste.p5')::uuid), 'Fica o registro do que foi separado');
+select teste.falha(format($$select app.confirmar_separacao_estoque(%L, '[{"item_id":"%s","quantidade":10}]', 1)$$, current_setting('teste.p5'), current_setting('teste.i5')),
+  'já foi conferido', 'Não confere duas vezes');
+reset role;
+delete from app.deposito_responsaveis where deposito_id = :'DG' and usuario_id = :'KEILA';
+set role vc_app;
+
 \echo '== Pedido enviado ao cliente por link =='
 select teste.como(:'KEILA');
 select set_config('teste.p3', app.criar_pedido_vendedora(:'CG', 'GS', :'DG', null, null,

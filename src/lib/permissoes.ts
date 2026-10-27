@@ -21,7 +21,9 @@ export const PERMISSOES: Permissao[] = [
   { chave: "produtos", nome: "Ver produtos", rotas: ["/produtos"] },
   { chave: "produtos_editar", nome: "Cadastrar produtos, preços, kits e fotos", gestao: true,
     rotas: ["/produtos/novo", "/produtos/precos-rapido", "/produtos/precos-cde", "/produtos/custos", "/produtos/kits", "/produtos/grupos", "/produtos/categorias", "/produtos/subcategorias", "/produtos/marcas", "/produtos/fotos", "/produtos/fotos-faltando", "/estoque/precos"] },
-  { chave: "estoque", nome: "Estoque e inventário", rotas: ["/estoque"] },
+  { chave: "estoque", nome: "Estoque (saldos, movimentos, compras)", rotas: ["/estoque"] },
+  { chave: "separacao", nome: "Área do estoquista: separar pedidos e pedidos entre unidades", rotas: ["/estoque/separacao", "/estoque/transferencias"] },
+  { chave: "inventario", nome: "Balanço de estoque (contagem)", rotas: ["/estoque/inventario"] },
   { chave: "estoque_importar", nome: "Importar estoque do Bling", rotas: ["/estoque/importar"], gestao: true },
   { chave: "estoque_notas", nome: "Notas a chegar (entrada de compra)", rotas: ["/estoque/notas"], gestao: true },
   { chave: "relatorios", nome: "Relatórios", rotas: ["/relatorios"] },
@@ -43,8 +45,9 @@ const PADRAO: Record<Perfil, string[]> = {
   dono: TODAS,
   gerente: TODAS,
   consulta: TODAS.filter((c) => c !== "caixa" && c !== "equipe" && c !== "rh"),
-  vendedora: ["pedidos", "caixa", "clientes", "metas", "promocoes", "catalogo", "procuras", "produtos", "estoque", "relatorios", "comissoes", "site", "calendario"],
-  estoquista: ["pedidos", "produtos", "estoque", "relatorios", "procuras"],
+  vendedora: ["pedidos", "caixa", "clientes", "metas", "promocoes", "catalogo", "procuras", "produtos", "estoque", "separacao", "inventario", "relatorios", "comissoes", "site", "calendario"],
+  // Estoquista: só balanço de estoque e separação (confere e confirma; não altera pedido)
+  estoquista: ["separacao", "inventario"],
 };
 
 /** Só o dono pode ligar ou desligar esta área para alguém. */

@@ -3,11 +3,11 @@ import { exigirUsuario } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
 import { dinheiro, type Moeda } from "@/lib/formato";
 import { unidadeSistema } from "@/lib/unidade-sistema";
-import { Selo } from "../../avisos";
+import { Avisos, Selo } from "../../avisos";
 
 export const metadata = { title: "Área do estoquista" };
 
-export default async function Separacao({ searchParams }: { searchParams: Promise<{ ordem?: string }> }) {
+export default async function Separacao({ searchParams }: { searchParams: Promise<{ ordem?: string; ok?: string; erro?: string }> }) {
   const u = await exigirUsuario();
   const f = await searchParams;
   const { atual } = await unidadeSistema(u);
@@ -52,10 +52,14 @@ export default async function Separacao({ searchParams }: { searchParams: Promis
           <div className="trilha"><Link href="/estoque">Estoque</Link> / Área do estoquista</div>
           <h1>Área do estoquista{atual ? ` · ${atual.nome}` : ""}</h1>
           <p>Fila do que separar em {d.deps.filter((x) => !atual || x.id === atual.id).map((x) => x.nome).join(" e ")}: pedidos de clientes e pedidos de outras unidades.
-            Abra, confira na prateleira e marque o que tem e o que falta. A vendedora é avisada e segue com o cliente.</p>
+            Abra, confira na prateleira e confirme a quantidade exata de cada item e o total de caixas. O que faltar, marque "Não tem": a vendedora é avisada e segue com o cliente.</p>
         </div>
       </section>
 
+      <Avisos ok={f.ok} erro={f.erro} />
+      <section className="atalhos">
+        <Link className="atalho" href="/estoque/inventario"><b>Balanço de estoque</b><span>Contar a prateleira e acertar o saldo</span></Link>
+      </section>
       <section className="indicadores">
         <div className="indicador"><span className="rotulo">Pedidos de clientes a separar</span><span className="valor">{d.pedidos.length}</span></div>
         <div className="indicador"><span className="rotulo">Pedidos de outra unidade a separar</span><span className="valor">{d.transf.length}</span></div>
@@ -83,7 +87,7 @@ export default async function Separacao({ searchParams }: { searchParams: Promis
                 <td className="num">{p.itens} · {Number(p.pecas).toLocaleString("pt-BR")} pç</td>
                 <td>{p.previsao_envio ? <span style={atrasado(p) ? { color: "var(--erro)", fontWeight: 700 } : undefined}>{new Date(p.previsao_envio).toLocaleDateString("pt-BR", { timeZone: "UTC" })}</span> : "—"}</td>
                 <td className="num">{dinheiro(p.valor_total, p.moeda as Moeda)}</td>
-                <td><Link className="botao principal" href={`/pedidos/${p.id}#separar`}>Separar</Link></td>
+                <td><Link className="botao principal" href={`/estoque/separacao/${p.id}`}>Separar</Link></td>
               </tr>))}</tbody>
           </table></div>
         )}

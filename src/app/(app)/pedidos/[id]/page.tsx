@@ -295,8 +295,14 @@ export default async function Pedido({ params, searchParams }: {
           <h2>Itens do pedido <span className="suave pequeno">({d.itens.length || itensBling.length})</span></h2>
           {trocar && <span className="pequeno suave">Falou com o cliente? Use <b>⇄ Trocar</b> para mudar o produto ou a fragrância.</span>}
         </div>
+        {separar && (
+          <div id="separar" className="aviso-caixa info linha entre">
+            <span>Separação: confira na prateleira, confirme a quantidade de cada item e o total de caixas.</span>
+            <Link className="botao principal" href={`/estoque/separacao/${p.id}`}>Separar este pedido</Link>
+          </div>
+        )}
         {d.itens.length > 0 ? (
-          <ItensPedido pedidoId={p.id} itens={itensVista} total={dinheiro(p.valor_total, moeda)} separar={separar} trocar={trocar}
+          <ItensPedido pedidoId={p.id} itens={itensVista} total={dinheiro(p.valor_total, moeda)} separar={false} trocar={trocar}
             produtos={d.produtos.map((x) => `${x.codigo} · ${x.nome}`)} />
         ) : itensBling.length > 0 ? (
           <div className="tabela"><table>

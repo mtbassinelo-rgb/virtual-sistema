@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { exigirUsuario, ehGestao } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
 import { dinheiro, data, dataHora, linkWhatsApp, MODALIDADES, telefone, type Moeda } from "@/lib/formato";
@@ -15,6 +16,8 @@ export const metadata = { title: "Hoje" };
 
 export default async function Hoje() {
   const u = await exigirUsuario();
+  // estoquista não tem painel de vendas: vai direto para a área dele
+  if (u.perfil === "estoquista") redirect("/estoque/separacao");
   const gestao = ehGestao(u);
   // unidade escolhida no topo (Todas / CD Foz / CD CDE): os números e pedidos são só dela
   const { atual } = await unidadeSistema(u);
@@ -63,7 +66,10 @@ export default async function Hoje() {
          where v.status_comercial = 'em_separacao' and v.origem <> 'bling' and p.separacao_conferida_em is null
            and (app.pode_gerir() or app.pode_operar_deposito(p.deposito_id)) order by v.data_pedido`)).rows;
     const confirmar = (await c.query(`
-        select v.id, v.cliente_nome, v.valor_total, v.moeda from app.v_pedidos v join app.pedidos p on p.id = v.id
+        select v.id, v.cliente_nome, v.valor_total, v.moeda, p.caixas_separadas, p.separacao_conferida_em,
+               (select count(*) from app.pedido_itens_indisponiveis x where x.pedido_id = v.id)::int faltas,
+               (select string_agg(x.descricao || ' (faltou ' || x.quantidade_faltou::int || ')', ', ') from app.pedido_itens_indisponiveis x where x.pedido_id = v.id) falta_txt
+          from app.v_pedidos v join app.pedidos p on p.id = v.id
          where v.status_comercial = 'em_separacao' and p.separacao_conferida_em is not null and p.total_confirmado_em is null
          order by p.separacao_conferida_em`)).rows;
     const pendencias = gestao ? (await c.query(`select count(*)::int n from app.estoque_pendencias where resolvida_em is null`)).rows[0].n : 0;
@@ -149,6 +155,21 @@ export default async function Hoje() {
         <Link href="/whatsapp?f=aguardando&o=espera" className="kpi"><span className="rotulo">WhatsApp esperando resposta</span>
           <span className="valor">{d.esperando.length}</span><span className="pequeno suave">últimos 3 dias</span></Link>
       </div>
+
+      {d.confirmar.length > 0 && (
+        <section className="painel" style={{ borderColor: d.confirmar.some((x) => x.faltas > 0) ? "var(--erro)" : "var(--ok)" }}>
+          <h2>Separados pela expedição: confirme com o cliente ({d.confirmar.length})</h2>
+          <ul className="crm-lista">{d.confirmar.map((x) => (
+            <li key={x.id}>
+              <Link href={`/pedidos/${x.id}`} className="crm-quem">{x.cliente_nome ?? "Cliente avulso"}
+                <small>{x.caixas_separadas != null ? `${x.caixas_separadas} caixa(s) · ` : ""}{dinheiro(x.valor_total, x.moeda)}
+                  {x.separacao_conferida_em ? ` · separado ${dataHora(x.separacao_conferida_em)}` : ""}</small>
+                {x.faltas > 0 && <small className="texto-erro">Não tinha: {x.falta_txt}</small>}
+              </Link>
+              {x.faltas > 0 ? <Selo cor="erro">{x.faltas} em falta</Selo> : <Selo cor="ok">completo</Selo>}
+            </li>))}</ul>
+        </section>
+      )}
 
       <FilaPedidos itens={d.fila} titulo={gestao ? "Pedidos em andamento" : "Seus pedidos em andamento"} />
 
