@@ -100,18 +100,20 @@ export default async function Desempenho({ searchParams }: {
         left join app.clientes cl on cl.id = cv.cliente_id
        where ($3::uuid is null or cv.conexao_id = $3)`, [de, ate, w])).rows as Conv[];
     // Atividade: mensagens enviadas por dia (primeira e última) e por hora, por vendedora responsável da conversa
+    // de quem é cada conversa (já calculado acima): evita rodar o cálculo de novo
+    const mapa = JSON.stringify(convs.map((x) => ({ conexao_id: x.conexao_id, contato: x.contato, vendedora_id: x.vendedora_id })));
     const msgs = `
-      with cv as (select conexao_id, contato, vendedora_id from app.whatsapp_conversas($1::date, $2::date) where ($3::uuid is null or conexao_id = $3)),
+      with cv as materialized (select * from jsonb_to_recordset($3::jsonb) as x(conexao_id uuid, contato text, vendedora_id uuid)),
       per as (select ($1::date)::timestamp at time zone 'America/Asuncion' as ini, ($2::date + 1)::timestamp at time zone 'America/Asuncion' as fim),
       mm as (select cv.vendedora_id, m.enviada, m.em at time zone 'America/Asuncion' as loc
                from app.whatsapp_mensagens m join cv using (conexao_id, contato), per where m.em >= per.ini and m.em < per.fim)`;
     const ativ = (await c.query(`${msgs}
       select vendedora_id, to_char(loc::date, 'YYYY-MM-DD') as dia, to_char(min(loc), 'HH24:MI') as primeira, to_char(max(loc), 'HH24:MI') as ultima,
              count(*)::int as enviadas
-        from mm where enviada group by 1, 2 order by 2`, [de, ate, w])).rows as Ativ[];
+        from mm where enviada group by 1, 2 order by 2`, [de, ate, mapa])).rows as Ativ[];
     const horas = (await c.query(`${msgs}
       select vendedora_id, extract(hour from loc)::int as hora, count(*) filter (where enviada)::int as enviadas, count(*) filter (where not enviada)::int as recebidas
-        from mm group by 1, 2`, [de, ate, w])).rows as Hora[];
+        from mm group by 1, 2`, [de, ate, mapa])).rows as Hora[];
     const carteira = (await c.query("select vendedora_id, count(*)::int as clientes from app.clientes where ativo and mesclado_em is null group by 1")).rows as Carteira[];
     return { conexoes, vendedoras, convs, ativ, horas, carteira };
   });

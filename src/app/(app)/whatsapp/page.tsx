@@ -62,25 +62,27 @@ export default async function WhatsApp({ searchParams }: {
 
     const convs = (await c.query(`
       with ${periodo},
-      conv as (
+      conv as materialized (
         select m.conexao_id, m.contato, count(*) filter (where m.enviada)::int as enviadas, count(*) filter (where not m.enviada)::int as recebidas
           from app.whatsapp_mensagens m, per
          where m.em >= per.ini and m.em < per.fim and ($3::uuid is null or m.conexao_id = $3)
          group by 1, 2),
-      cham as (
+      cham as materialized (
         select x.conexao_id, x.contato, x.enviada, x.em
           from (select y.conexao_id, y.contato, y.enviada, y.em, lag(y.em) over (partition by y.conexao_id, y.contato order by y.em) as ant
-                  from app.whatsapp_mensagens y join conv using (conexao_id, contato)) x, per
+                  from app.whatsapp_mensagens y join conv using (conexao_id, contato), per
+                 where y.em >= per.ini - interval '7 days' and y.em < per.fim) x, per
          where (x.ant is null or x.em - x.ant > interval '12 hours') and x.em < per.fim),
-      quem as (
+      quem as materialized (
         select ch.conexao_id, ch.contato, (array_agg(ch.enviada order by ch.em desc))[1] as quem_iniciou,
                count(*) filter (where ch.enviada and ch.em >= per.ini)::int as chamadas_nossas,
                count(*) filter (where not ch.enviada and ch.em >= per.ini)::int as chamadas_cliente
           from cham ch, per group by 1, 2),
-      ult as (
-        select distinct on (m.conexao_id, m.contato) m.conexao_id, m.contato, m.enviada, m.tipo, m.texto, m.em
-          from app.whatsapp_mensagens m join conv using (conexao_id, contato)
-         order by m.conexao_id, m.contato, m.em desc)
+      ult as materialized (
+        select conv.conexao_id, conv.contato, l.enviada, l.tipo, l.texto, l.em
+          from conv cross join lateral (select m.enviada, m.tipo, m.texto, m.em from app.whatsapp_mensagens m
+                                         where m.conexao_id = conv.conexao_id and m.contato = conv.contato
+                                         order by m.em desc limit 1) l)
       select conv.*, k.nome as contato_nome, k.primeira_em, w.nome as conexao, w.pais,
              u.enviada as ultima_enviada, u.tipo as ultimo_tipo, u.texto as ultimo_texto, u.em as ultima_em,
              cli.id as cliente_id, cli.nome as cliente, coalesce(cli.moeda, case when w.pais = 'PY' then 'GS' else 'BRL' end::app.moeda) as moeda,
