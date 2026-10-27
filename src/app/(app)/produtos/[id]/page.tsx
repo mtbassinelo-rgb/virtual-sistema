@@ -16,7 +16,7 @@ const TABELAS = [
 ];
 
 export default async function Produto({ params, searchParams }: {
-  params: Promise<{ id: string }>; searchParams: Promise<{ ok?: string; erro?: string; foto?: string }>;
+  params: Promise<{ id: string }>; searchParams: Promise<{ ok?: string; erro?: string; foto?: string; de?: string }>;
 }) {
   const u = await exigirUsuario();
   const { id } = await params;
@@ -25,7 +25,11 @@ export default async function Produto({ params, searchParams }: {
   if (!novo && !/^[0-9a-f-]{36}$/.test(id)) notFound();
   const pode = ehGestao(u);
 
-  const d = novo ? null : await comUsuario(u.id, async (c) => {
+  // Duplicar: /produtos/novo?de=<id> abre o formulário já preenchido com o produto de origem
+  const deId = novo && f.de && /^[0-9a-f-]{36}$/.test(f.de) ? f.de : null;
+  const carregarId = novo ? deId : id;
+  const d = !carregarId ? null : await comUsuario(u.id, async (c) => {
+    const id = carregarId;
     const p = (await c.query("select * from app.produtos where id = $1", [id])).rows[0];
     if (!p) return null;
     const precos = (await c.query(
@@ -41,6 +45,7 @@ export default async function Produto({ params, searchParams }: {
     return { p, precos, historico, estoque, componentes };
   });
   if (!novo && !d) notFound();
+  const copia = novo && d ? d.p : null;
   // Novo produto a partir de uma foto do catálogo (Produtos → Fotos do catálogo)
   const fotoCat = novo && f.foto && /^p[0-9]{2}-[0-9]{2}$/.test(f.foto)
     ? await comUsuario(u.id, async (c) => (await c.query("select id, nome from app.fotos_catalogo where id = $1 and status = 'pendente'", [f.foto])).rows[0] as { id: string; nome: string } | undefined)
@@ -57,8 +62,10 @@ export default async function Produto({ params, searchParams }: {
     <>
       <section>
         <div className="pequeno"><Link href="/produtos">Produtos</Link></div>
-        <h1>{novo ? "Novo produto" : p.nome}</h1>
-        {!novo && (
+        <h1>{copia ? "Duplicar produto" : novo ? "Novo produto" : p.nome}</h1>
+        {copia && <div className="aviso-caixa info">Cópia de <b>{copia.nome}</b> ({copia.codigo}): troque o <b>código</b> e o <b>nome</b> (ex.: a fragrância) e confira os preços. Estoque não é copiado.</div>}
+        {!novo && pode && <Link className="botao" href={`/produtos/novo?de=${id}`} style={{ marginTop: 6 }}>⧉ Duplicar produto</Link>}
+        {!novo && p && (
           <div className="linha pequeno suave" style={{ gap: 8 }}>
             <span>{p.codigo}</span>
             {p.tipo === "kit" && <Selo cor="info">kit</Selo>}
@@ -73,14 +80,15 @@ export default async function Produto({ params, searchParams }: {
       <form action={salvarProduto} className="duas-colunas">
         <input type="hidden" name="id" value={novo ? "" : id} />
         {fotoCat && <input type="hidden" name="foto_catalogo" value={fotoCat.id} />}
+        {copia && <input type="hidden" name="copiar_de" value={copia.id} />}
         <section className="painel">
           <h2>Dados</h2>
           <div className="campos" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10 }}>
-            <label>Código (SKU)<input name="codigo" defaultValue={p?.codigo ?? ""} required disabled={!pode} placeholder="Ex.: RHE-020" /></label>
+            <label>Código (SKU)<input name="codigo" defaultValue={copia ? "" : p?.codigo ?? ""} required disabled={!pode} placeholder="Ex.: RHE-020" /></label>
             <label style={{ gridColumn: "span 2" }}>Nome<input name="nome" defaultValue={p?.nome ?? fotoCat?.nome ?? ""} required disabled={!pode} /></label>
             <label>Marca<input name="marca" defaultValue={p?.marca ?? ""} disabled={!pode} placeholder="Ex.: Maycrene" /></label>
             <label>Unidade<input name="unidade" defaultValue={p?.unidade ?? "UN"} disabled={!pode} /></label>
-            <label>Código de barras<input name="gtin" defaultValue={p?.gtin ?? ""} disabled={!pode} inputMode="numeric" /></label>
+            <label>Código de barras<input name="gtin" defaultValue={copia ? "" : p?.gtin ?? ""} disabled={!pode} inputMode="numeric" /></label>
             <label>Peças na caixa do fornecedor <span className="pequeno suave">(o cliente compra sempre caixa com 12)</span><input name="unidades_caixa" defaultValue={p?.unidades_caixa_fornecedor ?? ""} disabled={!pode} inputMode="numeric" placeholder="Ex.: 12" /></label>
             {pode && <label>Custo (R$)<input name="custo" defaultValue={p?.custo != null ? Number(p.custo).toFixed(2).replace(".", ",") : ""} disabled={!pode} inputMode="decimal" /></label>}
             <label style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -129,6 +137,8 @@ export default async function Produto({ params, searchParams }: {
             <h2>Foto</h2>
             {fotoCat ? <><img src={`/fotos-catalogo/${fotoCat.id}.webp`} alt={fotoCat.nome} style={{ width: "100%", maxWidth: 320, aspectRatio: "1", objectFit: "contain", borderRadius: 12, background: "#fff" }} />
               <p className="pequeno suave" style={{ margin: 0 }}>Foto do catálogo: entra neste produto ao criar.</p></>
+            : copia?.foto ? <><img src={copia.foto} alt={copia.nome} style={{ width: "100%", maxWidth: 320, aspectRatio: "1", objectFit: "contain", borderRadius: 12, background: "#fff" }} />
+              <p className="pequeno suave" style={{ margin: 0 }}>A foto do produto de origem entra na cópia; depois dá para trocar.</p></>
             : pode ? <CampoFoto produtoId={novo ? null : id} fotoAtual={p?.foto ?? null} nome={p?.nome ?? "Foto do produto"} />
             : p?.foto ? <img src={p.foto} alt={p.nome} style={{ width: "100%", maxWidth: 320, aspectRatio: "1", objectFit: "cover", borderRadius: 12, background: "#fff" }} />
               : <div className="vazio" style={{ background: "var(--afundado)", borderRadius: 12 }}>Sem foto: no site aparece o rótulo colorido.</div>}

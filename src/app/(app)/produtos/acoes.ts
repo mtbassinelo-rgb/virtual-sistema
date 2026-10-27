@@ -77,6 +77,19 @@ export async function salvarProduto(fd: FormData) {
         await c.query("select app.decidir_foto_catalogo($1, 'aplicar', $2)", [fc, pid]);
         if (antiga) await rm(path.join(pastaFotos(), path.basename(antiga)), { force: true });
       }
+      // Duplicar: copia categorias/grupo/frete e a foto do produto de origem
+      const de = texto(fd, "copiar_de");
+      if (!idAtual && /^[0-9a-f-]{36}$/i.test(de)) {
+        await c.query("select app.copiar_extras_produto($1, $2)", [de, pid]);
+        const fotoDe = (await c.query("select foto from app.produtos where id = $1", [de])).rows[0]?.foto as string | null;
+        if (!bytes && fotoDe && fotoDe.startsWith("/fotos/")) {
+          await mkdir(pastaFotos(), { recursive: true });
+          const nome = `${pid}-${Date.now()}${path.extname(fotoDe) || ".jpg"}`;
+          await copyFile(path.join(pastaFotos(), path.basename(fotoDe)), path.join(pastaFotos(), nome));
+          fotoNova = nome;
+          await c.query("select app.definir_foto($1, $2)", [pid, `/fotos/${nome}`]);
+        }
+      }
       if (bytes && ext) {
         await mkdir(pastaFotos(), { recursive: true });
         const nome = `${pid}-${Date.now()}.${ext}`;
@@ -90,7 +103,9 @@ export async function salvarProduto(fd: FormData) {
     destino = `/produtos/${id}?ok=${encodeURIComponent(idAtual ? "Produto salvo." : "Produto criado.")}`;
   } catch (e) {
     if (fotoNova) await rm(path.join(pastaFotos(), fotoNova), { force: true });   // a transação voltou atrás: some o arquivo também
-    destino = `${idAtual ? `/produtos/${idAtual}` : "/produtos/novo"}?erro=${encodeURIComponent(mensagemErro(e))}`;
+    const de = texto(fd, "copiar_de");
+    const volta = idAtual ? `/produtos/${idAtual}?` : /^[0-9a-f-]{36}$/i.test(de) ? `/produtos/novo?de=${de}&` : "/produtos/novo?";
+    destino = `${volta}erro=${encodeURIComponent(mensagemErro(e))}`;
   }
   revalidatePath("/produtos");
   revalidatePath("/loja");
