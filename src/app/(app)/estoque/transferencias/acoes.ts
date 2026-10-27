@@ -21,8 +21,14 @@ export async function solicitarTransferencia(fd: FormData) {
   try {
     const itens = [...fd.entries()].filter(([k, v]) => k.startsWith("q:") && qtd(v) > 0).map(([k, v]) => ({ produto_id: k.slice(2), quantidade: qtd(v) }));
     if (!itens.length) throw new Error("Informe a quantidade de pelo menos um produto.");
-    id = await comUsuario(u.id, async (c) => (await c.query("select app.solicitar_transferencia($1, $2, $3::jsonb, $4, $5) id",
-      [texto(fd, "origem"), texto(fd, "destino"), JSON.stringify(itens), texto(fd, "obs") || null, texto(fd, "pedido") || null])).rows[0].id as string);
+    id = await comUsuario(u.id, async (c) => {
+      // kit pedido vira os produtos do kit (o estoque é dos componentes)
+      const abertos = (await c.query(`select coalesce(k.componente_id, x.produto_id) produto_id, sum(x.quantidade * coalesce(k.quantidade, 1))::float quantidade
+          from jsonb_to_recordset($1::jsonb) x(produto_id uuid, quantidade numeric)
+          left join app.kit_componentes k on k.kit_id = x.produto_id group by 1`, [JSON.stringify(itens)])).rows;
+      return (await c.query("select app.solicitar_transferencia($1, $2, $3::jsonb, $4, $5) id",
+        [texto(fd, "origem"), texto(fd, "destino"), JSON.stringify(abertos), texto(fd, "obs") || null, texto(fd, "pedido") || null])).rows[0].id as string;
+    });
   } catch (e) {
     erro = mensagemErro(e);
   }

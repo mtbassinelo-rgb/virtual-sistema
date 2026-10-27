@@ -8,7 +8,7 @@ import { EscolherUnidades, ListaPedido } from "./lista";
 
 export const metadata = { title: "Pedir mercadoria" };
 
-type Linha = { id: string; codigo: string; nome: string; marca: string | null; caixa: number | null; origem: number; destino: number; vendas30: number; sugerido: number | null };
+type Linha = { id: string; codigo: string; nome: string; marca: string | null; caixa: number | null; kit: boolean; origem: number; destino: number; vendas30: number; sugerido: number | null };
 
 export default async function NovaSolicitacao({ searchParams }: {
   searchParams: Promise<{ origem?: string; destino?: string; ver?: string; marca?: string; q?: string; pedido?: string; ordem?: string; erro?: string }>;
@@ -37,17 +37,26 @@ export default async function NovaSolicitacao({ searchParams }: {
          where i.pedido_id = $1 and i.produto_id is not null group by 1`, [pedido.id])).rows;
       for (const r of its) sug.set(r.produto_id, Number(r.q));
     }
+    // kits entram na lista com o estoque que dá para montar (menor componente); no pedido viram os componentes
     const linhas = (await c.query(`
-      select p.id, p.codigo, p.nome, p.marca, p.unidades_caixa_fornecedor caixa,
-             coalesce(so.quantidade, 0)::float origem, coalesce(sd.quantidade, 0)::float destino,
+      select * from (
+      select p.id, p.codigo, p.nome, p.marca, p.unidades_caixa_fornecedor caixa, p.tipo = 'kit' kit,
+             (case when p.tipo = 'kit' then coalesce((select min(floor(coalesce(s.quantidade, 0) / k.quantidade))
+                     from app.kit_componentes k left join app.estoque_saldos s on s.produto_id = k.componente_id and s.deposito_id = $1
+                    where k.kit_id = p.id and k.quantidade > 0), 0)
+                   else coalesce(so.quantidade, 0) end)::float origem,
+             (case when p.tipo = 'kit' then coalesce((select min(floor(coalesce(s.quantidade, 0) / k.quantidade))
+                     from app.kit_componentes k left join app.estoque_saldos s on s.produto_id = k.componente_id and s.deposito_id = $2
+                    where k.kit_id = p.id and k.quantidade > 0), 0)
+                   else coalesce(sd.quantidade, 0) end)::float destino,
              coalesce((select sum(i.quantidade) from app.pedido_itens i join app.pedidos pe on pe.id = i.pedido_id
                         where i.produto_id = p.id and pe.deposito_id = $2 and app.conta_como_venda(pe.status_comercial)
                           and pe.data_pedido >= current_date - 30), 0)::float vendas30
         from app.produtos p
         left join app.estoque_saldos so on so.produto_id = p.id and so.deposito_id = $1
         left join app.estoque_saldos sd on sd.produto_id = p.id and sd.deposito_id = $2
-       where p.ativo and p.tipo is distinct from 'kit'
-         and (coalesce(so.quantidade, 0) > 0 or p.id = any($3::uuid[]))`, [origem.id, destino.id, [...sug.keys()]])).rows
+       where p.ativo and (p.tipo is distinct from 'kit' or exists (select 1 from app.kit_componentes k where k.kit_id = p.id))
+      ) x where x.origem > 0 or x.id = any($3::uuid[])`, [origem.id, destino.id, [...sug.keys()]])).rows
       .map((r) => ({ ...r, sugerido: sug.get(r.id) ?? null })) as Linha[];
     const marcas = [...new Set(linhas.map((l) => l.marca).filter((m): m is string => Boolean(m)))].sort();
     return { deps, destino, origem, linhas, marcas, pedido };
@@ -97,9 +106,10 @@ export default async function NovaSolicitacao({ searchParams }: {
         <input type="hidden" name="origem" value={d.origem.id} /><input type="hidden" name="destino" value={d.destino.id} />
         <input type="hidden" name="volta" value={volta} />
         {d.pedido && <input type="hidden" name="pedido" value={d.pedido.id} />}
-        <ListaPedido key={`${d.origem.id}-${d.destino.id}-${ver}-${ordem}`} linhas={gestao ? linhas : linhas.map((l) => ({ ...l, vendas30: 0 }))} marcas={d.marcas} origemNome={d.origem.nome} destinoNome={d.destino.nome} />
+        <ListaPedido key={`${d.origem.id}-${d.destino.id}-${ver}-${ordem}`} linhas={gestao ? linhas : linhas.map((l) => ({ ...l, vendas30: 0 }))}
+          todas={gestao ? d.linhas : d.linhas.map((l) => ({ ...l, vendas30: 0 }))} marcas={d.marcas} origemNome={d.origem.nome} destinoNome={d.destino.nome} />
         <label>Observação (cliente, urgência…)<input name="obs" maxLength={500} placeholder={d.pedido ? `Repor pedido de ${d.pedido.cliente ?? ""}` : "Ex.: para cliente Ana, precisa até sexta"} /></label>
-        <span className="pequeno suave">Os botões somam uma caixa por vez; dá para digitar a quantidade em unidades. Kits: peça os componentes.</span>
+        <span className="pequeno suave">Os botões somam uma caixa por vez; dá para digitar a quantidade em unidades. A busca procura em tudo que tem na origem. Kits pedidos viram os produtos do kit.</span>
       </form>
     </>
   );
