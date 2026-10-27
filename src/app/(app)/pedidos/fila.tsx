@@ -19,7 +19,7 @@ export function etapaSql(v: string, p: string) {
 
 export const ETAPAS: { id: string; titulo: string; dica: string; cor: string }[] = [
   { id: "cliente", titulo: "Cliente confirmar", dica: "Link enviado, esperando o cliente", cor: "aviso" },
-  { id: "aprovar", titulo: "Aprovar", dica: "Pedido feito pelo cliente no site", cor: "aviso" },
+  { id: "aprovar", titulo: "Ajustar e mandar separar", dica: "Pedido do site: a vendedora confere", cor: "aviso" },
   { id: "separar", titulo: "Separar", dica: "Expedição confere as quantidades", cor: "info" },
   { id: "total", titulo: "Confirmar total", dica: "Mandar total e conta ao cliente", cor: "marca" },
   { id: "conferir", titulo: "Confirmar pagamento", dica: "Cliente pagou: gerente confirma", cor: "aviso" },

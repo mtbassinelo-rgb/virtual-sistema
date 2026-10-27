@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { conferirSeparacao, trocarItem, pedirRemocao } from "../acoes";
+import { conferirSeparacao, trocarItem, pedirRemocao, editarItens } from "../acoes";
 
 export type Sugestao = { codigo: string; nome: string; estoque: number };
 export type ItemPedido = {
@@ -13,11 +13,14 @@ export type ItemPedido = {
  * Itens do pedido numa lista só: a expedição confere a separação na própria linha
  * e a vendedora troca o item (ou a fragrância) com um botão, depois de falar com o cliente.
  */
-export function ItensPedido({ pedidoId, itens, total, separar, trocar, produtos }: {
-  pedidoId: string; itens: ItemPedido[]; total: string; separar: boolean; trocar: boolean; produtos: string[];
+export function ItensPedido({ pedidoId, itens, total, separar, trocar, produtos, editar = false }: {
+  pedidoId: string; itens: ItemPedido[]; total: string; separar: boolean; trocar: boolean; produtos: string[]; editar?: boolean;
 }) {
   const [aberto, setAberto] = useState<string | null>(null);
   const [falta, setFalta] = useState<Record<string, boolean>>({});
+  const [qtd, setQtd] = useState<Record<string, string>>({});
+  const [novos, setNovos] = useState(1);
+  const mudou = Object.entries(qtd).some(([id, v]) => Number(v.replace(",", ".")) !== itens.find((i) => i.id === id)?.quantidade);
 
   return (
     <div className="itens-ped">
@@ -47,6 +50,15 @@ export function ItensPedido({ pedidoId, itens, total, separar, trocar, produtos 
             <span className="num" data-rot="Preço">{i.preco}</span>
             <span className="num" data-rot="Total"><b>{i.total}</b></span>
             <span className="item-acoes">
+              {editar && (
+                <>
+                  <input name={`q_${i.id}`} form="form-editar" inputMode="decimal" className="item-qtd" aria-label={`Quantidade de ${i.descricao}`}
+                    value={qtd[i.id] ?? String(i.quantidade)} onChange={(e) => setQtd({ ...qtd, [i.id]: e.target.value })}
+                    style={qtd[i.id] === "0" ? { textDecoration: "line-through", opacity: 0.6 } : undefined} />
+                  <button type="button" title="Tirar do pedido" aria-label={`Tirar ${i.descricao}`}
+                    onClick={() => setQtd({ ...qtd, [i.id]: qtd[i.id] === "0" ? String(i.quantidade) : "0" })}>{qtd[i.id] === "0" ? "↺" : "✕"}</button>
+                </>
+              )}
               {separar && (
                 <>
                   <input name={`sep_${i.id}`} form="form-separar" inputMode="decimal" defaultValue={i.quantidade}
@@ -71,6 +83,23 @@ export function ItensPedido({ pedidoId, itens, total, separar, trocar, produtos 
       <div className="item-ped rodape">
         <span><b>Total do pedido</b></span><span /><span /><span className="num"><b>{total}</b></span><span />
       </div>
+      {editar && (
+        <form id="form-editar" action={editarItens} className="editar-pedido">
+          <input type="hidden" name="pedido_id" value={pedidoId} />
+          <b className="pequeno">Acrescentar produto</b>
+          {Array.from({ length: novos }).map((_, k) => (
+            <div key={k} className="linha">
+              <input name={`novo_${k}`} list="lista-substitutos" placeholder="Digite código ou nome" autoComplete="off" style={{ flex: 1, minWidth: 180 }}
+                onChange={(e) => { if (e.target.value && k === novos - 1 && novos < 10) setNovos(novos + 1); }} />
+              <input name={`novoq_${k}`} inputMode="decimal" placeholder="Qtd" style={{ width: 80 }} />
+            </div>
+          ))}
+          <div className="linha entre">
+            <span className="pequeno suave">Mude a quantidade na linha, ✕ tira o item. O preço é o da tabela do cliente e o total é recalculado.</span>
+            <button className={mudou ? "principal" : ""}>Salvar alterações do pedido</button>
+          </div>
+        </form>
+      )}
       {separar && (
         <form id="form-separar" action={conferirSeparacao} className="linha entre">
           <input type="hidden" name="pedido_id" value={pedidoId} />

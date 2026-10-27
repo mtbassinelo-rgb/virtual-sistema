@@ -51,7 +51,7 @@ function proximoPasso(p: { status_comercial: string; origem: string; saldo: stri
                       f: { separacao_conferida_em: string | null; total_confirmado_em: string | null } | undefined): string | null {
   switch (p.status_comercial) {
     case "aguardando_cliente": return "Mandar o link para o cliente conferir e confirmar as caixas.";
-    case "aguardando_aprovacao": return "Conferir os itens e aprovar o pedido feito pelo cliente.";
+    case "aguardando_aprovacao": return "Vendedora: confira e ajuste os itens com o cliente e mande para a separação.";
     case "em_separacao":
       if (p.origem !== "bling" && !f?.separacao_conferida_em) return "Expedição: conferir a separação na lista de itens. Faltou algo? Troque a fragrância com o cliente.";
       if (p.origem !== "bling" && !f?.total_confirmado_em) return "Confirmar o total e mandar a conta para o cliente pelo WhatsApp.";
@@ -173,6 +173,7 @@ export default async function Pedido({ params, searchParams }: {
     : null;
   const whatsLink = msgLink ? linkWhatsApp(cliente?.whatsapp ?? cliente?.telefone, msgLink) : null;
   const separar = p.status_comercial === "em_separacao" && p.origem !== "bling" && !fluxo?.separacao_conferida_em && Boolean(gestao || fluxo?.opera);
+  const editar = escrever && d.editavelItens && ["aguardando_cliente", "aguardando_aprovacao"].includes(p.status_comercial);
   const trocar = escrever && d.editavelItens;
   const itensVista: ItemPedido[] = d.itens.map((i) => ({
     id: i.id, codigo: i.codigo, descricao: i.descricao, quantidade: Number(i.quantidade), pedida: Number(i.quantidade_pedida),
@@ -277,14 +278,14 @@ export default async function Pedido({ params, searchParams }: {
 
       {escrever && p.status_comercial === "aguardando_aprovacao" && (
         <section className="painel" style={{ borderColor: "var(--marca)" }}>
-          <h2>Pedido feito pelo cliente na área de atacado</h2>
-          <p className="suave">Confira os itens. Ao aprovar, o pedido vai para a expedição separar
+          <h2>Pedido feito pelo cliente no site</h2>
+          <p className="suave">Confira e ajuste os itens abaixo com o cliente (quantidades, tirar ou acrescentar). Depois mande para a separação, sem precisar do gerente. O pedido vai para a expedição separar
             {d.itens.some((i) => i.origem && i.origem !== d.itens[0]?.origem) ? " e a transferência do CD para a loja já fica preparada" : ""}.</p>
           <form action={decidirPedidoPortal} className="campos">
             <input type="hidden" name="pedido_id" value={p.id} />
             <label>Motivo (se recusar, o cliente vê)<input name="motivo" /></label>
             <div className="linha">
-              <button className="principal" name="decisao" value="aprovar">Aprovar e mandar separar</button>
+              <button className="principal" name="decisao" value="aprovar">Mandar para separação</button>
               <button className="perigo" name="decisao" value="recusar">Recusar</button>
             </div>
           </form>
@@ -304,7 +305,7 @@ export default async function Pedido({ params, searchParams }: {
           </div>
         )}
         {d.itens.length > 0 ? (
-          <ItensPedido pedidoId={p.id} itens={itensVista} total={dinheiro(p.valor_total, moeda)} separar={false} trocar={trocar}
+          <ItensPedido pedidoId={p.id} itens={itensVista} total={dinheiro(p.valor_total, moeda)} separar={false} trocar={trocar} editar={editar}
             produtos={d.produtos.map((x) => `${x.codigo} · ${x.nome}`)} />
         ) : itensBling.length > 0 ? (
           <div className="tabela"><table>

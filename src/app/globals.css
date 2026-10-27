@@ -584,3 +584,6 @@ details.recusar > summary::-webkit-details-marker { display: none; }
 .pagamento-caixa details > summary.botao { display: inline-block; margin-top: 10px; cursor: pointer; }
 .mais-detalhes > summary { cursor: pointer; padding: 2px 0; }
 .mais-detalhes:not([open]) { padding-top: 12px; padding-bottom: 12px; }
+
+/* Pedido: vendedora ajusta itens antes da separação */
+.editar-pedido { display: grid; gap: 8px; margin-top: 12px; padding: 12px; border-radius: 10px; background: var(--afundado); }

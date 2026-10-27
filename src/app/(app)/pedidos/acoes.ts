@@ -224,6 +224,33 @@ export async function definirVolumes(fd: FormData) {
   });
 }
 
+/** Vendedora ajusta o pedido antes da separação: quantidades (q_<item>, 0 tira) e produtos novos (novo_k = "código · nome", novoq_k). */
+export async function editarItens(fd: FormData) {
+  const pedido = texto(fd, "pedido_id");
+  await executar(pedido, "Pedido ajustado e total recalculado.", async (uid) => {
+    await comUsuario(uid, async (c) => {
+      const itens: Record<string, unknown>[] = [];
+      for (const [k, v] of fd.entries()) {
+        if (!k.startsWith("q_")) continue;
+        const q = Number(String(v).replace(",", "."));
+        if (!Number.isFinite(q) || q < 0) throw new Error("Quantidade inválida.");
+        itens.push({ item_id: k.slice(2), quantidade: q });
+      }
+      for (let k = 0; k < 10; k++) {
+        const nome = texto(fd, `novo_${k}`);
+        if (!nome) continue;
+        const q = Number(texto(fd, `novoq_${k}`).replace(",", "."));
+        if (!(q > 0)) throw new Error(`Informe a quantidade de "${nome}".`);
+        const cod = nome.split(" · ")[0].trim();
+        const r = (await c.query("select id from app.produtos where codigo = $1 and ativo", [cod])).rows[0];
+        if (!r) throw new Error(`Produto não encontrado: "${nome}". Escolha da lista.`);
+        itens.push({ produto_id: r.id, quantidade: q });
+      }
+      await c.query("select app.editar_itens_pedido($1, $2::jsonb)", [pedido, JSON.stringify(itens)]);
+    });
+  });
+}
+
 export async function decidirPedidoPortal(fd: FormData) {
   const pedido = texto(fd, "pedido_id");
   const aprovar = texto(fd, "decisao") === "aprovar";

@@ -56,6 +56,29 @@ select teste.ok(exists (select 1 from app.procuras where pedido_id = :'PED' and 
 select teste.como(:'KEILA');
 select teste.ok(exists (select 1 from app.procuras where pedido_id = :'PED'), 'A vendedora vê o registro na lista dela');
 
+\echo '== Vendedora ajusta o pedido antes da separação =='
+reset role;
+update app.pedidos set status_comercial = 'aguardando_aprovacao' where id = :'PED';
+insert into app.produtos (id, codigo, nome, marca) values ('00000000-0000-0000-0000-0000000000e9', 'EDIT-01', 'Máscara Nova', 'RHENUKS');
+insert into app.precos (produto_id, tabela, valor, vigente_desde) values
+  ('00000000-0000-0000-0000-0000000000e9', 'py_normal', 9000, current_date - 30), ('00000000-0000-0000-0000-0000000000e9', 'py_vip', 8500, current_date - 30);
+set role vc_app;
+select teste.como(:'YESSICA');
+select teste.falha($$select app.editar_itens_pedido('00000000-0000-0000-0000-0000000000e8', '[{"item_id":"00000000-0000-0000-0000-0000000000e1","quantidade":5}]')$$,
+  'vendedora do pedido', 'Outra vendedora não edita o pedido');
+select teste.como(:'KEILA');
+select app.editar_itens_pedido(:'PED', '[{"item_id":"00000000-0000-0000-0000-0000000000e1","quantidade":5},{"produto_id":"00000000-0000-0000-0000-0000000000e9","quantidade":4}]');
+select teste.ok((select quantidade from app.pedido_itens where id = '00000000-0000-0000-0000-0000000000e1') = 5, 'Vendedora muda a quantidade');
+select teste.ok(exists (select 1 from app.pedido_itens where pedido_id = :'PED' and produto_id = '00000000-0000-0000-0000-0000000000e9' and quantidade = 4), 'Vendedora acrescenta produto');
+select teste.ok((select valor_total from app.pedidos where id = :'PED') = (select sum(total) from app.pedido_itens where pedido_id = :'PED'),
+  'Total recalculado depois do ajuste');
+select teste.falha($$select app.editar_itens_pedido('00000000-0000-0000-0000-0000000000e8',
+  (select jsonb_agg(jsonb_build_object('item_id', id, 'quantidade', 0)) from app.pedido_itens where pedido_id = '00000000-0000-0000-0000-0000000000e8'))$$,
+  'sem itens', 'Não deixa o pedido sem itens');
+select app.decidir_pedido_portal(:'PED', true, null);
+select teste.ok((select status_comercial::text from app.pedidos where id = :'PED') = 'em_separacao', 'A própria vendedora manda para a separação');
+select teste.falha($$select app.editar_itens_pedido('00000000-0000-0000-0000-0000000000e8', '[]')$$, 'separação', 'Depois da separação não edita mais por aqui');
+
 \echo '== Depois do total confirmado não muda =='
 reset role;
 update app.pedidos set total_confirmado_em = now() where id = :'PED';
