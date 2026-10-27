@@ -47,7 +47,7 @@ function variacoes(item: { codigo: string | null; nome: string | null; descricao
 }
 
 /** O que falta fazer neste pedido, em uma frase (para a vendedora e a expedição). */
-function proximoPasso(p: { status_comercial: string; origem: string; saldo: string },
+function proximoPasso(p: { status_comercial: string; origem: string; saldo: string; a_conferir: string },
                       f: { separacao_conferida_em: string | null; total_confirmado_em: string | null } | undefined): string | null {
   switch (p.status_comercial) {
     case "aguardando_cliente": return "Mandar o link para o cliente conferir e confirmar as caixas.";
@@ -55,6 +55,7 @@ function proximoPasso(p: { status_comercial: string; origem: string; saldo: stri
     case "em_separacao":
       if (p.origem !== "bling" && !f?.separacao_conferida_em) return "Expedição: conferir a separação na lista de itens. Faltou algo? Troque a fragrância com o cliente.";
       if (p.origem !== "bling" && !f?.total_confirmado_em) return "Confirmar o total e mandar a conta para o cliente pelo WhatsApp.";
+      if (Number(p.saldo) > 0 && Number(p.a_conferir) > 0) return "O cliente informou o pagamento: o gerente confirma o recebimento.";
       if (Number(p.saldo) > 0) return "Aguardando o pagamento do cliente (registre o comprovante quando chegar).";
       return "Pago: despachar o pedido.";
     case "enviado": return "Em transporte: avisar quando chegar para retirada.";
@@ -181,6 +182,8 @@ export default async function Pedido({ params, searchParams }: {
     remocaoPendente: d.remocoes.some((r) => r.status === "pendente" && r.item_id === i.id),
   }));
   const passo = proximoPasso(p, fluxo);
+  const pendentes = d.pagamentos.filter((g) => g.status_conferencia === "pendente");
+  const resolvidos = d.pagamentos.filter((g) => g.status_conferencia !== "pendente");
   const feitos = [
     true,
     !["aguardando_cliente", "aguardando_aprovacao"].includes(p.status_comercial),
@@ -203,8 +206,7 @@ export default async function Pedido({ params, searchParams }: {
           </h1>
           <div className="linha pequeno suave">
             <span>{data(p.data_pedido)}</span><span>{p.vendedora_nome}</span><span>Canal: {p.canal}</span>
-            <span>Origem: {p.origem}</span>
-            <Selo cor={COR_PAGAMENTO[p.status_pagamento]}>{STATUS_PAGAMENTO[p.status_pagamento]}</Selo>
+                        <Selo cor={COR_PAGAMENTO[p.status_pagamento]}>{STATUS_PAGAMENTO[p.status_pagamento]}</Selo>
             <Selo>{STATUS_COMERCIAL[p.status_comercial]}</Selo>
             {p.envio_atrasado && <Selo cor="erro">envio atrasado</Selo>}
           </div>
@@ -391,16 +393,6 @@ export default async function Pedido({ params, searchParams }: {
           </ul>
         </div>
       )}
-      {(escrever || fluxo?.opera) && ["em_separacao", "enviado", "aguardando_retirada", "entregue"].includes(p.status_comercial) && (
-        <form action={definirVolumes} className="painel linha">
-          <input type="hidden" name="pedido_id" value={p.id} />
-          <label>Volumes do envio (caixas que saem)
-            <input name="volumes" type="number" min={0} max={10000} defaultValue={fluxo?.volumes ?? ""} style={{ width: 110 }} />
-          </label>
-          <button>Salvar volumes</button>
-          <span className="pequeno suave">Usado no resumo semanal de envios e no custo do passeiro.</span>
-        </form>
-      )}
       {p.origem !== "bling" && (escrever || fluxo?.opera) && ["em_separacao", "enviado", "aguardando_retirada"].includes(p.status_comercial)
         && (fluxo?.separacao_conferida_em) && (
         <section className="painel" style={{ borderColor: "var(--ok)" }}>
@@ -460,98 +452,115 @@ export default async function Pedido({ params, searchParams }: {
         </div>
       )}
 
-      <div className="indicadores">
-        <div className="indicador"><span className="rotulo">Total</span><span className="valor num">{dinheiro(p.valor_total, moeda)}</span></div>
-        <div className="indicador"><span className="rotulo">Recebido (conferido)</span><span className="valor num">{dinheiro(p.recebido, moeda)}</span></div>
-        <div className="indicador"><span className="rotulo">A conferir</span><span className="valor num">{dinheiro(p.a_conferir, moeda)}</span></div>
-        <div className="indicador"><span className="rotulo">Saldo pendente</span><span className="valor num">{dinheiro(p.saldo, moeda)}</span></div>
-        <div className="indicador"><span className="rotulo">Vencimento</span><span className="valor">{data(p.vencimento)}</span>
-          {p.credito_concedido && <span className="pequeno suave">crédito concedido</span>}</div>
-        <div className="indicador"><span className="rotulo">Previsão de envio</span><span className="valor">{data(p.previsao_envio)}</span></div>
-      </div>
+      {p.status_comercial !== "cancelado" && (d.pagamentos.length > 0 || fluxo?.total_confirmado_em || ehBling || Number(p.saldo) <= 0) && (
+        <section className="painel pagamento-caixa" id="pagamentos"
+          style={{ borderColor: Number(p.saldo) <= 0 ? "var(--ok)" : pendentes.length ? "#e0b04a" : "var(--marca)" }}>
+          <div className="linha entre">
+            <h2 style={{ margin: 0 }}>Pagamento</h2>
+            <span className="linha pequeno">
+              <span>Total <b className="num">{dinheiro(p.valor_total, moeda)}</b></span>
+              <span>Recebido <b className="num">{dinheiro(p.recebido, moeda)}</b></span>
+              <span>{Number(p.saldo) > 0 ? <>Falta <b className="num" style={{ color: "var(--erro)" }}>{dinheiro(p.saldo, moeda)}</b></> : <Selo cor="ok">Pago</Selo>}</span>
+              {p.vencimento && Number(p.saldo) > 0 && <span className="suave">vence {data(p.vencimento)}</span>}
+            </span>
+          </div>
 
-      <div className="duas-colunas">
-        <div className="coluna">
-
-          <section className="painel" id="pagamentos">
-            <h2>Pagamentos</h2>
-            {d.pagamentos.length === 0 && <p className="suave">Nenhum pagamento registrado.</p>}
-            {d.pagamentos.map((g) => (
-              <div key={g.id} className="painel" style={{ background: "var(--afundado)" }}>
-                <div className="linha entre">
-                  <b className="num">{dinheiro(g.valor, moeda)}</b>
-                  <Selo cor={g.status_conferencia === "conferido" ? "ok" : g.status_conferencia === "recusado" ? "erro" : "aviso"}>
-                    {CONFERENCIA[g.status_conferencia]}
-                  </Selo>
-                </div>
-                <div className="pequeno suave">
-                  {data(g.data)} · {MODALIDADES[g.modalidade]}{g.banco ? ` · ${g.banco}` : ""} · registrado por {g.registrado_nome ?? "—"}
-                  {g.observacao ? ` · ${g.observacao}` : ""}
-                </div>
-                {g.status_conferencia !== "pendente" && (
-                  <div className="pequeno">
-                    {g.status_conferencia === "conferido"
-                      ? `Conferido por ${g.conferido_nome} em ${dataHora(g.conferido_em)} com o pedido ${g.conferencia_bling_numero} do Bling.`
-                      : `Recusado por ${g.conferido_nome} em ${dataHora(g.conferido_em)}: ${g.motivo_recusa}`}
-                  </div>
-                )}
-                <div className="linha pequeno">
+          {pendentes.map((g) => (
+            <div key={g.id} className="pag-pendente">
+              <div>
+                <b className="num">{dinheiro(g.valor, moeda)}</b> · {MODALIDADES[g.modalidade]}{g.banco ? ` · ${g.banco}` : ""} · {data(g.data)}
+                <div className="pequeno suave">Informado por {g.registrado_nome ?? "—"}{g.observacao ? ` · ${g.observacao}` : ""}{" · "}
                   {d.comprovantes.filter((c) => c.pagamento_id === g.id).map((c) => (
-                    <a key={c.id} href={`/comprovantes/${c.id}`} target="_blank" rel="noopener noreferrer">📎 {c.nome_original ?? "comprovante"}</a>
+                    <a key={c.id} href={`/comprovantes/${c.id}`} target="_blank" rel="noopener noreferrer">📎 ver comprovante </a>
                   ))}
-                  {d.comprovantes.every((c) => c.pagamento_id !== g.id) && <span className="suave">Sem comprovante</span>}
+                  {d.comprovantes.every((c) => c.pagamento_id !== g.id) && "sem comprovante"}
                 </div>
-                {escrever && g.status_conferencia === "pendente" && (
-                  <form action={anexarComprovante} className="linha">
+              </div>
+              {gestao ? (
+                <div className="linha">
+                  <form action={conferirPagamento}>
                     <input type="hidden" name="pedido_id" value={p.id} /><input type="hidden" name="pagamento_id" value={g.id} />
-                    <input type="file" name="comprovante" accept="image/*,application/pdf" style={{ maxWidth: 260 }} />
-                    <button>Anexar comprovante</button>
+                    <input type="hidden" name="bling_numero" value={p.bling_numero ?? ""} />
+                    <button className="principal">✓ Confirmar pago</button>
                   </form>
-                )}
-                {gestao && g.status_conferencia === "pendente" && (
-                  <div className="duas-colunas" style={{ gap: 10 }}>
-                    <form action={conferirPagamento} className="campos">
+                  <details className="recusar">
+                    <summary className="botao">Não caiu</summary>
+                    <form action={recusarPagamento} className="linha" style={{ marginTop: 6 }}>
                       <input type="hidden" name="pedido_id" value={p.id} /><input type="hidden" name="pagamento_id" value={g.id} />
-                      <label>Nº do pedido no Bling
-                        <input name="bling_numero" inputMode="numeric" required defaultValue={p.bling_numero ?? ""} />
-                      </label>
-                      <button className="principal">Conferir</button>
-                    </form>
-                    <form action={recusarPagamento} className="campos">
-                      <input type="hidden" name="pedido_id" value={p.id} /><input type="hidden" name="pagamento_id" value={g.id} />
-                      <label>Motivo da recusa<input name="motivo" required placeholder="Ex.: não localizado no banco" /></label>
+                      <input name="motivo" required placeholder="Motivo (a vendedora vê)" />
                       <button className="perigo">Recusar</button>
                     </form>
-                  </div>
-                )}
-              </div>
-            ))}
-            {escrever && p.status_comercial !== "cancelado" && (
-              <details open={d.pagamentos.length === 0}>
-                <summary>Registrar pagamento</summary>
-                <form action={registrarPagamento} className="campos" style={{ marginTop: 10 }}>
-                  <input type="hidden" name="pedido_id" value={p.id} />
-                  <label>Valor ({moeda === "GS" ? "Gs" : "R$"})<input name="valor" inputMode="decimal" required /></label>
-                  <label>Data<input name="data" type="date" required defaultValue={hojeISO()} /></label>
-                  <label>Modalidade
-                    <select name="modalidade" defaultValue="transferencia">
-                      {Object.entries(MODALIDADES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                    </select>
-                  </label>
-                  <label>Banco / conta<input name="banco" placeholder="Ex.: Continental, Ueno" /></label>
-                  <label className="largo">Comprovante (foto ou PDF)
-                    <input name="comprovante" type="file" accept="image/*,application/pdf" />
-                  </label>
-                  <label className="largo">Observação<input name="observacao" /></label>
-                  <button className="principal">Registrar</button>
+                  </details>
+                </div>
+              ) : (
+                <span className="selo aviso">aguardando o gerente confirmar</span>
+              )}
+              {escrever && d.comprovantes.every((c) => c.pagamento_id !== g.id) && (
+                <form action={anexarComprovante} className="linha pequeno">
+                  <input type="hidden" name="pedido_id" value={p.id} /><input type="hidden" name="pagamento_id" value={g.id} />
+                  <input type="file" name="comprovante" accept="image/*,application/pdf" style={{ maxWidth: 240 }} />
+                  <button>Anexar comprovante</button>
                 </form>
-                <p className="pequeno suave">O pagamento só conta como recebido depois que o gerente conferir com o nº do pedido no Bling.</p>
-              </details>
-            )}
-          </section>
-        </div>
+              )}
+            </div>
+          ))}
 
+          {escrever && Number(p.saldo) - Number(p.a_conferir) > 0 && (
+            <details open={pendentes.length === 0 && Boolean(fluxo?.total_confirmado_em || ehBling)}>
+              <summary className="botao">+ Cliente pagou: registrar pagamento</summary>
+              <form action={registrarPagamento} className="campos" style={{ marginTop: 10 }}>
+                <input type="hidden" name="pedido_id" value={p.id} />
+                <label>Valor ({moeda === "GS" ? "Gs" : "R$"})<input name="valor" inputMode="decimal" required
+                  defaultValue={String(Number(p.saldo) - Number(p.a_conferir)).replace(".", ",")} /></label>
+                <label>Data<input name="data" type="date" required defaultValue={hojeISO()} /></label>
+                <label>Como pagou
+                  <select name="modalidade" defaultValue="transferencia">
+                    {Object.entries(MODALIDADES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  </select>
+                </label>
+                <label>Banco / conta<input name="banco" placeholder="Ex.: Continental, Ueno" /></label>
+                <label className="largo">Comprovante (foto ou PDF)<input name="comprovante" type="file" accept="image/*,application/pdf" /></label>
+                <label className="largo">Observação<input name="observacao" /></label>
+                <button className="principal">Registrar pagamento</button>
+              </form>
+              <p className="pequeno suave">{gestao ? "Depois de registrar, é só clicar em Confirmar pago." : "O gerente confirma quando o dinheiro cair; até lá o pedido aparece como \"Confirmar pagamento\"."}</p>
+            </details>
+          )}
+
+          {resolvidos.length > 0 && (
+            <ul className="lista-simples pequeno">
+              {resolvidos.map((g) => (
+                <li key={g.id}>
+                  <Selo cor={g.status_conferencia === "conferido" ? "ok" : "erro"}>{CONFERENCIA[g.status_conferencia]}</Selo>{" "}
+                  <b className="num">{dinheiro(g.valor, moeda)}</b> · {MODALIDADES[g.modalidade]} · {data(g.data)}
+                  <span className="suave"> · {g.status_conferencia === "conferido"
+                    ? `confirmado por ${g.conferido_nome ?? "—"} em ${dataHora(g.conferido_em)}`
+                    : `recusado por ${g.conferido_nome ?? "—"}: ${g.motivo_recusa}`}</span>
+                  {d.comprovantes.filter((c) => c.pagamento_id === g.id).map((c) => (
+                    <span key={c.id}> · <a href={`/comprovantes/${c.id}`} target="_blank" rel="noopener noreferrer">📎 comprovante</a></span>
+                  ))}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
+      <details className="painel mais-detalhes">
+        <summary><b>Mais detalhes</b> <span className="pequeno suave">dados comerciais, volumes, atendimento, histórico</span></summary>
+      <div className="duas-colunas" style={{ marginTop: 12 }}>
         <div className="coluna">
+      {(escrever || fluxo?.opera) && ["em_separacao", "enviado", "aguardando_retirada", "entregue"].includes(p.status_comercial) && (
+        <form action={definirVolumes} className="painel linha">
+          <input type="hidden" name="pedido_id" value={p.id} />
+          <label>Volumes do envio (caixas que saem)
+            <input name="volumes" type="number" min={0} max={10000} defaultValue={fluxo?.volumes ?? ""} style={{ width: 110 }} />
+          </label>
+          <button>Salvar volumes</button>
+          <span className="pequeno suave">Usado no resumo semanal de envios e no custo do passeiro.</span>
+        </form>
+      )}
+
           <section className="painel">
             <h2>Dados comerciais</h2>
             {escrever ? (
@@ -641,6 +650,7 @@ export default async function Pedido({ params, searchParams }: {
           )}
         </div>
       </div>
+      </details>
     </>
   );
 }

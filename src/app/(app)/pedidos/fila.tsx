@@ -9,6 +9,7 @@ export function etapaSql(v: string, p: string) {
     when ${v}.status_comercial = 'aguardando_aprovacao' then 'aprovar'
     when ${v}.status_comercial = 'em_separacao' and ${v}.origem <> 'bling' and ${p}.separacao_conferida_em is null then 'separar'
     when ${v}.status_comercial = 'em_separacao' and ${v}.origem <> 'bling' and ${p}.total_confirmado_em is null then 'total'
+    when ${v}.status_comercial = 'em_separacao' and ${v}.saldo > 0 and ${v}.a_conferir > 0 then 'conferir'
     when ${v}.status_comercial = 'em_separacao' and ${v}.saldo > 0 then 'cobrar'
     when ${v}.status_comercial = 'em_separacao' then 'enviar'
     when ${v}.status_comercial = 'enviado' then 'transporte'
@@ -21,6 +22,7 @@ export const ETAPAS: { id: string; titulo: string; dica: string; cor: string }[]
   { id: "aprovar", titulo: "Aprovar", dica: "Pedido feito pelo cliente no site", cor: "aviso" },
   { id: "separar", titulo: "Separar", dica: "Expedição confere as quantidades", cor: "info" },
   { id: "total", titulo: "Confirmar total", dica: "Mandar total e conta ao cliente", cor: "marca" },
+  { id: "conferir", titulo: "Confirmar pagamento", dica: "Cliente pagou: gerente confirma", cor: "aviso" },
   { id: "cobrar", titulo: "Cobrar", dica: "Total enviado, falta pagar", cor: "erro" },
   { id: "enviar", titulo: "Enviar", dica: "Pago: pronto para despachar", cor: "ok" },
   { id: "transporte", titulo: "Em transporte", dica: "A caminho do cliente", cor: "ok" },

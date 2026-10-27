@@ -89,8 +89,7 @@ update app.pagamentos set valor = 450000 where id='00000000-0000-0000-0000-00000
 select teste.ok(true, 'Vendedora corrige o próprio pagamento enquanto pendente');
 
 select teste.como(:'GERENTE');
-select teste.falha($$select app.conferir_pagamento('00000000-0000-0000-0000-0000000000e1', null)$$, 'número do pedido no bling',
-  'Conferência exige o número do pedido no Bling');
+-- o nº do Bling é opcional na conferência (0123); quando informado, liga o pedido
 select app.conferir_pagamento('00000000-0000-0000-0000-0000000000e1', 555);
 select teste.ok((select bling_numero from app.pedidos where id = :'P1') = 555, 'Conferência liga o pedido ao nº 555 do Bling');
 select teste.ok((select status_pagamento from app.v_pedidos where id = :'P1') = 'parcial', 'Pedido fica parcialmente pago');

@@ -86,9 +86,9 @@ export async function anexarComprovante(fd: FormData) {
 
 export async function conferirPagamento(fd: FormData) {
   const pedido = texto(fd, "pedido_id");
-  await executar(pedido, "Pagamento conferido.", async (uid) => {
-    const nBling = texto(fd, "bling_numero").replace(/\D/g, "");
-    if (!nBling) throw new Error("Informe o número do pedido no Bling para conferir.");
+  await executar(pedido, "Pagamento confirmado.", async (uid) => {
+    // nº do Bling é opcional: quando o pedido já tem, confere; quando não tem, confirma só o recebimento
+    const nBling = texto(fd, "bling_numero").replace(/\D/g, "") || null;
     await comUsuario(uid, (c) => c.query("select app.conferir_pagamento($1, $2)", [texto(fd, "pagamento_id"), nBling]));
   });
 }

@@ -573,3 +573,14 @@ a.kpi:hover { border-color: var(--marca); }
   .tabela.cartoes td > div { text-align: right; line-height: 1.4; }
   .tabela.cartoes td.titulo > div { text-align: left; }
 }
+
+/* Pedido: caixa de pagamento e "mais detalhes" recolhido */
+.pagamento-caixa { border-width: 2px; }
+.pag-pendente { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px;
+  padding: 10px 12px; margin-top: 10px; border-radius: 10px; background: #fffaf0; border: 1px solid #f0d9a8; }
+.pag-pendente > form { flex-basis: 100%; }
+details.recusar > summary { list-style: none; cursor: pointer; }
+details.recusar > summary::-webkit-details-marker { display: none; }
+.pagamento-caixa details > summary.botao { display: inline-block; margin-top: 10px; cursor: pointer; }
+.mais-detalhes > summary { cursor: pointer; padding: 2px 0; }
+.mais-detalhes:not([open]) { padding-top: 12px; padding-bottom: 12px; }
