@@ -88,7 +88,9 @@ export default async function Separacao({ searchParams }: { searchParams: Promis
                 <td className="num" data-rot="Itens">{p.itens} · {Number(p.pecas).toLocaleString("pt-BR")} pç</td>
                 <td data-rot="Enviar até">{p.previsao_envio ? <span style={atrasado(p) ? { color: "var(--erro)", fontWeight: 700 } : undefined}>{new Date(p.previsao_envio).toLocaleDateString("pt-BR", { timeZone: "UTC" })}</span> : "—"}</td>
                 {gestao && <td className="num" data-rot="Total">{dinheiro(p.valor_total, p.moeda as Moeda)}</td>}
-                <td className="acao"><Link className="botao principal" href={`/estoque/separacao/${p.id}`}>Separar</Link></td>
+                <td className="acao"><span className="linha" style={{ gap: 6, justifyContent: "flex-end" }}>
+                  {u.perfil !== "estoquista" && <Link className="botao" href={`/pedidos/${p.id}`}>Ver pedido</Link>}
+                  <Link className="botao principal" href={`/estoque/separacao/${p.id}`}>Separar</Link></span></td>
               </tr>))}</tbody>
           </table></div>
         )}
@@ -106,7 +108,9 @@ export default async function Separacao({ searchParams }: { searchParams: Promis
                 <td className="titulo">Para <b>{t.destino}</b>{t.observacao && <div className="pequeno suave">{t.observacao}</div>}</td>
                 <td className="num" data-rot="Itens">{t.itens} · {Number(t.pecas).toLocaleString("pt-BR")} pç</td>
                 <td data-rot="Quem pediu">{t.quem}</td>
-                <td className="acao"><Link className="botao principal" href={`/estoque/transferencias/${t.id}`}>Separar</Link></td>
+                <td className="acao"><span className="linha" style={{ gap: 6, justifyContent: "flex-end" }}>
+                  <Link className="botao" href={`/estoque/transferencias/${t.id}`}>Ver pedido</Link>
+                  <Link className="botao principal" href={`/estoque/transferencias/${t.id}#separar`}>Separar</Link></span></td>
               </tr>))}</tbody>
           </table></div>
         )}

@@ -60,7 +60,7 @@ export default async function Transferencia({ params, searchParams }: { params: 
 
       {/* Separação: estoquista da origem */}
       {t.status === "solicitada" && t.opera_origem ? (
-        <form action={separarTransferencia} className="painel">
+        <form id="separar" action={separarTransferencia} className="painel">
           <input type="hidden" name="id" value={t.id} />
           <h2>Separar</h2>
           <p className="pequeno suave" style={{ margin: 0 }}>Confira cada produto na prateleira. Separou menos? Ajuste a quantidade. Não tem? Marque "Não tem". O estoque só sai quando o envio for aprovado.</p>
