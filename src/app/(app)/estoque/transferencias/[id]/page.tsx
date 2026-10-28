@@ -37,8 +37,27 @@ export default async function Transferencia({ params, searchParams }: { params: 
   const pedidas = itens.reduce((a, i) => a + Number(i.quantidade_solicitada ?? i.quantidade_enviada), 0);
   const enviadas = itens.reduce((a, i) => a + Number(i.quantidade_enviada), 0);
   const podeCancelar = ["solicitada", "separada", "rascunho"].includes(t.status) && (t.opera_origem || t.aprova || t.criada_por === u.id);
+  const separado = !["solicitada", "rascunho"].includes(t.status);
   return (
     <>
+      {/* Folha impressa: uma linha por produto (aparece só ao imprimir) */}
+      <section className="folha-transf">
+        <div className="folha-topo">
+          <b>Pedido entre unidades #{t.numero} · {t.origem} → {t.destino}</b>
+          <span>Pedido em {quando(t.criada_em)} por {t.criada_por_nome}{t.observacao ? ` · ${t.observacao}` : ""}</span>
+        </div>
+        <table>
+          <thead><tr><th>#</th><th>Produto</th><th>Código</th><th className="num">Pedido</th>{separado && <th className="num">Separado</th>}<th className="num">Conferido</th></tr></thead>
+          <tbody>{itens.map((i, k) => (
+            <tr key={i.produto_id}><td className="num">{k + 1}</td><td>{i.nome}</td><td>{i.codigo}</td>
+              <td className="num">{Number(i.quantidade_solicitada ?? i.quantidade_enviada).toLocaleString("pt-BR")}</td>
+              {separado && <td className="num">{Number(i.quantidade_enviada).toLocaleString("pt-BR")}</td>}
+              <td className="caixa-conf"></td></tr>))}</tbody>
+        </table>
+        <div className="folha-rodape">{itens.length} produto(s) · {pedidas.toLocaleString("pt-BR")} peças pedidas{separado ? ` · ${enviadas.toLocaleString("pt-BR")} separadas` : ""}
+          <span>Separado por: ____________________</span><span>Conferido por: ____________________</span></div>
+      </section>
+      <div className="tela-transf">
       <section className="cabecalho-pagina">
         <div>
           <div className="trilha"><Link href="/estoque/transferencias">Pedidos entre unidades</Link> / #{t.numero}</div>
@@ -133,6 +152,7 @@ export default async function Transferencia({ params, searchParams }: { params: 
           </form>
         </details>
       )}
+      </div>
     </>
   );
 }

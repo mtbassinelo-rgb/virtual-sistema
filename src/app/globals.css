@@ -588,3 +588,19 @@ details.recusar > summary::-webkit-details-marker { display: none; }
 /* Pedido: vendedora ajusta itens antes da separação */
 .editar-pedido { display: grid; gap: 8px; margin-top: 12px; padding: 12px; border-radius: 10px; background: var(--afundado); }
 .perigo-texto { color: var(--erro, #b0303a); }
+
+/* Pedido entre unidades: folha impressa compacta (uma linha por produto) */
+.folha-transf { display: none; }
+@media print {
+  .tela-transf { display: none !important; }
+  .folha-transf { display: block; color: #000; font-size: 10.5px; }
+  .folha-topo { display: flex; justify-content: space-between; gap: 12px; border-bottom: 2px solid #000; padding-bottom: 4px; margin-bottom: 4px; }
+  .folha-topo b { font-size: 13px; }
+  .folha-transf table { width: 100%; border-collapse: collapse; }
+  .folha-transf th { text-align: left; border-bottom: 1px solid #000; padding: 2px 4px; font-size: 10px; }
+  .folha-transf td { border-bottom: 1px solid #ccc; padding: 2px 4px; line-height: 1.25; }
+  .folha-transf .num { text-align: right; white-space: nowrap; }
+  .folha-transf tr { break-inside: avoid; }
+  .folha-transf .caixa-conf { width: 60px; border: 1px solid #999; }
+  .folha-rodape { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; font-size: 10.5px; }
+}
