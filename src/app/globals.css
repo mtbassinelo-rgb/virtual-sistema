@@ -587,3 +587,4 @@ details.recusar > summary::-webkit-details-marker { display: none; }
 
 /* Pedido: vendedora ajusta itens antes da separação */
 .editar-pedido { display: grid; gap: 8px; margin-top: 12px; padding: 12px; border-radius: 10px; background: var(--afundado); }
+.perigo-texto { color: var(--erro, #b0303a); }

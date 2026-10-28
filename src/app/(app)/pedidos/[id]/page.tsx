@@ -10,7 +10,7 @@ import {
 } from "@/lib/formato";
 import { Avisos, Selo } from "../../avisos";
 import {
-  anexarComprovante, atualizarPedido, avancarEntrega, conferirPagamento, confirmarTotal, decidirPedidoPortal,
+  anexarComprovante, atualizarPedido, cancelarPedido, avancarEntrega, conferirPagamento, confirmarTotal, decidirPedidoPortal,
   reconhecerBling, recusarPagamento, registrarAtendimento, registrarPagamento, gerarLinkPedido, definirVolumes, decidirDescontoQuantidade,
   decidirRemocao,
 } from "../acoes";
@@ -140,8 +140,10 @@ export default async function Pedido({ params, searchParams }: {
       : [];
     // Parâmetros → vendedora_ajusta_separacao: vendedora diminui/tira itens também na separação
     const ajustaSeparacao = Number((await c.query("select app.param('vendedora_ajusta_separacao') v")).rows[0]?.v ?? 0) === 1;
+    // Parâmetros → vendedora_cancela_pedido: vendedora cancela o próprio pedido antes de sair
+    const cancelaVendedora = Number((await c.query("select app.param('vendedora_cancela_pedido') v")).rows[0]?.v ?? 0) === 1;
     return { p, cliente, itens, fluxo, transf, bling, pagamentos, comprovantes, atendimentos, depositos, historico, indisponiveis,
-             trocas, remocoes, editavelItens, produtos, ajustaSeparacao };
+             trocas, remocoes, editavelItens, produtos, ajustaSeparacao, cancelaVendedora };
   });
   if (!d) notFound();
   const { p, cliente } = d;
@@ -176,6 +178,10 @@ export default async function Pedido({ params, searchParams }: {
   const whatsLink = msgLink ? linkWhatsApp(cliente?.whatsapp ?? cliente?.telefone, msgLink) : null;
   const separar = p.status_comercial === "em_separacao" && p.origem !== "bling" && !fluxo?.separacao_conferida_em && Boolean(gestao || fluxo?.opera);
   const naSeparacao = p.status_comercial === "em_separacao";
+  // Cancelar: gerente em qualquer etapa; vendedora antes do pedido sair e sem pagamento (o banco confere de novo)
+  const podeCancelar = p.status_comercial !== "cancelado" && !ehBling && !(p.origem === "planilha" && p.numero_externo)
+    && (gestao || (escrever && d.cancelaVendedora && d.pagamentos.every((g) => g.status_conferencia === "recusado")
+        && ["aguardando_cliente", "aguardando_aprovacao", "em_separacao"].includes(p.status_comercial)));
   const editar = escrever && d.editavelItens
     && (["aguardando_cliente", "aguardando_aprovacao"].includes(p.status_comercial) || (naSeparacao && (gestao || d.ajustaSeparacao)));
   const trocar = escrever && d.editavelItens;
@@ -242,6 +248,26 @@ export default async function Pedido({ params, searchParams }: {
       )}
 
       <Avisos ok={avisos.ok} erro={avisos.erro} />
+
+      {podeCancelar && (
+        <details className="painel cancelar-pedido">
+          <summary><b className="perigo-texto">Cancelar pedido</b> <span className="pequeno suave">o cliente desistiu ou o pedido foi feito errado</span></summary>
+          <form action={cancelarPedido} className="campos" style={{ marginTop: 10 }}>
+            <input type="hidden" name="pedido_id" value={p.id} />
+            <label className="largo">Motivo (fica no histórico do pedido)<input name="motivo" required maxLength={300} placeholder="Ex.: cliente desistiu da compra" /></label>
+            {["enviado", "aguardando_retirada", "entregue"].includes(p.status_comercial) && (
+              <div className="aviso-caixa aviso pequeno largo">O pedido já saiu: ao cancelar, a mercadoria volta ao estoque como devolução.</div>
+            )}
+            {d.pagamentos.some((g) => g.status_conferencia !== "recusado") && (
+              <div className="aviso-caixa aviso pequeno largo">Este pedido tem pagamento registrado: combine a devolução do dinheiro com o cliente.</div>
+            )}
+            <label className="largo" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <input type="checkbox" name="confirmo" required style={{ width: "auto" }} /> Confirmo que quero cancelar este pedido
+            </label>
+            <button className="perigo">Cancelar pedido</button>
+          </form>
+        </details>
+      )}
 
       {p.desconto_qtd_status === "pendente" && (
         <section className="painel" style={{ borderColor: "#e0b04a", background: "#fffaf0" }}>

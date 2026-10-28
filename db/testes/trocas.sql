@@ -117,4 +117,35 @@ select teste.como(:'KEILA');
 select teste.falha($$select app.trocar_item_pedido('00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000b1', 2, 'b.jpg', 'b.jpg', 'image/jpeg', 10, 'def')$$,
   'total já foi confirmado', 'Depois do total confirmado ao cliente não troca');
 reset role;
+
+\echo '== Cancelar pedido =='
+insert into app.pedidos (id, origem, cliente_id, vendedora_id, data_pedido, moeda, valor_total, status_comercial) values
+  ('00000000-0000-0000-0000-0000000000f1', 'manual', :'JULISA', '00000000-0000-0000-0000-0000000000a1', current_date, 'GS', 0, 'em_separacao'),
+  ('00000000-0000-0000-0000-0000000000f2', 'manual', :'JULISA', '00000000-0000-0000-0000-0000000000a1', current_date, 'GS', 0, 'em_separacao'),
+  ('00000000-0000-0000-0000-0000000000f3', 'manual', :'JULISA', '00000000-0000-0000-0000-0000000000a1', current_date, 'GS', 0, 'enviado');
+insert into app.pagamentos (pedido_id, valor, data, modalidade) values ('00000000-0000-0000-0000-0000000000f2', 1000, current_date, 'pix');
+update app.parametros set valor = 0 where chave = 'vendedora_cancela_pedido';
+set role vc_app;
+select teste.como(:'KEILA');
+select teste.falha($$select app.cancelar_pedido('00000000-0000-0000-0000-0000000000f1', 'cliente desistiu')$$, 'só para o gerente', 'Desligado: vendedora não cancela');
+reset role;
+update app.parametros set valor = 1 where chave = 'vendedora_cancela_pedido';
+set role vc_app;
+select teste.como(:'KEILA');
+select teste.falha($$select app.cancelar_pedido('00000000-0000-0000-0000-0000000000f1', '  ')$$, 'motivo', 'Cancelar exige motivo');
+select teste.como(:'YESSICA');
+select teste.falha($$select app.cancelar_pedido('00000000-0000-0000-0000-0000000000f1', 'x')$$, 'vendedora do pedido', 'Outra vendedora não cancela');
+select teste.como(:'KEILA');
+select app.cancelar_pedido('00000000-0000-0000-0000-0000000000f1', 'cliente desistiu');
+select teste.ok((select status_comercial::text = 'cancelado' and observacoes like '%cliente desistiu%' from app.pedidos where id = '00000000-0000-0000-0000-0000000000f1'),
+  'Vendedora cancela o próprio pedido em separação (motivo fica registrado)');
+select teste.falha($$select app.cancelar_pedido('00000000-0000-0000-0000-0000000000f1', 'de novo')$$, 'já está cancelado', 'Não cancela duas vezes');
+select teste.falha($$select app.cancelar_pedido('00000000-0000-0000-0000-0000000000f2', 'cliente desistiu')$$, 'pagamento', 'Com pagamento registrado só o gerente cancela');
+select teste.falha($$select app.cancelar_pedido('00000000-0000-0000-0000-0000000000f3', 'cliente desistiu')$$, 'já saiu', 'Pedido enviado: vendedora não cancela');
+select teste.como(:'GERENTE');
+select app.cancelar_pedido('00000000-0000-0000-0000-0000000000f2', 'cliente desistiu, devolver pix');
+select app.cancelar_pedido('00000000-0000-0000-0000-0000000000f3', 'devolvido pelo cliente');
+select teste.ok((select count(*) from app.pedidos where id in ('00000000-0000-0000-0000-0000000000f2', '00000000-0000-0000-0000-0000000000f3') and status_comercial = 'cancelado') = 2,
+  'Gerente cancela com pagamento e depois de enviado');
+reset role;
 \echo '== Testes de trocas passaram =='

@@ -251,6 +251,15 @@ export async function editarItens(fd: FormData) {
   });
 }
 
+/** Cancelar o pedido (motivo obrigatório). A regra do banco decide quem pode e até quando. */
+export async function cancelarPedido(fd: FormData) {
+  const pedido = texto(fd, "pedido_id");
+  await executar(pedido, "Pedido cancelado.", async (uid) => {
+    if (fd.get("confirmo") !== "on") throw new Error("Marque a confirmação para cancelar o pedido.");
+    await comUsuario(uid, (c) => c.query("select app.cancelar_pedido($1, $2)", [pedido, texto(fd, "motivo")]));
+  });
+}
+
 export async function decidirPedidoPortal(fd: FormData) {
   const pedido = texto(fd, "pedido_id");
   const aprovar = texto(fd, "decisao") === "aprovar";
