@@ -13,8 +13,12 @@ export type ItemPedido = {
  * Itens do pedido numa lista só: a expedição confere a separação na própria linha
  * e a vendedora troca o item (ou a fragrância) com um botão, depois de falar com o cliente.
  */
-export function ItensPedido({ pedidoId, itens, total, separar, trocar, produtos, editar = false }: {
+export function ItensPedido({ pedidoId, itens, total, separar, trocar, produtos, editar = false, soDiminuir = false, separado = false }: {
   pedidoId: string; itens: ItemPedido[]; total: string; separar: boolean; trocar: boolean; produtos: string[]; editar?: boolean;
+  /** Pedido em separação: só diminui ou tira (igual ao estoquista), não acrescenta. */
+  soDiminuir?: boolean;
+  /** A expedição já conferiu a separação: o que sair volta para a prateleira. */
+  separado?: boolean;
 }) {
   const [aberto, setAberto] = useState<string | null>(null);
   const [falta, setFalta] = useState<Record<string, boolean>>({});
@@ -86,16 +90,28 @@ export function ItensPedido({ pedidoId, itens, total, separar, trocar, produtos,
       {editar && (
         <form id="form-editar" action={editarItens} className="editar-pedido">
           <input type="hidden" name="pedido_id" value={pedidoId} />
-          <b className="pequeno">Acrescentar produto</b>
-          {Array.from({ length: novos }).map((_, k) => (
-            <div key={k} className="linha">
-              <input name={`novo_${k}`} list="lista-substitutos" placeholder="Digite código ou nome" autoComplete="off" style={{ flex: 1, minWidth: 180 }}
-                onChange={(e) => { if (e.target.value && k === novos - 1 && novos < 10) setNovos(novos + 1); }} />
-              <input name={`novoq_${k}`} inputMode="decimal" placeholder="Qtd" style={{ width: 80 }} />
-            </div>
-          ))}
+          {soDiminuir ? (
+            separado && (
+              <div className="aviso-caixa aviso pequeno">
+                A expedição já separou este pedido: o que você diminuir ou tirar, avise o estoquista para devolver à prateleira.
+              </div>
+            )
+          ) : (
+            <>
+              <b className="pequeno">Acrescentar produto</b>
+              {Array.from({ length: novos }).map((_, k) => (
+                <div key={k} className="linha">
+                  <input name={`novo_${k}`} list="lista-substitutos" placeholder="Digite código ou nome" autoComplete="off" style={{ flex: 1, minWidth: 180 }}
+                    onChange={(e) => { if (e.target.value && k === novos - 1 && novos < 10) setNovos(novos + 1); }} />
+                  <input name={`novoq_${k}`} inputMode="decimal" placeholder="Qtd" style={{ width: 80 }} />
+                </div>
+              ))}
+            </>
+          )}
           <div className="linha entre">
-            <span className="pequeno suave">Mude a quantidade na linha, ✕ tira o item. O preço é o da tabela do cliente e o total é recalculado.</span>
+            <span className="pequeno suave">{soDiminuir
+              ? "Pedido em separação: diminua a quantidade na linha ou ✕ para tirar o item. O total é recalculado."
+              : "Mude a quantidade na linha, ✕ tira o item. O preço é o da tabela do cliente e o total é recalculado."}</span>
             <button className={mudou ? "principal" : ""}>Salvar alterações do pedido</button>
           </div>
         </form>

@@ -138,8 +138,10 @@ export default async function Pedido({ params, searchParams }: {
             where pr.ativo and not pr.marketplace and pr.codigo is not null order by pr.nome`, [p.deposito_id])).rows as
           { codigo: string; nome: string; marca: string | null; estoque: number }[]
       : [];
+    // Parâmetros → vendedora_ajusta_separacao: vendedora diminui/tira itens também na separação
+    const ajustaSeparacao = Number((await c.query("select app.param('vendedora_ajusta_separacao') v")).rows[0]?.v ?? 0) === 1;
     return { p, cliente, itens, fluxo, transf, bling, pagamentos, comprovantes, atendimentos, depositos, historico, indisponiveis,
-             trocas, remocoes, editavelItens, produtos };
+             trocas, remocoes, editavelItens, produtos, ajustaSeparacao };
   });
   if (!d) notFound();
   const { p, cliente } = d;
@@ -173,7 +175,9 @@ export default async function Pedido({ params, searchParams }: {
     : null;
   const whatsLink = msgLink ? linkWhatsApp(cliente?.whatsapp ?? cliente?.telefone, msgLink) : null;
   const separar = p.status_comercial === "em_separacao" && p.origem !== "bling" && !fluxo?.separacao_conferida_em && Boolean(gestao || fluxo?.opera);
-  const editar = escrever && d.editavelItens && ["aguardando_cliente", "aguardando_aprovacao"].includes(p.status_comercial);
+  const naSeparacao = p.status_comercial === "em_separacao";
+  const editar = escrever && d.editavelItens
+    && (["aguardando_cliente", "aguardando_aprovacao"].includes(p.status_comercial) || (naSeparacao && (gestao || d.ajustaSeparacao)));
   const trocar = escrever && d.editavelItens;
   const itensVista: ItemPedido[] = d.itens.map((i) => ({
     id: i.id, codigo: i.codigo, descricao: i.descricao, quantidade: Number(i.quantidade), pedida: Number(i.quantidade_pedida),
@@ -306,6 +310,7 @@ export default async function Pedido({ params, searchParams }: {
         )}
         {d.itens.length > 0 ? (
           <ItensPedido pedidoId={p.id} itens={itensVista} total={dinheiro(p.valor_total, moeda)} separar={false} trocar={trocar} editar={editar}
+            soDiminuir={naSeparacao} separado={Boolean(fluxo?.separacao_conferida_em)}
             produtos={d.produtos.map((x) => `${x.codigo} · ${x.nome}`)} />
         ) : itensBling.length > 0 ? (
           <div className="tabela"><table>

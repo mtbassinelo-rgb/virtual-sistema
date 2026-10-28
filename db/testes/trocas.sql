@@ -77,7 +77,37 @@ select teste.falha($$select app.editar_itens_pedido('00000000-0000-0000-0000-000
   'sem itens', 'Não deixa o pedido sem itens');
 select app.decidir_pedido_portal(:'PED', true, null);
 select teste.ok((select status_comercial::text from app.pedidos where id = :'PED') = 'em_separacao', 'A própria vendedora manda para a separação');
-select teste.falha($$select app.editar_itens_pedido('00000000-0000-0000-0000-0000000000e8', '[]')$$, 'separação', 'Depois da separação não edita mais por aqui');
+
+\echo '== Vendedora ajusta na separação (parâmetro vendedora_ajusta_separacao) =='
+reset role;
+update app.parametros set valor = 0 where chave = 'vendedora_ajusta_separacao';
+set role vc_app;
+select teste.como(:'KEILA');
+select teste.falha($$select app.editar_itens_pedido('00000000-0000-0000-0000-0000000000e8', '[]')$$, 'separação', 'Desligado: na separação não edita por aqui');
+reset role;
+update app.parametros set valor = 1 where chave = 'vendedora_ajusta_separacao';
+set role vc_app;
+select teste.como(:'KEILA');
+select app.editar_itens_pedido(:'PED', '[{"item_id":"00000000-0000-0000-0000-0000000000e1","quantidade":3}]');
+select teste.ok((select quantidade = 3 and quantidade_pedida = 3 from app.pedido_itens where id = '00000000-0000-0000-0000-0000000000e1'),
+  'Ligado: vendedora diminui a quantidade na separação');
+select teste.falha($$select app.editar_itens_pedido('00000000-0000-0000-0000-0000000000e8', '[{"item_id":"00000000-0000-0000-0000-0000000000e1","quantidade":9}]')$$,
+  'só dá para diminuir', 'Na separação não aumenta');
+select teste.falha($$select app.editar_itens_pedido('00000000-0000-0000-0000-0000000000e8', '[{"produto_id":"00000000-0000-0000-0000-0000000000b1","quantidade":2}]')$$,
+  'acrescentar', 'Na separação não acrescenta produto');
+reset role;
+update app.pedidos set separacao_conferida_em = now() where id = :'PED';
+set role vc_app;
+select teste.como(:'KEILA');
+select app.editar_itens_pedido(:'PED', (select jsonb_build_array(jsonb_build_object('item_id', id, 'quantidade', 0))
+  from app.pedido_itens where pedido_id = :'PED' and produto_id = '00000000-0000-0000-0000-0000000000e9'));
+select teste.ok(not exists (select 1 from app.pedido_itens where pedido_id = :'PED' and produto_id = '00000000-0000-0000-0000-0000000000e9'),
+  'Depois da expedição conferir, vendedora tira o item');
+select teste.ok((select valor_total from app.pedidos where id = :'PED') = (select sum(total) from app.pedido_itens where pedido_id = :'PED'),
+  'Total recalculado depois do ajuste na separação');
+select teste.como(:'YESSICA');
+select teste.falha($$select app.editar_itens_pedido('00000000-0000-0000-0000-0000000000e8', '[{"item_id":"00000000-0000-0000-0000-0000000000e1","quantidade":1}]')$$,
+  'vendedora do pedido', 'Outra vendedora não ajusta na separação');
 
 \echo '== Depois do total confirmado não muda =='
 reset role;
