@@ -175,6 +175,23 @@ select teste.ok(exists (select 1 from app.cde_chegando() x where x.id = current_
   'Retira na CDE aparece para a loja com os itens');
 select app.cde_cliente_retirou(current_setting('teste.pr')::uuid);
 select teste.ok((select status_comercial = 'entregue' from app.pedidos where id = current_setting('teste.pr')::uuid), 'Loja CDE dá o ✓ cliente retirou');
+-- gerente finaliza em um passo (confirma o pagamento informado e entrega)
+select teste.como(:'KEILA');
+select set_config('teste.pf', app.criar_pedido_vendedora(:'CG', 'GS', :'DG', null, null,
+  jsonb_build_array(jsonb_build_object('produto_id', :'G1', 'quantidade', 1)), false)::text, false);
+select teste.como(:'GERENTE');
+select teste.falha(format($$select app.finalizar_pedido(%L)$$, current_setting('teste.pf')), 'separar o pedido', 'Não finaliza antes da separação');
+reset role;
+update app.pedidos set separacao_conferida_em = now() where id = current_setting('teste.pf')::uuid;
+insert into app.pagamentos (pedido_id, valor, data, modalidade, registrado_por)
+values (current_setting('teste.pf')::uuid, 13000, current_date, 'transferencia', :'KEILA');
+set role vc_app;
+select teste.como(:'KEILA');
+select teste.falha(format($$select app.finalizar_pedido(%L)$$, current_setting('teste.pf')), 'gerente', 'Vendedora não finaliza');
+select teste.como(:'GERENTE');
+select app.finalizar_pedido(current_setting('teste.pf')::uuid);
+select teste.ok((select status_comercial = 'entregue' and total_confirmado_em is not null from app.pedidos where id = current_setting('teste.pf')::uuid), 'Gerente finaliza o pedido');
+select teste.ok((select status_conferencia = 'conferido' from app.pagamentos where pedido_id = current_setting('teste.pf')::uuid), 'Finalizar confirma o pagamento informado');
 select teste.como(:'KEILA');
 reset role;
 delete from app.deposito_responsaveis where deposito_id = :'DG' and usuario_id = :'KEILA';

@@ -650,3 +650,4 @@ a.indicador.clicavel:active { transform: scale(.98); }
 #envios, #clientes, #unidades { scroll-margin-top: 70px; }
 button.mini { padding: 4px 10px; font-size: .78rem; }
 @media print { .envio-cartao.chegando { break-inside: avoid; border-color: #999; } .envios-lista { grid-template-columns: 1fr 1fr; } }
+.finalizar-caixa { border: 2px solid var(--ok); gap: 12px; flex-wrap: wrap; }

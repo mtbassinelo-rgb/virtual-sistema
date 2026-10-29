@@ -309,6 +309,23 @@ export async function definirEntrega(fd: FormData) {
   });
 }
 
+/** Gerente finaliza o pedido (confirma os pagamentos informados, se marcado). */
+export async function finalizarPedido(fd: FormData) {
+  const pedido = texto(fd, "pedido_id");
+  const volta = texto(fd, "volta");
+  const u = await exigirUsuario();
+  let erro: string | null = null;
+  try {
+    await comUsuario(u.id, (c) => c.query("select app.finalizar_pedido($1, $2)", [pedido, fd.get("confirmar") !== null || fd.get("todos") === "1"]));
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  revalidatePath("/pedidos");
+  revalidatePath(`/pedidos/${pedido}`);
+  const base = volta.startsWith("/pedidos") ? volta : `/pedidos/${pedido}`;
+  redirect(`${base}${base.includes("?") ? "&" : "?"}${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Pedido finalizado.")}`);
+}
+
 /** Loja CDE entregou o pedido de retirada ao cliente. */
 export async function cdeClienteRetirou(fd: FormData) {
   const u = await exigirUsuario();

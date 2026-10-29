@@ -10,7 +10,7 @@ import {
 } from "@/lib/formato";
 import { Avisos, Selo } from "../../avisos";
 import {
-  anexarComprovante, atualizarPedido, cancelarPedido, avancarEntrega, conferirPagamento, confirmarTotal, decidirPedidoPortal,
+  anexarComprovante, atualizarPedido, finalizarPedido, cancelarPedido, avancarEntrega, conferirPagamento, confirmarTotal, decidirPedidoPortal,
   reconhecerBling, recusarPagamento, registrarAtendimento, registrarPagamento, gerarLinkPedido, definirVolumes, decidirDescontoQuantidade,
   decidirRemocao,
 } from "../acoes";
@@ -54,18 +54,17 @@ function proximoPasso(p: { status_comercial: string; origem: string; saldo: stri
     case "aguardando_cliente": return "Mandar o link para o cliente conferir e confirmar as caixas.";
     case "aguardando_aprovacao": return "Vendedora: confira e ajuste os itens com o cliente e mande para a separação.";
     case "em_separacao":
-      if (p.origem !== "bling" && !f?.separacao_conferida_em) return "Expedição: conferir a separação na lista de itens. Faltou algo? Troque a fragrância com o cliente.";
-      if (p.origem !== "bling" && !f?.total_confirmado_em) return "Confirmar o total e mandar a conta para o cliente pelo WhatsApp.";
-      if (Number(p.saldo) > 0 && Number(p.a_conferir) > 0) return "O cliente informou o pagamento: o gerente confirma o recebimento.";
-      if (Number(p.saldo) > 0) return "Aguardando o pagamento do cliente (registre o comprovante quando chegar).";
-      return "Pago: despachar o pedido.";
+      if (p.origem !== "bling" && !f?.separacao_conferida_em) return "Expedição: separar o pedido. Faltou algo? Troque a fragrância com o cliente.";
+      if (Number(p.saldo) > 0 && Number(p.a_conferir) > 0) return "Pagamento informado: o gerente confere e finaliza o pedido.";
+      if (Number(p.saldo) > 0) return "Cliente pagou? Registre o pagamento com o comprovante (ou os detalhes) na caixa Pagamento.";
+      return "Pago: o gerente finaliza o pedido.";
     case "enviado": return "Em transporte: avisar quando chegar para retirada.";
     case "aguardando_retirada": return "Aguardando o cliente retirar.";
     default: return null;
   }
 }
 
-const PASSOS = ["Pedido", "Confirmado", "Separado", "Total enviado", "Pago", "Enviado", "Entregue"];
+const PASSOS = ["Pedido", "Confirmado", "Separado", "Pago", "Finalizado"];
 
 export default async function Pedido({ params, searchParams }: {
   params: Promise<{ id: string }>; searchParams: Promise<{ ok?: string; erro?: string; link?: string }>;
@@ -201,10 +200,8 @@ export default async function Pedido({ params, searchParams }: {
   const feitos = [
     true,
     !["aguardando_cliente", "aguardando_aprovacao"].includes(p.status_comercial),
-    Boolean(fluxo?.separacao_conferida_em) || ["enviado", "aguardando_retirada", "entregue"].includes(p.status_comercial),
-    Boolean(fluxo?.total_confirmado_em) || ehBling,
+    Boolean(fluxo?.separacao_conferida_em) || ["enviado", "aguardando_retirada", "entregue"].includes(p.status_comercial) || ehBling,
     p.status_pagamento === "pago",
-    ["enviado", "aguardando_retirada", "entregue"].includes(p.status_comercial),
     p.status_comercial === "entregue",
   ];
   const itensBling: { codigo?: string; descricao?: string; quantidade?: number; valor?: number }[] =
@@ -402,17 +399,17 @@ export default async function Pedido({ params, searchParams }: {
         </div>
       )}
       {escrever && p.status_comercial === "em_separacao" && (fluxo?.separacao_conferida_em || p.origem === "bling") && !fluxo?.total_confirmado_em && (
-        <section className="painel" style={{ borderColor: "var(--marca)" }}>
-          <h2>Confirmar total para o cliente</h2>
-          <p>Total separado: <b className="num">{dinheiro(p.valor_total, moeda)}</b></p>
-          <form action={confirmarTotal} className="campos">
+        <details className="painel">
+          <summary><b>Mandar o total e a conta ao cliente</b> <span className="pequeno suave">(opcional) · total separado {dinheiro(p.valor_total, moeda)}</span></summary>
+          <form action={confirmarTotal} className="campos" style={{ marginTop: 8 }}>
             <input type="hidden" name="pedido_id" value={p.id} />
             <label className="largo">Dados para pagamento (banco, conta, titular)
               <textarea name="conta" required placeholder="Ex.: Banco Continental · Cuenta 0000000 · Virtual Cosméticos" />
             </label>
             <button className="principal">Confirmar total</button>
           </form>
-        </section>
+          <p className="pequeno suave">Ao confirmar, os itens não mudam mais e a mensagem com o total e a conta fica pronta para o WhatsApp.</p>
+        </details>
       )}
       {fluxo?.total_confirmado_em && Number(p.saldo) > 0 && (
         <div className="aviso-caixa linha entre">
@@ -519,6 +516,19 @@ export default async function Pedido({ params, searchParams }: {
         </div>
       )}
 
+      {gestao && ["em_separacao", "enviado", "aguardando_retirada"].includes(p.status_comercial) && (fluxo?.separacao_conferida_em || ehBling) && (
+        <form action={finalizarPedido} className="painel finalizar-caixa linha entre">
+          <input type="hidden" name="pedido_id" value={p.id} />
+          <span>
+            <b>Finalizar pedido</b>
+            <span className="pequeno suave" style={{ display: "block" }}>
+              {Number(p.saldo) > 0 && Number(p.a_conferir) <= 0 ? `Atenção: falta pagar ${dinheiro(p.saldo, moeda)}. ` : ""}
+              Fecha o pedido como entregue{Number(p.a_conferir) > 0 ? " e confirma os pagamentos informados" : ""}.</span>
+          </span>
+          {Number(p.a_conferir) > 0 && <label className="pequeno linha" style={{ gap: 6 }}><input type="checkbox" name="confirmar" defaultChecked style={{ width: "auto" }} /> confirmar pagamento(s) informado(s)</label>}
+          <button className="principal">✓ Finalizar</button>
+        </form>
+      )}
       {p.status_comercial !== "cancelado" && (
         <section className="painel pagamento-caixa" id="pagamentos"
           style={{ borderColor: Number(p.saldo) <= 0 ? "var(--ok)" : pendentes.length ? "#e0b04a" : "var(--marca)" }}>

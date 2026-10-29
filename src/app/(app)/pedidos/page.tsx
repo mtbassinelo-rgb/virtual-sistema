@@ -5,7 +5,7 @@ import { comUsuario } from "@/lib/db";
 import { dinheiro, data, STATUS_COMERCIAL, STATUS_PAGAMENTO, COR_PAGAMENTO, MODALIDADES, type Moeda } from "@/lib/formato";
 import { Avisos, Selo } from "../avisos";
 import { carregarFila, etapaSql, ETAPA_POR_ID, FilaPedidos } from "./fila";
-import { confirmarPagamentosDaLista } from "./acoes";
+import { confirmarPagamentosDaLista, finalizarPedido } from "./acoes";
 
 export const metadata = { title: "Pedidos" };
 
@@ -311,6 +311,13 @@ export default async function Pedidos({ searchParams }: { searchParams: Promise<
                       ? <Link href={`/pedidos/${p.id}`} className={`selo ${ETAPA_POR_ID[p.etapa].cor}`} style={{ textDecoration: "none" }}>{ETAPA_POR_ID[p.etapa].titulo}</Link>
                       : <span className="pequeno suave">{STATUS_COMERCIAL[p.status_comercial]}</span>}
                     {p.envio_atrasado && <> <Selo cor="erro">envio atrasado</Selo></>}
+                    {ehGestao(u) && ["conferir", "finalizar", "transporte", "retirada"].includes(p.etapa) && (
+                      <form action={finalizarPedido} style={{ marginTop: 6 }}>
+                        <input type="hidden" name="pedido_id" value={p.id} /><input type="hidden" name="todos" value="1" />
+                        <input type="hidden" name="volta" value={`/pedidos?${new URLSearchParams(Object.entries(f).filter(([k, v]) => typeof v === "string" && !["ok", "erro"].includes(k)) as [string, string][])}`} />
+                        <button className="principal mini">✓ Finalizar</button>
+                      </form>
+                    )}
                     {Array.isArray(p.pendentes) && p.pendentes.length > 0 && (
                       <div className="linha" style={{ gap: 6, marginTop: 6 }}>
                         {(p.pendentes as { id: string; comprovante: string | null }[]).map((g, k) => g.comprovante
