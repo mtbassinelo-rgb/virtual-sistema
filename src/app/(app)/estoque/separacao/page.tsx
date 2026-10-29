@@ -87,10 +87,12 @@ export default async function Separacao({ searchParams }: { searchParams: Promis
         <Link className="atalho" href="/estoque/inventario"><b>Balanço de estoque</b><span>Contar a prateleira e acertar o saldo</span></Link>
       </section>
       <section className="indicadores">
-        <div className="indicador"><span className="rotulo">Envios Shopee / ML a embalar</span><span className="valor">{d.envios.filter((e) => e.etapa === "a_preparar").length}</span>
-          <span className="pequeno suave">{d.embaladosHoje} embalado(s) hoje</span></div>
-        <div className="indicador"><span className="rotulo">Pedidos de clientes a separar</span><span className="valor">{d.pedidos.length}</span></div>
-        <div className="indicador"><span className="rotulo">Pedidos de outra unidade a separar</span><span className="valor">{d.transf.length}</span></div>
+        <a href="#envios" className="indicador clicavel"><span className="rotulo">Envios Shopee / ML a embalar</span><span className="valor">{d.envios.filter((e) => e.etapa === "a_preparar").length}</span>
+          <span className="pequeno suave">{d.embaladosHoje} embalado(s) hoje · ver →</span></a>
+        <a href="#clientes" className="indicador clicavel"><span className="rotulo">Pedidos de clientes a separar</span><span className="valor">{d.pedidos.length}</span>
+          <span className="pequeno suave">ver →</span></a>
+        <a href="#unidades" className="indicador clicavel"><span className="rotulo">Pedidos de outra unidade a separar</span><span className="valor">{d.transf.length}</span>
+          <span className="pequeno suave">ver →</span></a>
         <div className="indicador"><span className="rotulo">Separados hoje</span><span className="valor">{d.hoje.pedidos + d.hoje.transf}</span>
           <span className="pequeno suave">{d.hoje.pedidos} de clientes · {d.hoje.transf} entre unidades</span></div>
       </section>
@@ -127,7 +129,7 @@ export default async function Separacao({ searchParams }: { searchParams: Promis
         )}
       </section>
 
-      <section className="painel">
+      <section className="painel" id="clientes">
         <div className="linha entre" style={{ flexWrap: "wrap" }}>
           <h2>Pedidos de clientes</h2>
           <nav className="filtros">
@@ -156,7 +158,7 @@ export default async function Separacao({ searchParams }: { searchParams: Promis
         )}
       </section>
 
-      <section className="painel">
+      <section className="painel" id="unidades">
         <h2>Pedidos de outra unidade</h2>
         {d.transf.length === 0 ? <div className="vazio">Nenhuma unidade pediu mercadoria.</div> : (
           <div className="tabela cartoes"><table>
