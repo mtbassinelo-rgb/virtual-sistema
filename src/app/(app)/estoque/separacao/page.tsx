@@ -35,6 +35,7 @@ export default async function Separacao({ searchParams }: { searchParams: Promis
     const pedidos = (await c.query(`select p.id, p.data_pedido, p.criado_em, p.bling_numero, p.moeda, p.valor_total, p.previsao_envio, p.canal, p.origem,
         cl.nome cliente, v.nome vendedora, d.nome deposito,
         (select count(*) from app.pedido_itens i where i.pedido_id = p.id)::int itens,
+        exists (select 1 from app.pedido_separacao s where s.pedido_id = p.id) acrescimo,
         (select coalesce(sum(i.quantidade), 0) from app.pedido_itens i where i.pedido_id = p.id) pecas
       from app.pedidos p left join app.clientes cl on cl.id = p.cliente_id left join app.vendedoras v on v.id = p.vendedora_id
       join app.depositos d on d.id = p.deposito_id
@@ -141,7 +142,8 @@ export default async function Separacao({ searchParams }: { searchParams: Promis
               <tr key={p.id}>
                 <td data-rot="Pedido em">{new Date(p.criado_em).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}{p.bling_numero && <div className="pequeno suave">nº {p.bling_numero}</div>}
                   {!atual && d.deps.length > 1 && <div className="pequeno suave">{p.deposito}</div>}</td>
-                <td className="titulo">{p.cliente ?? "Cliente avulso"}{p.origem === "portal" && <> <Selo cor="info">site</Selo></>}</td>
+                <td className="titulo">{p.cliente ?? "Cliente avulso"}{p.origem === "portal" && <> <Selo cor="info">site</Selo></>}
+                  {p.acrescimo && <> <Selo cor="aviso">acréscimo: separar só a diferença</Selo></>}</td>
                 <td data-rot="Vendedora">{p.vendedora}</td>
                 <td className="num" data-rot="Itens">{p.itens} · {Number(p.pecas).toLocaleString("pt-BR")} pç</td>
                 <td data-rot="Enviar até">{p.previsao_envio ? <span style={atrasado(p) ? { color: "var(--erro)", fontWeight: 700 } : undefined}>{new Date(p.previsao_envio).toLocaleDateString("pt-BR", { timeZone: "UTC" })}</span> : "—"}</td>

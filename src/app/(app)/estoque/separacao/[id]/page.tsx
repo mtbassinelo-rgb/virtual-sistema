@@ -29,13 +29,22 @@ export default async function SepararPedido({ params, searchParams }: { params: 
     const itens = (await c.query(`select i.id, i.codigo, i.descricao, i.quantidade::float quantidade, pr.unidades_caixa_fornecedor cx, o.nome origem
         from app.pedido_itens i left join app.produtos pr on pr.id = i.produto_id left join app.depositos o on o.id = i.deposito_origem_id
        where i.pedido_id = $1 order by pr.marca nulls last, i.descricao`, [id])).rows;
-    const feito = (await c.query("select descricao, pedida::float pedida, separada::float separada from app.pedido_separacao where pedido_id = $1 order by descricao", [id])).rows;
+    const feito = (await c.query("select item_id, descricao, pedida::float pedida, separada::float separada from app.pedido_separacao where pedido_id = $1 order by descricao", [id])).rows;
     return { p, itens, feito };
   });
   if (!d) notFound();
   const { p } = d;
-  const itens: ItemSep[] = d.itens.map((i) => ({ id: i.id, codigo: i.codigo, descricao: i.descricao, quantidade: Number(i.quantidade),
-    caixa: i.cx ? Number(i.cx) : null, dica: caixasFisicas(Number(i.quantidade), i.cx ? Number(i.cx) : null), origem: i.origem }));
+  // Pedido reaberto (a vendedora acrescentou depois de separado): o estoquista separa só a diferença
+  const ja = new Map<string, number>(d.feito.map((x) => [String(x.item_id), Number(x.separada)]));
+  const reaberto = !p.separacao_conferida_em && d.feito.length > 0;
+  const todos = d.itens.map((i) => {
+    const jaSep = Math.min(ja.get(i.id) ?? 0, Number(i.quantidade));
+    const falta = Number(i.quantidade) - jaSep;
+    return { id: i.id, codigo: i.codigo, descricao: i.descricao, quantidade: falta, total: Number(i.quantidade), jaSep,
+      caixa: i.cx ? Number(i.cx) : null, dica: caixasFisicas(falta, i.cx ? Number(i.cx) : null), origem: i.origem };
+  });
+  const itens: ItemSep[] = todos.filter((i) => i.quantidade > 0);
+  const prontos = todos.filter((i) => i.quantidade <= 0);
   const podeSeparar = p.opera && p.status === "em_separacao" && !p.separacao_conferida_em && p.origem !== "bling";
 
   return (
@@ -53,9 +62,22 @@ export default async function SepararPedido({ params, searchParams }: { params: 
 
       {podeSeparar ? (
         <>
-          <div className="aviso-caixa info pequeno">Pegue cada produto na prateleira e digite <b>quantas unidades separou</b>. Se não tem, marque <b>Não tem</b>.
-            No fim, informe o <b>total de caixas</b> e confirme.</div>
-          <Conferencia pedidoId={p.id} itens={itens} />
+          {reaberto ? (
+            <div className="aviso-caixa aviso">
+              <b>A vendedora acrescentou produtos depois da separação.</b> Separe <b>só o que aparece abaixo</b> (a diferença), informe as
+              <b> caixas a mais</b> e confirme: o sistema junta com o que você já tinha separado{p.caixas_separadas ? ` (${p.caixas_separadas} caixa(s))` : ""}.
+            </div>
+          ) : (
+            <div className="aviso-caixa info pequeno">Pegue cada produto na prateleira e digite <b>quantas unidades separou</b>. Se não tem, marque <b>Não tem</b>.
+              No fim, informe o <b>total de caixas</b> e confirme.</div>
+          )}
+          <Conferencia pedidoId={p.id} itens={itens} acrescimo={reaberto} />
+          {reaberto && prontos.length > 0 && (
+            <details className="painel">
+              <summary>Já separado antes ({prontos.length} item(ns)): não precisa mexer</summary>
+              <ul className="lista-simples pequeno">{prontos.map((i) => <li key={i.id}>{i.jaSep}× {i.descricao}</li>)}</ul>
+            </details>
+          )}
         </>
       ) : p.separacao_conferida_em ? (
         <section className="painel">

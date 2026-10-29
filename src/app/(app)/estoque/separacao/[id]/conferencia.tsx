@@ -9,7 +9,7 @@ export type ItemSep = { id: string; codigo: string | null; descricao: string; qu
  * Conferência da separação: o estoquista digita quanto separou de cada item (sem poder passar do pedido)
  * ou marca "Não tem", e informa o total de caixas. Só confirma quando tudo estiver preenchido.
  */
-export function Conferencia({ pedidoId, itens }: { pedidoId: string; itens: ItemSep[] }) {
+export function Conferencia({ pedidoId, itens, acrescimo = false }: { pedidoId: string; itens: ItemSep[]; acrescimo?: boolean }) {
   const [qtd, setQtd] = useState<Record<string, string>>({});
   const [falta, setFalta] = useState<Record<string, boolean>>({});
   const [caixas, setCaixas] = useState("");
@@ -24,7 +24,7 @@ export function Conferencia({ pedidoId, itens }: { pedidoId: string; itens: Item
     <form action={confirmarSeparacao} className="painel">
       <input type="hidden" name="pedido_id" value={pedidoId} />
       <div className="tabela cartoes"><table>
-        <thead><tr><th>Produto</th><th className="num">Pedido</th><th style={{ width: 130 }}>Separei</th><th>Não tem</th></tr></thead>
+        <thead><tr><th>Produto</th><th className="num">{acrescimo ? "Separar agora" : "Pedido"}</th><th style={{ width: 130 }}>Separei</th><th>Não tem</th></tr></thead>
         <tbody>{itens.map((i) => {
           const v = val(i);
           const erro = v !== null && (!Number.isFinite(v) || v < 0 || v > i.quantidade);
@@ -49,7 +49,7 @@ export function Conferencia({ pedidoId, itens }: { pedidoId: string; itens: Item
       </table></div>
 
       <div className="linha" style={{ gap: 16, alignItems: "flex-end", marginTop: 12 }}>
-        <label>Total de caixas separadas
+        <label>{acrescimo ? "Caixas a mais (só deste acréscimo)" : "Total de caixas separadas"}
           <input name="caixas" type="number" min={0} max={10000} value={caixas} onChange={(e) => setCaixas(e.target.value)} required={precisaCaixas} style={{ width: 140 }} />
         </label>
         <div className="pequeno">
@@ -59,7 +59,7 @@ export function Conferencia({ pedidoId, itens }: { pedidoId: string; itens: Item
         </div>
       </div>
       <div className="linha" style={{ marginTop: 12 }}>
-        <button className="principal" disabled={!pronto}>✓ Confirmar separação</button>
+        <button className="principal" disabled={!pronto}>{acrescimo ? "✓ Confirmar acréscimo" : "✓ Confirmar separação"}</button>
         <span className="pequeno suave">Você não altera o pedido: só confirma o que separou. Para trocar produto, a vendedora resolve com o cliente.</span>
       </div>
     </form>

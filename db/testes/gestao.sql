@@ -110,6 +110,22 @@ select teste.ok((select quantidade_faltou = 2 from app.pedido_itens_indisponivei
 select teste.ok((select pedida = 12 and separada = 10 from app.pedido_separacao where pedido_id = current_setting('teste.p5')::uuid), 'Fica o registro do que foi separado');
 select teste.falha(format($$select app.confirmar_separacao_estoque(%L, '[{"item_id":"%s","quantidade":10}]', 1)$$, current_setting('teste.p5'), current_setting('teste.i5')),
   'já foi conferido', 'Não confere duas vezes');
+-- vendedora acrescenta depois de separado: volta só a diferença para o estoquista
+select app.editar_itens_pedido(current_setting('teste.p5')::uuid,
+  jsonb_build_array(jsonb_build_object('item_id', current_setting('teste.i5'), 'quantidade', 14), jsonb_build_object('produto_id', :'G2', 'quantidade', 2)));
+select teste.ok((select separacao_conferida_em is null from app.pedidos where id = current_setting('teste.p5')::uuid), 'Acrescentou: volta para o estoquista');
+select teste.ok((select separada = 10 from app.pedido_separacao where pedido_id = current_setting('teste.p5')::uuid and item_id = current_setting('teste.i5')::uuid),
+  'O que já tinha sido separado fica guardado');
+select set_config('teste.i6', (select id::text from app.pedido_itens where pedido_id = current_setting('teste.p5')::uuid and produto_id = :'G2'), false);
+select teste.falha(format($$select app.confirmar_separacao_estoque(%L, '[{"item_id":"%s","quantidade":14},{"item_id":"%s","quantidade":2}]', 1)$$,
+  current_setting('teste.p5'), current_setting('teste.i5'), current_setting('teste.i6')), 'entre 0 e 4', 'Separa só a diferença (4), não o item inteiro');
+select app.confirmar_separacao_estoque(current_setting('teste.p5')::uuid,
+  format('[{"item_id":"%s","quantidade":4},{"item_id":"%s","quantidade":2}]', current_setting('teste.i5'), current_setting('teste.i6'))::jsonb, 1);
+select teste.ok((select separada = 14 from app.pedido_separacao where pedido_id = current_setting('teste.p5')::uuid and item_id = current_setting('teste.i5')::uuid),
+  'Junta: 10 de antes + 4 agora = 14');
+select teste.ok((select caixas_separadas = 2 and separacao_conferida_em is not null from app.pedidos where id = current_setting('teste.p5')::uuid),
+  'Caixas somam (1 + 1) e o pedido volta a ficar conferido');
+select teste.ok((select quantidade = 14 from app.pedido_itens where id = current_setting('teste.i5')::uuid), 'Item fica com o total (14)');
 reset role;
 delete from app.deposito_responsaveis where deposito_id = :'DG' and usuario_id = :'KEILA';
 set role vc_app;
