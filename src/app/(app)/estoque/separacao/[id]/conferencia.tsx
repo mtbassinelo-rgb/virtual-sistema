@@ -23,6 +23,11 @@ export function Conferencia({ pedidoId, itens, acrescimo = false }: { pedidoId: 
   return (
     <form action={confirmarSeparacao} className="painel">
       <input type="hidden" name="pedido_id" value={pedidoId} />
+      <div className="linha entre" style={{ marginBottom: 8 }}>
+        <span className="pequeno suave">Toque no <b>✓</b> quando separou a quantidade toda do item. Se separou menos, digite quantas.</span>
+        <button type="button" onClick={() => setQtd({ ...qtd, ...Object.fromEntries(itens.filter((i) => !falta[i.id] && !(qtd[i.id] ?? "").trim()).map((i) => [i.id, String(i.quantidade)])) })}
+          title="Preenche com a quantidade toda os itens que ainda estão em branco">✓ Separei tudo (os em branco)</button>
+      </div>
       <div className="tabela cartoes"><table>
         <thead><tr><th>Produto</th><th className="num">{acrescimo ? "Separar agora" : "Pedido"}</th><th style={{ width: 130 }}>Separei</th><th>Não tem</th></tr></thead>
         <tbody>{itens.map((i) => {
@@ -35,9 +40,14 @@ export function Conferencia({ pedidoId, itens, acrescimo = false }: { pedidoId: 
                 {i.dica && <span className="selo info">{i.dica}</span>}</td>
               <td className="num" data-rot="Pedido"><b>{i.quantidade}</b> un</td>
               <td data-rot="Separei">
+                <span className="sep-linha">
+                <button type="button" className={`sep-tudo ${!falta[i.id] && v === i.quantidade ? "ativo" : ""}`} disabled={falta[i.id]}
+                  title={`Separei tudo (${i.quantidade})`} aria-label={`Separei tudo de ${i.descricao}`}
+                  onClick={() => setQtd({ ...qtd, [i.id]: v === i.quantidade ? "" : String(i.quantidade) })}>✓</button>
                 <input name={`sep_${i.id}`} inputMode="numeric" value={falta[i.id] ? "0" : qtd[i.id] ?? ""} disabled={falta[i.id]}
-                  onChange={(e) => setQtd({ ...qtd, [i.id]: e.target.value })} placeholder="quantas?" aria-label={`Separado de ${i.descricao}`}
+                  onChange={(e) => setQtd({ ...qtd, [i.id]: e.target.value })} placeholder="ou digite" aria-label={`Separado de ${i.descricao}`}
                   style={erro ? { borderColor: "var(--erro)" } : undefined} />
+                </span>
                 {falta[i.id] && <input type="hidden" name={`sep_${i.id}`} value="0" />}
                 {erro && <div className="pequeno texto-erro">Máximo {i.quantidade}</div>}
                 {!falta[i.id] && v !== null && v < i.quantidade && v >= 0 && <div className="pequeno texto-erro">faltam {i.quantidade - v}</div>}

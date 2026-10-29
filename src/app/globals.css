@@ -625,3 +625,10 @@ details.recusar > summary::-webkit-details-marker { display: none; }
 .atalhos-lista kbd { min-width: 22px; text-align: center; opacity: 1; color: var(--marca); }
 @media (max-width: 900px) { .acoes-rapidas .rapido:not(:first-child):not(.teclado) { display: none; } .atalhos-lista { grid-template-columns: 1fr; } }
 .unidade-grade small.conv { font-variant-numeric: tabular-nums; opacity: .9; }
+
+/* Separação: ✓ = separei a quantidade toda */
+.sep-linha { display: inline-flex; gap: 6px; align-items: center; }
+.sep-linha input { width: 100px; }
+.sep-tudo { min-width: 46px; min-height: 42px; font-size: 1.2rem; font-weight: 800; border: 2px solid var(--ok); color: var(--ok); background: var(--superficie); border-radius: 8px; }
+.sep-tudo.ativo { background: var(--ok); color: #fff; }
+.sep-tudo:disabled { opacity: .35; }
