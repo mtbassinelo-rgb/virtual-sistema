@@ -300,6 +300,28 @@ export async function avancarEntrega(fd: FormData) {
   });
 }
 
+/** Vendedora informa como o pedido sai: envio (meio e dados) ou retirada. O estoquista despacha depois. */
+export async function definirEntrega(fd: FormData) {
+  const pedido = texto(fd, "pedido_id");
+  await executar(pedido, "Entrega informada. O pedido aparece para o estoquista despachar.", async (uid) => {
+    await comUsuario(uid, (c) => c.query("select app.definir_entrega($1, $2, $3, nullif($4, ''))",
+      [pedido, texto(fd, "tipo"), texto(fd, "meio"), texto(fd, "dados")]));
+  });
+}
+
+/** Loja CDE confirma que despachou pela transportadora o envio para o Paraguai. */
+export async function confirmarEnvioPy(fd: FormData) {
+  const u = await exigirUsuario();
+  let erro: string | null = null;
+  try {
+    await comUsuario(u.id, (c) => c.query("select app.confirmar_envio_py($1, nullif($2, ''))", [texto(fd, "pedido_id"), texto(fd, "guia")]));
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  revalidatePath("/pedidos/envios-py");
+  redirect(`/pedidos/envios-py?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Envio confirmado. A vendedora já pode finalizar o pedido.")}`);
+}
+
 /** Gerente libera (ou não) o desconto por quantidade que o pedido do site atingiu. */
 export async function decidirDescontoQuantidade(fd: FormData) {
   const pedido = texto(fd, "pedido_id");

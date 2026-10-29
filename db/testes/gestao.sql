@@ -142,6 +142,25 @@ select teste.ok((select separada = 14 from app.pedido_separacao where pedido_id 
 select teste.ok((select caixas_separadas = 2 and separacao_conferida_em is not null from app.pedidos where id = current_setting('teste.p5')::uuid),
   'Caixas somam (1 + 1) e o pedido volta a ficar conferido');
 select teste.ok((select quantidade = 14 from app.pedido_itens where id = current_setting('teste.i5')::uuid), 'Item fica com o total (14)');
+-- como sai: vendedora informa, estoquista despacha
+select teste.falha(format($$select app.despachar_pedido(%L)$$, current_setting('teste.p5')), 'ainda não informou', 'Sem envio informado não despacha');
+select teste.falha(format($$select app.definir_entrega(%L, 'envio', 'Passeiro', '')$$, current_setting('teste.p5')), 'dados para o envio', 'Envio exige os dados');
+select app.definir_entrega(current_setting('teste.p5')::uuid, 'envio', 'Transportadora Nasa', 'Maria, 0981 123 456, Encarnación');
+select teste.ok((select entrega_tipo = 'envio' and entrega_meio = 'Transportadora Nasa' from app.pedidos where id = current_setting('teste.p5')::uuid), 'Vendedora informa o envio');
+select app.despachar_pedido(current_setting('teste.p5')::uuid);
+select teste.ok((select status_comercial = 'enviado' and despachado_em is not null from app.pedidos where id = current_setting('teste.p5')::uuid), 'Estoquista dá o ✓: em transporte');
+select teste.falha(format($$select app.definir_entrega(%L, 'retira', 'Loja CDE', null)$$, current_setting('teste.p5')), 'já saiu', 'Depois de sair, a entrega não muda');
+reset role;
+select (select pais::text from app.clientes where id = :'CG') as pais_cg \gset
+set role vc_app;
+select teste.como(:'KEILA');
+select case when :'pais_cg' = 'PY' then teste.falha(format($$select app.avancar_entrega(%L, 'entregue')$$, current_setting('teste.p5')), 'loja CDE',
+  'Envio Paraguai: vendedora só finaliza depois da CDE confirmar') end;
+select teste.como(:'GERENTE');
+select case when :'pais_cg' = 'PY' then app.confirmar_envio_py(current_setting('teste.p5')::uuid, 'Guia 123') end;
+select teste.como(:'KEILA');
+select app.avancar_entrega(current_setting('teste.p5')::uuid, 'entregue');
+select teste.ok((select status_comercial = 'entregue' from app.pedidos where id = current_setting('teste.p5')::uuid), 'Depois da confirmação, a vendedora finaliza');
 reset role;
 delete from app.deposito_responsaveis where deposito_id = :'DG' and usuario_id = :'KEILA';
 set role vc_app;

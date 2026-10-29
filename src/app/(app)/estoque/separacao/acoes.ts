@@ -45,3 +45,18 @@ export async function marcarEnvio(fd: FormData) {
   revalidatePath("/estoque/separacao");
   redirect(erro ? `/estoque/separacao?erro=${encodeURIComponent(erro)}#envios` : "/estoque/separacao#envios");
 }
+
+
+/** Estoquista dá o ✓: o passeiro levou (envio) ou o pedido ficou pronto para retirar. */
+export async function despacharPedido(fd: FormData) {
+  const u = await exigirUsuario();
+  let erro: string | null = null, tipo = "";
+  try {
+    tipo = await comUsuario(u.id, async (c) => (await c.query("select app.despachar_pedido($1) t", [texto(fd, "pedido_id")])).rows[0].t as string);
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  revalidatePath("/estoque/separacao");
+  redirect(erro ? `/estoque/separacao?erro=${encodeURIComponent(erro)}#saidas`
+    : `/estoque/separacao?ok=${encodeURIComponent(tipo === "envio" ? "Pedido despachado com o passeiro." : "Pedido pronto para o cliente retirar.")}#saidas`);
+}

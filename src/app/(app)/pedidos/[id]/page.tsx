@@ -15,6 +15,7 @@ import {
   decidirRemocao,
 } from "../acoes";
 import { ItensPedido, type ItemPedido, type Sugestao } from "./itens-pedido";
+import { FormEntrega } from "./entrega";
 
 export const metadata = { title: "Pedido" };
 
@@ -87,7 +88,9 @@ export default async function Pedido({ params, searchParams }: {
         where i.pedido_id = $1 order by i.codigo, d.nome`, [id])).rows;
     const fluxo = (await c.query(
       `select volumes, separacao_conferida_em, total_confirmado_em, conta_pagamento, app.pode_operar_deposito(deposito_id) as opera,
-              chegou_em, local_retirada, (select nome from app.depositos where id = deposito_id) as deposito_nome
+              chegou_em, local_retirada, (select nome from app.depositos where id = deposito_id) as deposito_nome,
+              entrega_tipo, entrega_meio, entrega_dados, entrega_definida_em, app.nome_usuario(entrega_definida_por) as entrega_definida_nome,
+              despachado_em, app.nome_usuario(despachado_por) as despachado_nome, envio_confirmado_em, app.nome_usuario(envio_confirmado_por) as envio_confirmado_nome, envio_guia
          from app.pedidos where id = $1`, [id])).rows[0];
     const indisponiveis = (await c.query(
       "select descricao, quantidade_pedida, quantidade_faltou from app.pedido_itens_indisponiveis where pedido_id = $1 order by descricao", [id])).rows;
@@ -172,7 +175,7 @@ export default async function Pedido({ params, searchParams }: {
     ? `${urlPortal(h.get("x-forwarded-host") ?? h.get("host"), h.get("x-forwarded-proto"))}/loja/pedido/${avisos.link}` : null;
   const msgLink = linkCliente
     ? `Olá ${cliente?.nome ?? ""}! Aqui é a ${p.vendedora_nome}, da Virtual Cosméticos. Montei o seu pedido:\n` +
-      d.itens.map((i) => `• ${Number(i.quantidade)}× ${i.descricao}`).join("\n") +
+      d.itens.map((i) => `• ${Number(i.quantidade)}× ${i.descricao} · ${dinheiro(i.total, moeda)} _(${dinheiro(i.preco_unitario, moeda)} un.)_`).join("\n") +
       `\nTotal: ${dinheiro(p.valor_total, moeda)}\nConfira e confirme as caixas por este link: ${linkCliente}`
     : null;
   const whatsLink = msgLink ? linkWhatsApp(cliente?.whatsapp ?? cliente?.telefone, msgLink) : null;
@@ -425,44 +428,76 @@ export default async function Pedido({ params, searchParams }: {
           </ul>
         </div>
       )}
-      {p.origem !== "bling" && (escrever || fluxo?.opera) && ["em_separacao", "enviado", "aguardando_retirada"].includes(p.status_comercial)
-        && (fluxo?.separacao_conferida_em) && (
-        <section className="painel" style={{ borderColor: "var(--ok)" }}>
+      {p.origem !== "bling" && ["aguardando_cliente", "aguardando_aprovacao", "em_separacao", "enviado", "aguardando_retirada"].includes(p.status_comercial) && (
+        <section className="painel" id="entrega" style={{ borderColor: "var(--ok)" }}>
           <h2>Entrega</h2>
           <div className="etapas-entrega pequeno">
-            {["Separado", "Em transporte", "Aguardando retirada", "Retirado"].map((e, k) => {
-              const atual = p.status_comercial === "em_separacao" ? 0 : p.status_comercial === "enviado" ? 1 : 2;
+            {(fluxo?.entrega_tipo === "retira" ? ["Separado", "Pronto para retirar", "Retirado"] : ["Separado", "Saiu (passeiro)", ...(cliente?.pais === "PY" ? ["Enviado pela transportadora"] : []), "Cliente recebeu"]).map((e, k) => {
+              const atual = p.status_comercial === "em_separacao" ? (fluxo?.separacao_conferida_em ? 0 : -1)
+                : p.status_comercial === "aguardando_retirada" ? 1
+                : p.status_comercial === "enviado" ? (cliente?.pais === "PY" && fluxo?.entrega_tipo === "envio" && fluxo?.envio_confirmado_em ? 2 : 1) : 99;
               return <span key={e} className={k <= atual ? "feita" : ""}>{e}</span>;
             })}
           </div>
-          {p.status_comercial === "em_separacao" && (
+          {fluxo?.entrega_tipo ? (
+            <p style={{ margin: 0 }}>
+              <b>{fluxo.entrega_tipo === "envio" ? `Envio · ${fluxo.entrega_meio}` : `Retira: ${fluxo.entrega_meio}`}</b>
+              {fluxo.entrega_dados && <span className="pequeno" style={{ whiteSpace: "pre-line", display: "block" }}>{fluxo.entrega_dados}</span>}
+              <span className="pequeno suave">informado por {fluxo.entrega_definida_nome ?? "—"} em {dataHora(fluxo.entrega_definida_em)}</span>
+            </p>
+          ) : <p className="suave" style={{ margin: 0 }}>Ainda não informado se é envio ou retirada.</p>}
+
+          {escrever && ["aguardando_cliente", "aguardando_aprovacao", "em_separacao"].includes(p.status_comercial) && cliente && (
+            fluxo?.entrega_tipo ? (
+              <details><summary className="pequeno">Alterar a entrega</summary>
+                <FormEntrega pedidoId={p.id} pais={cliente.pais} atual={{ tipo: fluxo.entrega_tipo, meio: fluxo.entrega_meio, dados: fluxo.entrega_dados }} />
+              </details>
+            ) : <FormEntrega pedidoId={p.id} pais={cliente.pais} atual={{ tipo: null, meio: null, dados: null }} />
+          )}
+
+          {p.status_comercial === "em_separacao" && fluxo?.separacao_conferida_em && (
+            <p className="pequeno" style={{ margin: 0 }}>{fluxo?.entrega_tipo
+              ? "Aparece para o estoquista em \"Envio de pedidos\": ele dá o ✓ quando o passeiro levar (ou quando ficar pronto para retirar)."
+              : "Informe a entrega acima para o estoquista despachar."}
+              {Number(p.saldo) > 0 && <> <b>Atenção:</b> ainda há saldo a pagar de {dinheiro(p.saldo, moeda)}.</>}</p>
+          )}
+          {gestao && p.status_comercial === "em_separacao" && fluxo?.separacao_conferida_em && (
             <form action={avancarEntrega} className="linha">
               <input type="hidden" name="pedido_id" value={p.id} /><input type="hidden" name="etapa" value="transporte" />
-              <button className="principal">Despachar: em transporte</button>
-              {Number(p.saldo) > 0 && <span className="pequeno suave">Atenção: ainda há saldo a pagar de {dinheiro(p.saldo, moeda)}.</span>}
+              <button className="discreto pequeno">Gerência: marcar como despachado</button>
             </form>
           )}
+          {fluxo?.despachado_em && <p className="pequeno suave" style={{ margin: 0 }}>Saiu em {dataHora(fluxo.despachado_em)} ({fluxo.despachado_nome ?? "estoquista"}).</p>}
+
           {p.status_comercial === "enviado" && (
-            <form action={avancarEntrega} className="linha" style={{ alignItems: "end" }}>
-              <input type="hidden" name="pedido_id" value={p.id} /><input type="hidden" name="etapa" value="retirada" />
-              <label style={{ flex: 1, minWidth: 220 }}>Onde o cliente retira
-                <input name="local" required defaultValue={fluxo?.local_retirada ?? fluxo?.deposito_nome ?? ""} placeholder="Ex.: Loja Ciudad del Este, Transportadora X em Asunción" />
-              </label>
-              <button className="principal">Chegou: aguardando retirada</button>
-            </form>
+            cliente?.pais === "PY" && fluxo?.entrega_tipo === "envio" && !fluxo?.envio_confirmado_em ? (
+              <div className="aviso-caixa aviso pequeno">Na loja CDE: aguardando a Yessica despachar pela transportadora e confirmar. Depois disso você finaliza.</div>
+            ) : (
+              <>
+                {fluxo?.envio_confirmado_em && <p className="pequeno" style={{ margin: 0 }}>Enviado pela transportadora em {dataHora(fluxo.envio_confirmado_em)} ({fluxo.envio_confirmado_nome ?? "CDE"}){fluxo.envio_guia ? ` · ${fluxo.envio_guia}` : ""}.</p>}
+                {escrever && (
+                  <form action={avancarEntrega} className="linha">
+                    <input type="hidden" name="pedido_id" value={p.id} /><input type="hidden" name="etapa" value="entregue" />
+                    <button className="principal">✓ Cliente recebeu: finalizar</button>
+                  </form>
+                )}
+              </>
+            )
           )}
           {p.status_comercial === "aguardando_retirada" && (
             <>
-              <p style={{ margin: 0 }}>Aguardando retirada em <b>{fluxo?.local_retirada}</b>{fluxo?.chegou_em ? ` desde ${dataHora(fluxo.chegou_em)}` : ""}.</p>
+              <p style={{ margin: 0 }}>Pronto para retirar em <b>{fluxo?.local_retirada}</b>{fluxo?.chegou_em ? ` desde ${dataHora(fluxo.chegou_em)}` : ""}.</p>
               {(() => {
                 const z = cliente ? linkWhatsApp(cliente.whatsapp ?? cliente.telefone,
                   `Olá ${cliente.nome}! Aqui é a ${p.vendedora_nome}, da Virtual Cosméticos. Seu pedido${p.bling_numero ? " nº " + p.bling_numero : ""} já está disponível para retirada em ${fluxo?.local_retirada}.`) : null;
                 return z ? <a className="botao whatsapp" href={z} target="_blank" rel="noopener noreferrer">Avisar o cliente pelo WhatsApp</a> : null;
               })()}
-              <form action={avancarEntrega}>
-                <input type="hidden" name="pedido_id" value={p.id} /><input type="hidden" name="etapa" value="entregue" />
-                <button className="principal">Cliente retirou</button>
-              </form>
+              {escrever && (
+                <form action={avancarEntrega}>
+                  <input type="hidden" name="pedido_id" value={p.id} /><input type="hidden" name="etapa" value="entregue" />
+                  <button className="principal">✓ Cliente retirou: finalizar</button>
+                </form>
+              )}
             </>
           )}
         </section>

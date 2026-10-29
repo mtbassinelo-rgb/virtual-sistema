@@ -125,7 +125,8 @@ export default async function Hoje() {
             from app.whatsapp_mensagens m where m.em > now() - interval '3 days'
            order by m.conexao_id, m.contato, m.em desc) x
         where not x.enviada order by em limit 50`).catch(() => ({ rows: [] }))).rows as Espera[];
-    return { fila, mes, receber, comissao, recompra, carrinhos, esperando, semEstoque, destaques, sugestoesCredito, cadastros, site, aConferir, metasPropostas, recusados, envioAtrasado, pagAtrasado, metasPerto, transferencias, portal, separar, confirmar, pendencias };
+    const enviosPy = (await c.query("select count(*)::int n from app.envios_py_pendentes()").catch(() => ({ rows: [{ n: 0 }] }))).rows[0].n as number;
+    return { fila, mes, receber, comissao, recompra, carrinhos, esperando, semEstoque, destaques, sugestoesCredito, cadastros, site, aConferir, metasPropostas, recusados, envioAtrasado, pagAtrasado, metasPerto, transferencias, portal, separar, confirmar, pendencias, enviosPy };
   });
 
   return (
@@ -137,6 +138,13 @@ export default async function Hoje() {
         </div>
         <Link className="botao principal" href="/pedidos/novo">+ Novo pedido</Link>
       </section>
+
+      {d.enviosPy > 0 && (
+        <Link href="/pedidos/envios-py" className="aviso-caixa aviso linha entre" style={{ textDecoration: "none", color: "inherit" }}>
+          <span>🚚 <b>{d.enviosPy} envio(s) para o Paraguai</b> chegaram na CDE: despachar pela transportadora e confirmar.</span>
+          <span className="botao principal">Ver envios →</span>
+        </Link>
+      )}
 
       <div className="kpis">
         {d.mes.length === 0 && <div className="kpi marca"><span className="rotulo">{gestao ? "Vendido no mês" : "Você vendeu no mês"}</span><span className="valor">—</span></div>}

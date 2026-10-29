@@ -4,9 +4,12 @@ import { comUsuario } from "@/lib/db";
 import { dinheiro, type Moeda } from "@/lib/formato";
 import { unidadeSistema } from "@/lib/unidade-sistema";
 import { Avisos, Selo } from "../../avisos";
-import { marcarEnvio } from "./acoes";
+import { marcarEnvio, despacharPedido } from "./acoes";
 
 export const metadata = { title: "Área do estoquista" };
+
+type Saida = { id: string; cliente: string | null; pais: string | null; cidade: string | null; vendedora: string; entrega_tipo: string | null;
+  entrega_meio: string | null; entrega_dados: string | null; caixas: number | null; separacao_conferida_em: string; deve: boolean };
 
 type Envio = { id: string; canal: string; canal_nome: string; numero_externo: string; pacote: string | null; comprador: string | null;
   itens: { codigo: string; descricao: string; quantidade: number; produto_id: string | null }[]; status_plataforma: string | null;
@@ -31,7 +34,7 @@ export default async function Separacao({ searchParams }: { searchParams: Promis
   const d = await comUsuario(u.id, async (c) => {
     const deps = (await c.query("select id, nome from app.depositos where ativo and app.pode_operar_deposito(id) order by tipo, nome")).rows as { id: string; nome: string }[];
     const ids = deps.filter((x) => !atual || x.id === atual.id).map((x) => x.id);
-    if (!ids.length) return { deps, pedidos: [], transf: [], hoje: { pedidos: 0, transf: 0 }, faltas: [], envios: [] as Envio[], embaladosHoje: 0 };
+    if (!ids.length) return { deps, pedidos: [], transf: [], hoje: { pedidos: 0, transf: 0 }, faltas: [], envios: [] as Envio[], embaladosHoje: 0, saidas: [] as Saida[] };
     const pedidos = (await c.query(`select p.id, p.data_pedido, p.criado_em, p.bling_numero, p.moeda, p.valor_total, p.previsao_envio, p.canal, p.origem,
         cl.nome cliente, v.nome vendedora, d.nome deposito,
         (select count(*) from app.pedido_itens i where i.pedido_id = p.id)::int itens,
@@ -62,7 +65,13 @@ export default async function Separacao({ searchParams }: { searchParams: Promis
       order by e.etapa, e.prazo nulls last, e.criado_em limit 300`, [ids]).catch(() => ({ rows: [] }))).rows as Envio[];
     const embaladosHoje = (await c.query(`select count(*)::int n from app.marketplace_envios
       where deposito_id = any($1::uuid[]) and preparado_em::date = current_date`, [ids]).catch(() => ({ rows: [{ n: 0 }] }))).rows[0].n as number;
-    return { deps, pedidos, transf, hoje, faltas, envios, embaladosHoje };
+    // Pedidos separados: como saem (a vendedora informa) e o ✓ do estoquista quando o passeiro leva
+    const saidas = (await c.query(`select p.id, cl.nome cliente, cl.pais::text pais, cl.cidade, v.nome vendedora, p.entrega_tipo, p.entrega_meio, p.entrega_dados,
+        coalesce(p.caixas_separadas, p.volumes) caixas, p.separacao_conferida_em, (vp.saldo > 0) deve
+      from app.pedidos p join app.v_pedidos vp on vp.id = p.id left join app.clientes cl on cl.id = p.cliente_id join app.vendedoras v on v.id = p.vendedora_id
+      where p.status_comercial = 'em_separacao' and p.origem <> 'bling' and p.separacao_conferida_em is not null and p.deposito_id = any($1::uuid[])
+      order by p.entrega_tipo nulls last, p.separacao_conferida_em limit 200`, [ids]).catch(() => ({ rows: [] }))).rows as Saida[];
+    return { deps, pedidos, transf, hoje, faltas, envios, embaladosHoje, saidas };
   }).catch(() => null);
 
   if (!d) return <div className="painel">Não foi possível carregar a área do estoquista.</div>;
@@ -89,6 +98,8 @@ export default async function Separacao({ searchParams }: { searchParams: Promis
       <section className="indicadores">
         <a href="#envios" className="indicador clicavel"><span className="rotulo">Envios Shopee / ML a embalar</span><span className="valor">{d.envios.filter((e) => e.etapa === "a_preparar").length}</span>
           <span className="pequeno suave">{d.embaladosHoje} embalado(s) hoje · ver →</span></a>
+        <a href="#saidas" className="indicador clicavel"><span className="rotulo">Pedidos para despachar</span><span className="valor">{d.saidas.filter((x) => x.entrega_tipo).length}</span>
+          <span className="pequeno suave">{d.saidas.filter((x) => !x.entrega_tipo).length} esperando a vendedora · ver →</span></a>
         <a href="#clientes" className="indicador clicavel"><span className="rotulo">Pedidos de clientes a separar</span><span className="valor">{d.pedidos.length}</span>
           <span className="pequeno suave">ver →</span></a>
         <a href="#unidades" className="indicador clicavel"><span className="rotulo">Pedidos de outra unidade a separar</span><span className="valor">{d.transf.length}</span>
@@ -126,6 +137,38 @@ export default async function Separacao({ searchParams }: { searchParams: Promis
               );
             })}
           </div>
+        )}
+      </section>
+
+      <section className="painel" id="saidas">
+        <h2>Envio de pedidos</h2>
+        <p className="pequeno suave" style={{ margin: 0 }}>Pedidos já separados. Quando o passeiro levar (ou o pedido ficar pronto para o cliente retirar), toque no <b>✓</b>.</p>
+        {d.saidas.filter((x) => x.entrega_tipo).length === 0 ? <div className="vazio">Nada para despachar agora.</div> : (
+          <div className="envios-lista">
+            {d.saidas.filter((x) => x.entrega_tipo).map((x) => (
+              <div key={x.id} className="envio-cartao">
+                <div className="linha entre">
+                  <b>{x.cliente ?? "Cliente avulso"}</b>
+                  <Selo cor={x.entrega_tipo === "envio" ? "info" : "ok"}>{x.entrega_tipo === "envio" ? (x.pais === "PY" ? "envio PY (via CDE)" : "envio") : "retira"}</Selo>
+                </div>
+                <div className="pequeno"><b>{x.entrega_tipo === "envio" ? x.entrega_meio : `Retira: ${x.entrega_meio}`}</b>
+                  {x.caixas != null && <> · {x.caixas} caixa(s)</>}{x.cidade && <> · {x.cidade}</>} · {x.vendedora}</div>
+                {x.entrega_dados && <div className="pequeno suave" style={{ whiteSpace: "pre-line" }}>{x.entrega_dados}</div>}
+                {x.deve && <div className="pequeno" style={{ color: "var(--aviso)" }}>Pagamento ainda pendente: confirme com a vendedora antes de soltar.</div>}
+                <form action={despacharPedido} className="linha entre">
+                  <input type="hidden" name="pedido_id" value={x.id} />
+                  <Link className="pequeno" href={`/estoque/separacao/${x.id}`}>ver itens</Link>
+                  <button className="principal">{x.entrega_tipo === "envio" ? "✓ Passeiro levou" : "✓ Pronto para retirar"}</button>
+                </form>
+              </div>
+            ))}
+          </div>
+        )}
+        {d.saidas.some((x) => !x.entrega_tipo) && (
+          <details style={{ marginTop: 10 }}>
+            <summary className="pequeno">{d.saidas.filter((x) => !x.entrega_tipo).length} pedido(s) separado(s) esperando a vendedora informar envio ou retirada</summary>
+            <ul className="lista-simples pequeno">{d.saidas.filter((x) => !x.entrega_tipo).map((x) => <li key={x.id}>{x.cliente ?? "Cliente avulso"} · {x.vendedora}</li>)}</ul>
+          </details>
         )}
       </section>
 

@@ -39,7 +39,7 @@ export default async function Resumo({ params }: { params: Promise<{ id: string 
   const titulo = `Pedido${p.bling_numero ? " nº " + p.bling_numero : ""} de ${data(p.data_pedido)}`;
   const texto =
     `*Virtual Cosméticos · ${titulo}*\n${cliente?.nome ?? ""}\n\n` +
-    itens.map((i) => `• ${caixas(Number(i.quantidade), i.unidades_caixa)} · ${i.descricao} · ${dinheiro(i.total, moeda)}`).join("\n") +
+    itens.map((i) => `• ${caixas(Number(i.quantidade), i.unidades_caixa)} · ${i.descricao} · ${dinheiro(i.total, moeda)} _(${dinheiro(i.preco_unitario, moeda)} un.)_`).join("\n") +
     `\n\n*Total: ${dinheiro(p.valor_total, moeda)}*` +
     (totalCaixas ? `\nCaixas: ${totalCaixas}` : "") + `\nPeças: ${totalPecas.toLocaleString("pt-BR")}` +
     (d.volumes ? `\nVolumes no envio: ${d.volumes}` : "") +
@@ -75,8 +75,8 @@ export default async function Resumo({ params }: { params: Promise<{ id: string 
             <tr key={k}>
               <td>{i.descricao}<div className="pequeno suave">{i.codigo}{i.unidades_caixa > 1 ? ` · caixa com ${i.unidades_caixa}` : ""}</div></td>
               <td className="num">{caixas(Number(i.quantidade), i.unidades_caixa)}</td>
-              <td className="num">{dinheiro(i.preco_unitario, moeda)}</td>
-              <td className="num">{dinheiro(i.total, moeda)}</td>
+              <td className="num pequeno suave">{dinheiro(i.preco_unitario, moeda)}</td>
+              <td className="num"><b>{dinheiro(i.total, moeda)}</b></td>
             </tr>))}</tbody>
         </table></div>
         <section className="indicadores">
