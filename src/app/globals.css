@@ -604,3 +604,9 @@ details.recusar > summary::-webkit-details-marker { display: none; }
   .folha-transf .caixa-conf { width: 60px; border: 1px solid #999; }
   .folha-rodape { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; font-size: 10.5px; }
 }
+
+/* Área do estoquista: envios da Shopee / Mercado Livre */
+.envios-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; margin-top: 10px; }
+.envio-cartao { border: 1px solid var(--linha); border-radius: 10px; padding: 10px 12px; background: var(--superficie); display: grid; gap: 8px; }
+.envio-cartao.feito { opacity: .65; }
+.envio-itens { margin: 0; padding-left: 18px; font-size: 1rem; line-height: 1.5; }

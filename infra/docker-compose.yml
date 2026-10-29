@@ -45,6 +45,13 @@ services:
       WHATSAPP_API_URL: http://vc-whatsapp:8080
       WHATSAPP_API_KEY: ${WHATSAPP_API_KEY:-}
       WHATSAPP_WEBHOOK_SEGREDO: ${WHATSAPP_WEBHOOK_SEGREDO:-}
+      # Shopee e Mercado Livre direto (dados dos apps criados nas plataformas; só aqui no servidor)
+      APP_URL: ${APP_URL:-}
+      ML_CLIENT_ID: ${ML_CLIENT_ID:-}
+      ML_CLIENT_SECRET: ${ML_CLIENT_SECRET:-}
+      SHOPEE_PARTNER_ID: ${SHOPEE_PARTNER_ID:-}
+      SHOPEE_PARTNER_KEY: ${SHOPEE_PARTNER_KEY:-}
+      MARKETPLACE_SINC_SEGREDO: ${MARKETPLACE_SINC_SEGREDO:-}
     volumes:
       - arquivos_producao:/dados
     depends_on: [db-producao]
@@ -152,6 +159,16 @@ services:
     networks:
       interna:
         aliases: [vc-whatsapp-redis]
+
+  # Busca os pedidos da Shopee e do Mercado Livre a cada 5 minutos (só produção, só quando há loja conectada)
+  marketplace-sinc:
+    image: curlimages/curl:8.10.1
+    restart: unless-stopped
+    environment:
+      SEGREDO: ${MARKETPLACE_SINC_SEGREDO:-}
+    entrypoint: ["sh", "-c", "sleep 60; while true; do curl -sS -m 280 -o /dev/null \"http://vc-app-producao:3000/api/marketplace/sincronizar?chave=$$SEGREDO\" || true; sleep 300; done"]
+    depends_on: [app-producao]
+    networks: [interna]
 
   # Backup diário do banco de produção (guarda 30 dias no servidor;
   # a cópia para fora do servidor é configurada em backup.sh)

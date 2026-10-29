@@ -62,6 +62,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
       { href: "/marketplace", texto: "Visão geral", dica: "Shopee, Mercado Livre, TikTok: vendas do mês e o que pede atenção" },
       { href: "/marketplace?aba=anuncios", texto: "Anúncios e kits", dica: "Kits dos marketplaces, composição, quanto dá para montar e o que mais vende" },
       { href: "/estoque/marketplace", texto: "Lançar vendas do dia", dica: "Relatório do dia: pedidos entram e o estoque sai" },
+      ...(gestao ? [{ href: "/marketplace/conexoes", texto: "Conectar Shopee / Mercado Livre", dica: "Pedidos chegam sozinhos e viram envios para o estoquista" }] : []),
     ] },
     { id: "clientes", titulo: "Clientes", icone: "clientes", itens: [
       { href: "/clientes/recompra", texto: "Recompra (quem chamar)", dica: "Clientes que passaram do ritmo normal de compra, com WhatsApp pronto" },

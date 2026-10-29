@@ -31,3 +31,17 @@ export async function confirmarSeparacao(fd: FormData) {
   if (erro) redirect(`/estoque/separacao/${pedido}?erro=${encodeURIComponent(erro)}`);
   redirect(`/estoque/separacao?ok=${encodeURIComponent("Separação confirmada. A vendedora já vê o que foi separado e o que faltou.")}`);
 }
+
+
+/** Envios da Shopee / Mercado Livre: estoquista marca como embalado (ou desfaz). */
+export async function marcarEnvio(fd: FormData) {
+  const u = await exigirUsuario();
+  let erro: string | null = null;
+  try {
+    await comUsuario(u.id, (c) => c.query("select app.mkt_marcar_envio($1, $2)", [String(fd.get("envio")), fd.get("preparado") === "1"]));
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  revalidatePath("/estoque/separacao");
+  redirect(erro ? `/estoque/separacao?erro=${encodeURIComponent(erro)}#envios` : "/estoque/separacao#envios");
+}

@@ -13,6 +13,7 @@ garantir() { grep -q "^$1=" .env || echo "$1=$(openssl rand -hex 24)" >> .env; }
 garantir WHATSAPP_API_KEY
 garantir WHATSAPP_DB_SENHA
 garantir WHATSAPP_WEBHOOK_SEGREDO
+garantir MARKETPLACE_SINC_SEGREDO
 set -a; . ./.env; set +a
 senha_var="DB_$(echo "$alvo" | tr a-z A-Z)_SENHA"; app_var="APP_$(echo "$alvo" | tr a-z A-Z)_SENHA"
 # rede e pasta compartilhadas com o Instituto Supremo (o Caddy atende os dois sistemas)
@@ -38,6 +39,7 @@ fi
 # 4) aplicação
 docker compose --env-file .env build "app-$alvo"
 docker compose --env-file .env up -d "app-$alvo"
+[ "$alvo" = "producao" ] && docker compose --env-file .env up -d marketplace-sinc
 # o Caddyfile é montado como arquivo: depois do git pull o contêiner só enxerga a versão nova se for recriado
 docker compose --env-file .env up -d --force-recreate caddy
 echo "Ambiente $alvo atualizado."
