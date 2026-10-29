@@ -64,7 +64,9 @@ export default async function Produto({ params, searchParams }: {
         <div className="pequeno"><Link href="/produtos">Produtos</Link></div>
         <h1>{copia ? "Duplicar produto" : novo ? "Novo produto" : p.nome}</h1>
         {copia && <div className="aviso-caixa info">Cópia de <b>{copia.nome}</b> ({copia.codigo}): troque o <b>código</b> e o <b>nome</b> (ex.: a fragrância) e confira os preços. Estoque não é copiado.</div>}
-        {!novo && pode && <Link className="botao" href={`/produtos/novo?de=${id}`} style={{ marginTop: 6 }}>⧉ Duplicar produto</Link>}
+        {!novo && <div className="linha" style={{ gap: 6, marginTop: 6 }}>
+          <Link className="botao" href={`/produtos/vendas?p=${encodeURIComponent(`${p.codigo} · ${p.nome}`)}`}>Ver vendas deste produto</Link>
+          {pode && <Link className="botao" href={`/produtos/novo?de=${id}`}>⧉ Duplicar produto</Link>}</div>}
         {!novo && p && (
           <div className="linha pequeno suave" style={{ gap: 8 }}>
             <span>{p.codigo}</span>

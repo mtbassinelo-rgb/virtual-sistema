@@ -79,6 +79,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
     { id: "produtos", titulo: "Produtos", icone: "produtos", itens: [
       { href: "/produtos/pendentes", texto: "Novos produtos (pendentes)", contador: n.prod_pendentes, dica: "Vendedora fotografa o produto com quantidade e preço; o gerente clica em Atualizar" },
       { href: "/produtos", texto: "Todos os produtos" },
+      { href: "/produtos/vendas", texto: "Vendas por produto", dica: "Quem comprou um produto, quanto, a que preço e quando" },
       ...(gestao ? [
         { href: "/produtos/novo", texto: "Novo produto" },
         { href: "/produtos/precos-rapido", texto: "Editar preços rápido", contador: n.sem_preco, dica: "Produtos ativos sem nenhum preço" },
