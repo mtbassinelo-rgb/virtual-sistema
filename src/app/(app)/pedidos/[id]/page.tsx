@@ -484,7 +484,7 @@ export default async function Pedido({ params, searchParams }: {
         </div>
       )}
 
-      {p.status_comercial !== "cancelado" && (d.pagamentos.length > 0 || fluxo?.total_confirmado_em || ehBling || Number(p.saldo) <= 0) && (
+      {p.status_comercial !== "cancelado" && (
         <section className="painel pagamento-caixa" id="pagamentos"
           style={{ borderColor: Number(p.saldo) <= 0 ? "var(--ok)" : pendentes.length ? "#e0b04a" : "var(--marca)" }}>
           <div className="linha entre">
@@ -527,7 +527,7 @@ export default async function Pedido({ params, searchParams }: {
               ) : (
                 <span className="selo aviso">aguardando o gerente confirmar</span>
               )}
-              {escrever && d.comprovantes.every((c) => c.pagamento_id !== g.id) && (
+              {escrever && (
                 <form action={anexarComprovante} className="linha pequeno">
                   <input type="hidden" name="pedido_id" value={p.id} /><input type="hidden" name="pagamento_id" value={g.id} />
                   <input type="file" name="comprovante" accept="image/*,application/pdf" style={{ maxWidth: 240 }} />
@@ -539,7 +539,7 @@ export default async function Pedido({ params, searchParams }: {
 
           {escrever && Number(p.saldo) - Number(p.a_conferir) > 0 && (
             <details open={pendentes.length === 0 && Boolean(fluxo?.total_confirmado_em || ehBling)}>
-              <summary className="botao">+ Cliente pagou: registrar pagamento</summary>
+              <summary className="botao">+ Cliente pagou: registrar pagamento e anexar comprovante</summary>
               <form action={registrarPagamento} className="campos" style={{ marginTop: 10 }}>
                 <input type="hidden" name="pedido_id" value={p.id} />
                 <label>Valor ({moeda === "GS" ? "Gs" : "R$"})<input name="valor" inputMode="decimal" required

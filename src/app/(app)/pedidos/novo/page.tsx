@@ -71,6 +71,13 @@ export default async function NovoPedido({ searchParams }: { searchParams: Promi
         <div className="largo tabela" style={{ overflow: "visible" }}>
           <LinhasItens opcoes={opcoesProdutos} podeBaixar={ehGestao(u) || pode(u, "preco_abaixo")} />
         </div>
+        <fieldset className="largo desconto-pedido">
+          <legend>Desconto no pedido</legend>
+          <label>Valor do desconto<input name="desconto" inputMode="decimal" placeholder="Ex.: 20.000 ou 15,00" /></label>
+          <span className="pequeno suave">{ehGestao(u) || pode(u, "preco_abaixo")
+            ? "Sai do total do pedido, distribuído entre os produtos."
+            : "Sai da folga de cada produto acima do preço VIP. O máximo é chegar ao VIP em todos; se passar, o sistema avisa o limite."}</span>
+        </fieldset>
         <label className="largo">Observações<textarea name="observacoes" /></label>
         <label className="largo linha"><input type="checkbox" name="para_cliente" value="1" />
           Mandar para o cliente conferir e confirmar as caixas por link (WhatsApp) antes de separar</label>

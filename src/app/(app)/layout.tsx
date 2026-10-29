@@ -7,6 +7,7 @@ import { PERFIS } from "@/lib/formato";
 import { MenuLateral, type GrupoMenu } from "./menu-lateral";
 import { FiltrosAutomaticos } from "./filtros-automaticos";
 import { Atalhos, type Atalho } from "./atalhos";
+import { OcultarValores } from "./ocultar-valores";
 import { unidadeSistema } from "@/lib/unidade-sistema";
 import { permissaoDoLink, pode } from "@/lib/permissoes";
 
@@ -207,6 +208,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
             <input id="busca-geral" name="q" type="search" placeholder="Buscar produto, cliente ou pedido…" autoComplete="off" />
           </form>
           <Atalhos atalhos={atalhos} rapidos={rapidos} />
+          <OcultarValores />
           {un.lista.length > 1 && (
             <nav className="troca-unidade" aria-label="Unidade">
               <a href="/unidade" className={!un.atual ? "atual" : ""} aria-current={!un.atual ? "true" : undefined}>Todas</a>

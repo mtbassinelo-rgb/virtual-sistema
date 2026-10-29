@@ -5,7 +5,7 @@ import { BuscaLista } from "../../busca-lista";
 import { precoTabela } from "../acoes";
 
 type Opcao = { v: string; t: string; d?: string };
-type Piso = { preco: number | null; moeda: "GS" | "BRL" | null };
+type Piso = { preco: number | null; piso: number | null; moeda: "GS" | "BRL" | null };
 
 const fmt = (v: number, m: "GS" | "BRL" | null) =>
   m === "BRL" ? `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `Gs ${Math.round(v).toLocaleString("es-PY")}`;
@@ -20,7 +20,7 @@ const num = (s: string) => {
 
 /**
  * Linhas de produtos do pedido: começa com 10 e o botão acrescenta mais.
- * Preço por peça é opcional: vazio = tabela do cliente. A vendedora pode cobrar mais, nunca menos (o banco confere).
+ * Preço por peça é opcional: vazio = tabela do cliente. A vendedora pode baixar até o VIP, nunca menos (o banco confere).
  */
 export function LinhasItens({ opcoes, inicial = 10, podeBaixar = false }: { opcoes: Opcao[]; inicial?: number; podeBaixar?: boolean }) {
   const [n, setN] = useState(inicial);
@@ -35,7 +35,7 @@ export function LinhasItens({ opcoes, inicial = 10, podeBaixar = false }: { opco
     const v = (nome: string) => (form.elements.namedItem(nome) as HTMLInputElement | null)?.value ?? "";
     const cliente = v("cliente_id"), moeda = v("moeda"), produto = v(`produto_${i}`);
     const chave = `${cliente}|${moeda}|${produto}`;
-    if (!cliente || !produto) { setPisos((p) => ({ ...p, [i]: { preco: null, moeda: null, chave } })); return; }
+    if (!cliente || !produto) { setPisos((p) => ({ ...p, [i]: { preco: null, piso: null, moeda: null, chave } })); return; }
     if (pisos[i]?.chave === chave) return;
     const r = await precoTabela(cliente, moeda, produto);
     setPisos((p) => ({ ...p, [i]: { ...r, chave } }));
@@ -50,7 +50,8 @@ export function LinhasItens({ opcoes, inicial = 10, podeBaixar = false }: { opco
           {Array.from({ length: n }, (_, i) => {
             const piso = pisos[i];
             const valor = num(precos[i] ?? "");
-            const abaixo = !podeBaixar && piso?.preco != null && valor > 0 && valor < piso.preco;
+            const minimo = piso?.piso ?? piso?.preco ?? null;
+            const abaixo = !podeBaixar && minimo != null && valor > 0 && valor < minimo;
             return (
               <tr key={i}>
                 <td className="num suave">{i + 1}</td>
@@ -64,7 +65,9 @@ export function LinhasItens({ opcoes, inicial = 10, podeBaixar = false }: { opco
                     placeholder={piso?.preco != null ? fmt(piso.preco, piso.moeda) : "da tabela"}
                     onFocus={() => consultar(i)} onChange={(e) => setPrecos((p) => ({ ...p, [i]: e.target.value }))}
                     style={abaixo ? { borderColor: "var(--erro)" } : undefined} aria-invalid={abaixo || undefined} />
-                  {abaixo && <div className="pequeno texto-erro">Mínimo {fmt(piso!.preco!, piso!.moeda)}</div>}
+                  {abaixo && <div className="pequeno texto-erro">Mínimo (VIP) {fmt(minimo!, piso!.moeda)}</div>}
+                  {!abaixo && !podeBaixar && minimo != null && piso?.preco != null && minimo < piso.preco && (
+                    <div className="pequeno suave">pode baixar até {fmt(minimo, piso.moeda)}</div>)}
                 </td>
               </tr>
             );
@@ -75,7 +78,7 @@ export function LinhasItens({ opcoes, inicial = 10, podeBaixar = false }: { opco
         <button type="button" onClick={() => setN((x) => Math.min(x + 1, 300))}>+ Adicionar produto</button>
         <button type="button" className="discreto" onClick={() => setN((x) => Math.min(x + 10, 300))}>+ 10 linhas</button>
         <span className="pequeno suave">{n} linhas · linhas vazias são ignoradas · preço vazio = tabela do cliente
-          {podeBaixar ? "" : " · pode cobrar mais que a tabela, nunca menos"}</span>
+          {podeBaixar ? "" : " · pode baixar até o preço VIP, nunca menos"}</span>
       </div>
     </>
   );

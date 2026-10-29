@@ -632,3 +632,13 @@ details.recusar > summary::-webkit-details-marker { display: none; }
 .sep-tudo { min-width: 46px; min-height: 42px; font-size: 1.2rem; font-weight: 800; border: 2px solid var(--ok); color: var(--ok); background: var(--superficie); border-radius: 8px; }
 .sep-tudo.ativo { background: var(--ok); color: #fff; }
 .sep-tudo:disabled { opacity: .35; }
+
+/* Novo pedido: desconto */
+.desconto-pedido { border: 1px solid var(--linha); border-radius: 8px; padding: 8px 12px; display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.desconto-pedido legend { font-weight: 700; padding: 0 4px; }
+.desconto-pedido input { width: 180px; }
+
+/* Olhinho: esconder valores */
+.olho { padding: 6px 9px; font-size: 1rem; }
+.ocultar-valores main [data-dinheiro], .ocultar-valores main .valor, .ocultar-valores main .kpi b,
+.ocultar-valores main .num { filter: blur(7px); user-select: none; transition: filter .15s; }

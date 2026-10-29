@@ -47,7 +47,23 @@ select teste.ok((select cambio_custo is null from app.pedido_itens where pedido_
 \echo '== Preço: vendedora só para mais =='
 select teste.falha($$select app.criar_pedido_vendedora('00000000-0000-0000-0000-00000000ab20', 'GS', '00000000-0000-0000-0000-00000000ab10', null, null,
   '[{"produto_id": "00000000-0000-0000-0000-00000000ab01", "quantidade": 1, "preco": 12000}]', false)$$,
-  'abaixo da tabela', 'Vendedora não vende abaixo da tabela (13.000)');
+  'abaixo do VIP', 'Sem preço VIP cadastrado, a vendedora não baixa da tabela (13.000)');
+reset role;
+insert into app.precos (produto_id, tabela, valor, vigente_desde) values (:'G1', 'py_vip', 11500, current_date - 1);
+set role vc_app;
+select teste.como(:'KEILA');
+select set_config('teste.pv', app.criar_pedido_vendedora(:'CG', 'GS', :'DG', null, null,
+  jsonb_build_array(jsonb_build_object('produto_id', :'G1', 'quantidade', 1, 'preco', 12000)), false)::text, false);
+select teste.ok((select valor_total = 12000 from app.pedidos where id = current_setting('teste.pv')::uuid), 'Vendedora baixa o preço até o VIP (12.000 ≥ 11.500)');
+select teste.falha($$select app.criar_pedido_vendedora('00000000-0000-0000-0000-00000000ab20', 'GS', '00000000-0000-0000-0000-00000000ab10', null, null,
+  '[{"produto_id": "00000000-0000-0000-0000-00000000ab01", "quantidade": 1, "preco": 11000}]', false)$$,
+  'abaixo do VIP', 'Vendedora não vende abaixo do VIP (11.500)');
+select set_config('teste.pd', app.criar_pedido_vendedora(:'CG', 'GS', :'DG', null, null,
+  jsonb_build_array(jsonb_build_object('produto_id', :'G1', 'quantidade', 10)), false, 10000)::text, false);
+select teste.ok((select valor_total = 120000 from app.pedidos where id = current_setting('teste.pd')::uuid), 'Desconto de 10.000 em 10 × 13.000 = 120.000');
+select teste.falha($$select app.criar_pedido_vendedora('00000000-0000-0000-0000-00000000ab20', 'GS', '00000000-0000-0000-0000-00000000ab10', null, null,
+  '[{"produto_id": "00000000-0000-0000-0000-00000000ab01", "quantidade": 10}]', false, 20000)$$,
+  'acima do permitido', 'Desconto maior que a folga até o VIP (15.000) é barrado');
 select set_config('teste.p3', app.criar_pedido_vendedora(:'CG', 'GS', :'DG', null, null,
   jsonb_build_array(jsonb_build_object('produto_id', :'G1', 'quantidade', 2, 'preco', 15000)), false)::text, false);
 select teste.ok((select valor_total = 30000 from app.pedidos where id = current_setting('teste.p3')::uuid), 'Vendedora vende acima da tabela (2 × 15.000)');

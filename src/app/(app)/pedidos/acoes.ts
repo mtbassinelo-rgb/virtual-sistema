@@ -177,9 +177,9 @@ export async function criarPedidoSemPerder(fd: FormData): Promise<{ erro?: strin
     if (itens.length === 0) throw new Error("Inclua pelo menos um produto com caixas ou peças.");
     const moeda = ["GS", "BRL"].includes(texto(fd, "moeda")) ? texto(fd, "moeda") : null;
     id = await comUsuario(u.id, async (c) => (await c.query(
-      `select app.criar_pedido_vendedora($1, $2::app.moeda, nullif($3,'')::uuid, nullif($4,'')::date, $5, $6::jsonb, $7) as id`,
+      `select app.criar_pedido_vendedora($1, $2::app.moeda, nullif($3,'')::uuid, nullif($4,'')::date, $5, $6::jsonb, $7, $8) as id`,
       [cliente, moeda, texto(fd, "deposito_id"), texto(fd, "previsao_envio"), texto(fd, "observacoes"), JSON.stringify(itens),
-       texto(fd, "para_cliente") === "1"])).rows[0].id as string);
+       texto(fd, "para_cliente") === "1", numero(fd, "desconto")])).rows[0].id as string);
   } catch (e) {
     erro = mensagemErro(e);
   }
@@ -365,13 +365,15 @@ export async function decidirRemocao(fd: FormData) {
 }
 
 /** Preço de tabela (por peça) do produto para o cliente: o mínimo que a vendedora pode cobrar. */
-export async function precoTabela(cliente: string, moeda: string, produto: string): Promise<{ preco: number | null; moeda: "GS" | "BRL" | null }> {
+export async function precoTabela(cliente: string, moeda: string, produto: string): Promise<{ preco: number | null; piso: number | null; moeda: "GS" | "BRL" | null }> {
   const u = await exigirUsuario();
   const ok = (v: string) => /^[0-9a-f-]{36}$/i.test(v);
-  if (!ok(cliente) || !ok(produto)) return { preco: null, moeda: null };
+  if (!ok(cliente) || !ok(produto)) return { preco: null, piso: null, moeda: null };
   const r = await comUsuario(u.id, (c) => c.query(
-    `select app.preco_tabela_cliente($1, $2, nullif($3, '')::app.moeda) as preco, coalesce(nullif($3, '')::app.moeda, (select moeda from app.clientes where id = $1)) as moeda`,
+    `select x.preco, x.moeda, app.preco_piso_vendedora($2, x.moeda, x.preco) as piso
+       from (select app.preco_tabela_cliente($1, $2, nullif($3, '')::app.moeda) as preco,
+                    coalesce(nullif($3, '')::app.moeda, (select moeda from app.clientes where id = $1)) as moeda) x`,
     [cliente, produto, ["GS", "BRL"].includes(moeda) ? moeda : ""]));
   const x = r.rows[0];
-  return { preco: x?.preco == null ? null : Number(x.preco), moeda: x?.moeda ?? null };
+  return { preco: x?.preco == null ? null : Number(x.preco), piso: x?.piso == null ? null : Number(x.piso), moeda: x?.moeda ?? null };
 }
