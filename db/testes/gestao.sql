@@ -161,6 +161,21 @@ select case when :'pais_cg' = 'PY' then app.confirmar_envio_py(current_setting('
 select teste.como(:'KEILA');
 select app.avancar_entrega(current_setting('teste.p5')::uuid, 'entregue');
 select teste.ok((select status_comercial = 'entregue' from app.pedidos where id = current_setting('teste.p5')::uuid), 'Depois da confirmação, a vendedora finaliza');
+-- retira na CDE: aparece em "Chegando na CDE" e a loja entrega
+select set_config('teste.pr', app.criar_pedido_vendedora(:'CG', 'GS', :'DG', null, null,
+  jsonb_build_array(jsonb_build_object('produto_id', :'G1', 'quantidade', 2)), false)::text, false);
+reset role;
+update app.pedidos set separacao_conferida_em = now() where id = current_setting('teste.pr')::uuid;
+set role vc_app;
+select teste.como(:'KEILA');
+select app.definir_entrega(current_setting('teste.pr')::uuid, 'retira', 'Loja CDE', 'Ana');
+select teste.como(:'GERENTE');
+select app.despachar_pedido(current_setting('teste.pr')::uuid);
+select teste.ok(exists (select 1 from app.cde_chegando() x where x.id = current_setting('teste.pr')::uuid and x.tipo = 'retira' and jsonb_array_length(x.itens) = 1),
+  'Retira na CDE aparece para a loja com os itens');
+select app.cde_cliente_retirou(current_setting('teste.pr')::uuid);
+select teste.ok((select status_comercial = 'entregue' from app.pedidos where id = current_setting('teste.pr')::uuid), 'Loja CDE dá o ✓ cliente retirou');
+select teste.como(:'KEILA');
 reset role;
 delete from app.deposito_responsaveis where deposito_id = :'DG' and usuario_id = :'KEILA';
 set role vc_app;

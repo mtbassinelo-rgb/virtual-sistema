@@ -24,7 +24,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
   // Contadores ao lado dos itens do menu: o que está esperando alguém
   const n = await comUsuario(u.id, async (c) => (await c.query(`
     select (select count(*) from app.pedidos where status_comercial::text in ('aguardando_cliente','aguardando_aprovacao','em_separacao'))::int as pedidos_abertos,
-           app.pode_confirmar_envio_py() as confirma_py, (select count(*) from app.envios_py_pendentes())::int as envios_py,
+           app.pode_confirmar_envio_py() as confirma_py, (select count(*) from app.cde_chegando())::int as envios_py,
            ${gestao ? `(select count(*) from app.v_despesas where situacao = 'vencida')::int` : "0"} as contas_vencidas,
            ${gestao ? `(select count(*) from app.procuras where visto_em is null)::int` : "0"} as procuras,
            ${gestao ? `(select count(*) from app.fotos_catalogo where status = 'pendente')::int` : "0"} as fotos,
@@ -54,7 +54,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
     { id: "vendas", titulo: "Vendas", icone: "vendas", itens: [
       { href: "/pedidos", texto: "Pedidos", contador: n.pedidos_abertos, dica: "Pedidos abertos: em separação ou aguardando" },
       { href: "/pedidos/novo", texto: "Novo pedido" },
-      ...(n.confirma_py ? [{ href: "/pedidos/envios-py", texto: "Envios PY a confirmar", contador: n.envios_py, dica: "Pedidos que o passeiro trouxe para a CDE: despachar pela transportadora e confirmar" }] : []),
+      ...(n.confirma_py ? [{ href: "/pedidos/envios-py", texto: "Chegando na CDE", contador: n.envios_py, dica: "O que saiu do CD com o passeiro: envios para outras cidades e retiradas na loja, com os itens" }] : []),
       ...(gestao ? [{ href: "/desempenho", texto: "Desempenho das vendedoras", dica: "Pelo WhatsApp de cada número: atendimento, tempo de resposta, quem chamou, fechamento e vendas" }] : []),
       { href: "/orcamentos", texto: "Orçamentos", dica: "Orçamento para cliente (ou para quem ainda não é): WhatsApp, depois vira pedido" },
       { href: "/caixa", texto: "Caixa do dia", dica: "Abrir e fechar o caixa, vender no balcão e receber pedidos" },

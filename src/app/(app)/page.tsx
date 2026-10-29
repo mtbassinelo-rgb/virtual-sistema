@@ -125,7 +125,7 @@ export default async function Hoje() {
             from app.whatsapp_mensagens m where m.em > now() - interval '3 days'
            order by m.conexao_id, m.contato, m.em desc) x
         where not x.enviada order by em limit 50`).catch(() => ({ rows: [] }))).rows as Espera[];
-    const enviosPy = (await c.query("select count(*)::int n from app.envios_py_pendentes()").catch(() => ({ rows: [{ n: 0 }] }))).rows[0].n as number;
+    const enviosPy = (await c.query("select count(*)::int n from app.cde_chegando()").catch(() => ({ rows: [{ n: 0 }] }))).rows[0].n as number;
     // pedidos de mercadoria que saem de uma loja onde a pessoa trabalha (ex.: CDE → CD Principal)
     const lojaSeparar = (await c.query(`select t.id, t.numero, de.nome destino, o.nome origem, app.nome_usuario(t.criada_por) quem,
         (select count(*) from app.transferencia_itens i where i.transferencia_id = t.id)::int itens
@@ -147,8 +147,8 @@ export default async function Hoje() {
 
       {d.enviosPy > 0 && (
         <Link href="/pedidos/envios-py" className="aviso-caixa aviso linha entre" style={{ textDecoration: "none", color: "inherit" }}>
-          <span>🚚 <b>{d.enviosPy} envio(s) para o Paraguai</b> chegaram na CDE: despachar pela transportadora e confirmar.</span>
-          <span className="botao principal">Ver envios →</span>
+          <span>🚚 <b>{d.enviosPy} pedido(s) chegando na CDE</b>: envios para despachar pela transportadora e retiradas para entregar.</span>
+          <span className="botao principal">Ver pedidos →</span>
         </Link>
       )}
 

@@ -309,6 +309,19 @@ export async function definirEntrega(fd: FormData) {
   });
 }
 
+/** Loja CDE entregou o pedido de retirada ao cliente. */
+export async function cdeClienteRetirou(fd: FormData) {
+  const u = await exigirUsuario();
+  let erro: string | null = null;
+  try {
+    await comUsuario(u.id, (c) => c.query("select app.cde_cliente_retirou($1)", [texto(fd, "pedido_id")]));
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  revalidatePath("/pedidos/envios-py");
+  redirect(`/pedidos/envios-py?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Pedido entregue ao cliente.")}`);
+}
+
 /** Gerente confirma, direto da lista, os pagamentos informados de um pedido (✓ Pago). */
 export async function confirmarPagamentosDaLista(fd: FormData) {
   const u = await exigirUsuario();
