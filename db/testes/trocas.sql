@@ -91,10 +91,8 @@ select teste.como(:'KEILA');
 select app.editar_itens_pedido(:'PED', '[{"item_id":"00000000-0000-0000-0000-0000000000e1","quantidade":3}]');
 select teste.ok((select quantidade = 3 and quantidade_pedida = 3 from app.pedido_itens where id = '00000000-0000-0000-0000-0000000000e1'),
   'Ligado: vendedora diminui a quantidade na separação');
-select teste.falha($$select app.editar_itens_pedido('00000000-0000-0000-0000-0000000000e8', '[{"item_id":"00000000-0000-0000-0000-0000000000e1","quantidade":9}]')$$,
-  'só dá para diminuir', 'Na separação não aumenta');
-select teste.falha($$select app.editar_itens_pedido('00000000-0000-0000-0000-0000000000e8', '[{"produto_id":"00000000-0000-0000-0000-0000000000b1","quantidade":2}]')$$,
-  'acrescentar', 'Na separação não acrescenta produto');
+select app.editar_itens_pedido(:'PED', '[{"item_id":"00000000-0000-0000-0000-0000000000e1","quantidade":9}]');
+select teste.ok((select quantidade from app.pedido_itens where id = '00000000-0000-0000-0000-0000000000e1') = 9, 'Na separação, antes de fechar, a vendedora aumenta');
 reset role;
 update app.pedidos set separacao_conferida_em = now() where id = :'PED';
 set role vc_app;
@@ -105,6 +103,9 @@ select teste.ok(not exists (select 1 from app.pedido_itens where pedido_id = :'P
   'Depois da expedição conferir, vendedora tira o item');
 select teste.ok((select valor_total from app.pedidos where id = :'PED') = (select sum(total) from app.pedido_itens where pedido_id = :'PED'),
   'Total recalculado depois do ajuste na separação');
+select teste.ok((select separacao_conferida_em is not null from app.pedidos where id = :'PED'), 'Só tirar não desfaz a conferência da expedição');
+select app.editar_itens_pedido(:'PED', '[{"item_id":"00000000-0000-0000-0000-0000000000e1","quantidade":10}]');
+select teste.ok((select separacao_conferida_em is null from app.pedidos where id = :'PED'), 'Aumentou depois de separado: volta para o estoquista conferir');
 select teste.como(:'YESSICA');
 select teste.falha($$select app.editar_itens_pedido('00000000-0000-0000-0000-0000000000e8', '[{"item_id":"00000000-0000-0000-0000-0000000000e1","quantidade":1}]')$$,
   'vendedora do pedido', 'Outra vendedora não ajusta na separação');

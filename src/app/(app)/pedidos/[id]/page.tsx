@@ -336,7 +336,7 @@ export default async function Pedido({ params, searchParams }: {
         )}
         {d.itens.length > 0 ? (
           <ItensPedido pedidoId={p.id} itens={itensVista} total={dinheiro(p.valor_total, moeda)} separar={false} trocar={trocar} editar={editar}
-            soDiminuir={naSeparacao} separado={Boolean(fluxo?.separacao_conferida_em)}
+            soDiminuir={false} separado={Boolean(fluxo?.separacao_conferida_em)}
             produtos={d.produtos.map((x) => `${x.codigo} · ${x.nome}`)} />
         ) : itensBling.length > 0 ? (
           <div className="tabela"><table>

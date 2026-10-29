@@ -98,6 +98,7 @@ export function ItensPedido({ pedidoId, itens, total, separar, trocar, produtos,
             )
           ) : (
             <>
+              {separado && <div className="aviso-caixa aviso pequeno">A expedição já separou este pedido. Se você aumentar ou acrescentar, a separação volta para o estoquista conferir de novo; o que diminuir ou tirar, ele devolve à prateleira.</div>}
               <b className="pequeno">Acrescentar produto</b>
               {Array.from({ length: novos }).map((_, k) => (
                 <div key={k} className="linha">
