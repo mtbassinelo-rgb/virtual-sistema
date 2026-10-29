@@ -192,6 +192,42 @@ select teste.como(:'GERENTE');
 select app.finalizar_pedido(current_setting('teste.pf')::uuid);
 select teste.ok((select status_comercial = 'entregue' and total_confirmado_em is not null from app.pedidos where id = current_setting('teste.pf')::uuid), 'Gerente finaliza o pedido');
 select teste.ok((select status_conferencia = 'conferido' from app.pagamentos where pedido_id = current_setting('teste.pf')::uuid), 'Finalizar confirma o pagamento informado');
+-- finalizar com a entrega ainda por fazer: fica finalizado e vira entregue quando sai
+select teste.como(:'KEILA');
+select set_config('teste.pa', app.criar_pedido_vendedora(:'CG', 'GS', :'DG', null, null,
+  jsonb_build_array(jsonb_build_object('produto_id', :'G1', 'quantidade', 1)), false)::text, false);
+reset role;
+update app.pedidos set separacao_conferida_em = now() where id = current_setting('teste.pa')::uuid;
+set role vc_app;
+select app.definir_entrega(current_setting('teste.pa')::uuid, 'retira', 'Depósito Foz', 'Ana');
+select teste.como(:'GERENTE');
+select teste.ok(app.finalizar_pedido(current_setting('teste.pa')::uuid) = 'pendente_entrega', 'Finalizar antes do estoque entregar avisa que falta a entrega');
+select teste.ok((select status_comercial = 'em_separacao' and finalizado_em is not null from app.pedidos where id = current_setting('teste.pa')::uuid), 'Continua na lista do estoquista');
+select app.despachar_pedido(current_setting('teste.pa')::uuid);
+select teste.ok((select status_comercial = 'entregue' from app.pedidos where id = current_setting('teste.pa')::uuid), 'Saiu do estoque: o pedido finalizado fecha sozinho');
+-- sozinho: separado, pago, conferido e despachado → finalizado sem clicar
+select teste.como(:'KEILA');
+select set_config('teste.pb', app.criar_pedido_vendedora(:'CG', 'GS', :'DG', null, null,
+  jsonb_build_array(jsonb_build_object('produto_id', :'G1', 'quantidade', 1)), false)::text, false);
+reset role;
+update app.pedidos set separacao_conferida_em = now() where id = current_setting('teste.pb')::uuid;
+insert into app.pagamentos (pedido_id, valor, data, modalidade, registrado_por)
+values (current_setting('teste.pb')::uuid, 13000, current_date, 'transferencia', :'KEILA');
+set role vc_app;
+select teste.como(:'GERENTE');
+select app.conferir_pagamento((select id from app.pagamentos where pedido_id = current_setting('teste.pb')::uuid), null);
+select teste.ok((select status_comercial = 'em_separacao' and finalizado_em is null from app.pedidos where id = current_setting('teste.pb')::uuid), 'Pago mas sem entrega definida: espera');
+select teste.como(:'KEILA');
+select app.definir_entrega(current_setting('teste.pb')::uuid, 'retira', 'Depósito Foz', 'Ana');
+select teste.como(:'GERENTE');
+select app.despachar_pedido(current_setting('teste.pb')::uuid);
+select teste.ok((select status_comercial = 'entregue' and finalizado_em is not null from app.pedidos where id = current_setting('teste.pb')::uuid), 'Pago, conferido e despachado: finaliza sozinho');
+-- desconto num pedido já criado (até o VIP)
+select teste.como(:'KEILA');
+select set_config('teste.pc', app.criar_pedido_vendedora(:'CG', 'GS', :'DG', null, null,
+  jsonb_build_array(jsonb_build_object('produto_id', :'G1', 'quantidade', 10)), false)::text, false);
+select teste.ok(app.aplicar_desconto_pedido(current_setting('teste.pc')::uuid, 10000) = 120000, 'Desconto no pedido criado: 130.000 - 10.000');
+select teste.falha(format($$select app.aplicar_desconto_pedido(%L, 10000)$$, current_setting('teste.pc')), 'acima do permitido', 'Segundo desconto passaria do VIP');
 select teste.como(:'KEILA');
 reset role;
 delete from app.deposito_responsaveis where deposito_id = :'DG' and usuario_id = :'KEILA';

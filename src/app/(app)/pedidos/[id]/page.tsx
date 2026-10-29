@@ -10,7 +10,7 @@ import {
 } from "@/lib/formato";
 import { Avisos, Selo } from "../../avisos";
 import {
-  anexarComprovante, atualizarPedido, finalizarPedido, cancelarPedido, avancarEntrega, conferirPagamento, confirmarTotal, decidirPedidoPortal,
+  anexarComprovante, aplicarDesconto, atualizarPedido, finalizarPedido, cancelarPedido, avancarEntrega, conferirPagamento, confirmarTotal, decidirPedidoPortal,
   reconhecerBling, recusarPagamento, registrarAtendimento, registrarPagamento, gerarLinkPedido, definirVolumes, decidirDescontoQuantidade,
   decidirRemocao,
 } from "../acoes";
@@ -89,7 +89,7 @@ export default async function Pedido({ params, searchParams }: {
       `select volumes, separacao_conferida_em, total_confirmado_em, conta_pagamento, app.pode_operar_deposito(deposito_id) as opera,
               chegou_em, local_retirada, (select nome from app.depositos where id = deposito_id) as deposito_nome,
               entrega_tipo, entrega_meio, entrega_dados, entrega_definida_em, app.nome_usuario(entrega_definida_por) as entrega_definida_nome,
-              despachado_em, app.nome_usuario(despachado_por) as despachado_nome, envio_confirmado_em, app.nome_usuario(envio_confirmado_por) as envio_confirmado_nome, envio_guia
+              despachado_em, app.nome_usuario(despachado_por) as despachado_nome, finalizado_em, envio_confirmado_em, app.nome_usuario(envio_confirmado_por) as envio_confirmado_nome, envio_guia
          from app.pedidos where id = $1`, [id])).rows[0];
     const indisponiveis = (await c.query(
       "select descricao, quantidade_pedida, quantidade_faltou from app.pedido_itens_indisponiveis where pedido_id = $1 order by descricao", [id])).rows;
@@ -347,6 +347,18 @@ export default async function Pedido({ params, searchParams }: {
             </tbody></table></div>
         ) : <p className="suave">Itens não informados (pedido vindo da planilha).</p>}
         {ehBling && <p className="pequeno suave">Itens e valores deste pedido vêm do Bling e só mudam lá.</p>}
+        {trocar && d.itens.length > 0 && (
+          <details style={{ marginTop: 8 }}>
+            <summary className="pequeno"><b>Dar desconto no pedido</b></summary>
+            <form action={aplicarDesconto} className="linha" style={{ marginTop: 6, alignItems: "end" }}>
+              <input type="hidden" name="pedido_id" value={p.id} />
+              <label>Desconto ({moeda === "GS" ? "Gs" : "R$"})
+                <input name="desconto" inputMode="decimal" required placeholder={moeda === "GS" ? "ex.: 20.000" : "ex.: 15,00"} style={{ width: 140 }} /></label>
+              <button className="principal">Aplicar desconto</button>
+            </form>
+            <p className="pequeno suave">Sai do valor acima do preço VIP de cada item{gestao ? "" : " (nenhum item fica abaixo do VIP)"}. O total do pedido muda na hora.</p>
+          </details>
+        )}
       </section>
       {d.remocoes.some((r) => r.status === "pendente") && (
         <section className="painel" id="remocoes" style={{ borderColor: "#e0b04a", background: "#fffaf0" }}>
@@ -516,7 +528,7 @@ export default async function Pedido({ params, searchParams }: {
         </div>
       )}
 
-      {gestao && ["em_separacao", "enviado", "aguardando_retirada"].includes(p.status_comercial) && (fluxo?.separacao_conferida_em || ehBling) && (
+      {gestao && ["em_separacao", "enviado", "aguardando_retirada"].includes(p.status_comercial) && (fluxo?.separacao_conferida_em || ehBling) && !fluxo?.finalizado_em && (
         <form action={finalizarPedido} className="painel finalizar-caixa linha entre">
           <input type="hidden" name="pedido_id" value={p.id} />
           <span>
@@ -528,6 +540,9 @@ export default async function Pedido({ params, searchParams }: {
           {Number(p.a_conferir) > 0 && <label className="pequeno linha" style={{ gap: 6 }}><input type="checkbox" name="confirmar" defaultChecked style={{ width: "auto" }} /> confirmar pagamento(s) informado(s)</label>}
           <button className="principal">✓ Finalizar</button>
         </form>
+      )}
+      {fluxo?.finalizado_em && !["entregue", "cancelado"].includes(p.status_comercial) && (
+        <div className="aviso-caixa info">✓ Pedido finalizado em {data(fluxo.finalizado_em)}. Fecha sozinho quando {p.status_comercial === "em_separacao" ? "sair do estoque" : "a entrega terminar (loja CDE)"}.</div>
       )}
       {p.status_comercial !== "cancelado" && (
         <section className="painel pagamento-caixa" id="pagamentos"

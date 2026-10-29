@@ -9,7 +9,7 @@ export const metadata = { title: "Parâmetros" };
 
 // Ordem e grupo de cada parâmetro na tela
 const GRUPOS: { titulo: string; chaves: string[] }[] = [
-  { titulo: "Vendas e lucro", chaves: ["cambio_custo_gs", "pedido_exige_estoque", "vendedora_ajusta_separacao", "vendedora_cancela_pedido", "link_pedido_validade_dias", "arredondamento_gs"] },
+  { titulo: "Vendas e lucro", chaves: ["cambio_custo_gs", "pedido_exige_estoque", "vendedora_ajusta_separacao", "vendedora_cancela_pedido", "link_pedido_validade_dias", "arredondamento_gs", "aviso_pagamento_whatsapp"] },
   { titulo: "Envios ao Paraguai", chaves: ["passeiro_custo_volume"] },
   { titulo: "Inteligência comercial", chaves: ["cambio_compra_gs", "margem_minima_contribuicao", "classif_atracao_pct", "classif_margem_baixa", "frete_padrao_brl", "margem_alvo_normal", "margem_alvo_vip", "sugestao_tolerancia_pct"] },
   { titulo: "Recompra", chaves: ["recompra_intervalo_padrao", "recompra_tolerancia_pct", "recompra_inativo_dias", "recompra_novo_dias"] },
@@ -28,6 +28,7 @@ async function salvar(fd: FormData) {
     const valor = numero(fd, "valor");
     if (valor === null || valor < 0) throw new Error("Informe um número válido.");
     if ((chave === "pedido_exige_estoque" || chave === "retirada_foz_ativa" || chave === "vendedora_ajusta_separacao" || chave === "vendedora_cancela_pedido") && valor !== 0 && valor !== 1) throw new Error("Use 1 (sim) ou 0 (não).");
+    if (chave === "aviso_pagamento_whatsapp" && valor !== 0 && !/^[0-9]{10,15}$/.test(String(valor))) throw new Error("Número com DDI e DDD, só números (ex.: 5545999123456), ou 0 para desligar.");
     if ((chave === "cambio_custo_gs" || chave === "cambio_compra_gs") && (valor < 100 || valor > 100000)) throw new Error("Câmbio fora do esperado (Gs por R$).");
     if (chave === "margem_minima_contribuicao" && valor >= 90) throw new Error("Margem mínima deve ficar abaixo de 90%.");
     if ((chave === "margem_alvo_normal" || chave === "margem_alvo_vip") && (valor < 0 || valor >= 90)) throw new Error("Margem-alvo entre 0 e 90%.");
@@ -71,7 +72,7 @@ export default async function Parametros({ searchParams }: { searchParams: Promi
                 <td style={{ width: 260 }}>
                   <form action={salvar} className="linha">
                     <input type="hidden" name="chave" value={p!.chave} />
-                    <input name="valor" inputMode="decimal" defaultValue={Number(p!.valor).toLocaleString("pt-BR")} aria-label={p!.descricao} style={{ width: 120 }} />
+                    <input name="valor" inputMode="decimal" defaultValue={p!.chave === "aviso_pagamento_whatsapp" ? String(p!.valor).replace(/\.0+$/, "") : Number(p!.valor).toLocaleString("pt-BR")} aria-label={p!.descricao} style={{ width: 120 }} />
                     <button>Salvar</button>
                   </form>
                 </td>

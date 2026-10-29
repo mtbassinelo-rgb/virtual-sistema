@@ -9,6 +9,7 @@ import { exigirUsuario } from "@/lib/auth";
 import { comUsuario, mensagemErro } from "@/lib/db";
 import { numero, texto } from "@/lib/formato";
 import { pastaArquivos } from "@/lib/arquivos";
+import { avisarPagamento } from "@/lib/aviso-pagamento";
 import type { PoolClient } from "pg";
 
 const TIPOS_COMPROVANTE: Record<string, string> = {
@@ -47,7 +48,7 @@ export async function registrarPagamento(fd: FormData) {
       await writeFile(path.join(pastaArquivos(), nome), bytes);
       comp = { nome: arquivo.name, mime: arquivo.type, tamanho: arquivo.size, sha, caminho: nome };
     }
-    await comUsuario(uid, async (c) => {
+    const pagId = await comUsuario(uid, async (c) => {
       const { rows } = await c.query(
         `insert into app.pagamentos (pedido_id, valor, data, modalidade, banco, observacao)
          values ($1, $2, $3, $4, nullif($5,''), nullif($6,'')) returning id`,
@@ -60,7 +61,9 @@ export async function registrarPagamento(fd: FormData) {
           [rows[0].id, comp.caminho, comp.nome, comp.mime, comp.tamanho, comp.sha],
         );
       }
+      return rows[0].id as string;
     });
+    void avisarPagamento(uid, pagId, pedido);
   });
 }
 
@@ -312,18 +315,41 @@ export async function definirEntrega(fd: FormData) {
 /** Gerente finaliza o pedido (confirma os pagamentos informados, se marcado). */
 export async function finalizarPedido(fd: FormData) {
   const pedido = texto(fd, "pedido_id");
+  const ids = [...new Set([...(pedido ? [pedido] : []), ...fd.getAll("ids").map(String).filter(Boolean)])];
   const volta = texto(fd, "volta");
   const u = await exigirUsuario();
-  let erro: string | null = null;
-  try {
-    await comUsuario(u.id, (c) => c.query("select app.finalizar_pedido($1, $2)", [pedido, fd.get("confirmar") !== null || fd.get("todos") === "1"]));
-  } catch (e) {
-    erro = mensagemErro(e);
+  const confirmar = fd.get("confirmar") !== null || fd.get("todos") === "1";
+  const erros: string[] = [];
+  let entregues = 0, pendentes = 0;
+  for (const id of ids) {
+    try {
+      const r = await comUsuario(u.id, (c) => c.query("select app.finalizar_pedido($1, $2) as r", [id, confirmar]));
+      if (r.rows[0]?.r === "pendente_entrega") pendentes++; else entregues++;
+    } catch (e) {
+      erros.push(mensagemErro(e));
+    }
   }
   revalidatePath("/pedidos");
-  revalidatePath(`/pedidos/${pedido}`);
-  const base = volta.startsWith("/pedidos") ? volta : `/pedidos/${pedido}`;
-  redirect(`${base}${base.includes("?") ? "&" : "?"}${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Pedido finalizado.")}`);
+  for (const id of ids) revalidatePath(`/pedidos/${id}`);
+  const base = volta.startsWith("/pedidos") ? volta : ids.length === 1 ? `/pedidos/${ids[0]}` : "/pedidos";
+  const partes = [
+    entregues ? `${entregues} pedido(s) finalizado(s).` : "",
+    pendentes ? `${pendentes} finalizado(s): fecha(m) sozinho(s) quando sair(em) do estoque / a CDE entregar.` : "",
+  ].filter(Boolean).join(" ");
+  const q = ids.length === 0 ? "erro=" + encodeURIComponent("Marque pelo menos um pedido.")
+    : erros.length && !partes ? "erro=" + encodeURIComponent(erros[0])
+    : "ok=" + encodeURIComponent(partes + (erros.length ? ` ${erros.length} não finalizado(s): ${erros[0]}` : ""));
+  redirect(`${base}${base.includes("?") ? "&" : "?"}${q}`);
+}
+
+/** Desconto em valor num pedido já criado (até o preço VIP; abaixo só gerente). */
+export async function aplicarDesconto(fd: FormData) {
+  const pedido = texto(fd, "pedido_id");
+  await executar(pedido, "Desconto aplicado.", async (uid) => {
+    const v = numero(fd, "desconto");
+    if (!v || v <= 0) throw new Error("Informe o valor do desconto.");
+    await comUsuario(uid, (c) => c.query("select app.aplicar_desconto_pedido($1, $2)", [pedido, v]));
+  });
 }
 
 /** Loja CDE entregou o pedido de retirada ao cliente. */

@@ -137,7 +137,7 @@ export default async function Pedidos({ searchParams }: { searchParams: Promise<
     const pedidos = (await c.query(
       `select p.id, p.data_pedido, p.bling_numero, p.numero_externo, p.cliente_nome, p.vendedora_nome, p.moeda,
               p.valor_total, p.recebido, p.saldo, p.a_conferir, p.status_comercial, p.status_pagamento,
-              p.envio_atrasado, p.bling_mudou, p.canal, p.origem, ${etapaSql("p", "px")} etapa,
+              p.envio_atrasado, p.bling_mudou, p.canal, p.origem, px.finalizado_em, ${etapaSql("p", "px")} etapa,
               ${ehGestao(u) ? `(select json_agg(json_build_object('id', g.id, 'comprovante', (select c.id from app.comprovantes c where c.pagamento_id = g.id order by c.enviado_em desc limit 1)) order by g.registrado_em)
                  from app.pagamentos g where g.pedido_id = p.id and g.status_conferencia = 'pendente')` : "null"} as pendentes
          from app.v_pedidos p join app.pedidos px on px.id = p.id ${where}
@@ -281,6 +281,15 @@ export default async function Pedidos({ searchParams }: { searchParams: Promise<
       {d.pedidos.length === 0 ? (
         <div className="painel vazio">Nenhum pedido com esses filtros.</div>
       ) : (
+        <>
+        {ehGestao(u) && d.pedidos.some((p) => !p.finalizado_em && ["conferir", "finalizar", "transporte", "retirada"].includes(p.etapa)) && (
+          <form id="finalizar-lote" action={finalizarPedido} className="painel linha entre finalizar-caixa">
+            <input type="hidden" name="todos" value="1" />
+            <input type="hidden" name="volta" value={`/pedidos?${new URLSearchParams(Object.entries(f).filter(([k, v]) => typeof v === "string" && !["ok", "erro"].includes(k)) as [string, string][])}`} />
+            <span><b>Finalizar vários</b> <span className="pequeno suave">marque os pedidos na coluna "O que falta" (☐) e finalize de uma vez — confirma os pagamentos informados.</span></span>
+            <button className="principal">✓ Finalizar marcados</button>
+          </form>
+        )}
         <div className="tabela">
           <table>
             <thead>
@@ -311,8 +320,9 @@ export default async function Pedidos({ searchParams }: { searchParams: Promise<
                       ? <Link href={`/pedidos/${p.id}`} className={`selo ${ETAPA_POR_ID[p.etapa].cor}`} style={{ textDecoration: "none" }}>{ETAPA_POR_ID[p.etapa].titulo}</Link>
                       : <span className="pequeno suave">{STATUS_COMERCIAL[p.status_comercial]}</span>}
                     {p.envio_atrasado && <> <Selo cor="erro">envio atrasado</Selo></>}
-                    {ehGestao(u) && ["conferir", "finalizar", "transporte", "retirada"].includes(p.etapa) && (
-                      <form action={finalizarPedido} style={{ marginTop: 6 }}>
+                    {ehGestao(u) && !p.finalizado_em && ["conferir", "finalizar", "transporte", "retirada"].includes(p.etapa) && (
+                      <form action={finalizarPedido} className="linha" style={{ marginTop: 6, gap: 6 }}>
+                        <input type="checkbox" form="finalizar-lote" name="ids" value={p.id} aria-label="Marcar para finalizar" title="Marcar para finalizar vários" style={{ width: "auto" }} />
                         <input type="hidden" name="pedido_id" value={p.id} /><input type="hidden" name="todos" value="1" />
                         <input type="hidden" name="volta" value={`/pedidos?${new URLSearchParams(Object.entries(f).filter(([k, v]) => typeof v === "string" && !["ok", "erro"].includes(k)) as [string, string][])}`} />
                         <button className="principal mini">✓ Finalizar</button>
@@ -336,6 +346,7 @@ export default async function Pedidos({ searchParams }: { searchParams: Promise<
             </tbody>
           </table>
         </div>
+        </>
       )}
     </>
   );
