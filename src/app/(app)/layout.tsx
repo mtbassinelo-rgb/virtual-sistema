@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ehGestao, exigirUsuario, sair } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
@@ -167,9 +168,19 @@ export default async function AreaInterna({ children }: { children: React.ReactN
   ];
 
 
+  // Menu simples por função: cada pessoa vê só o que usa no dia a dia (pode abrir o menu completo no rodapé).
+  const ESSENCIAL: Partial<Record<string, string[]>> = {
+    vendedora: ["/", "/pedidos", "/pedidos/novo", "/orcamentos", "/clientes", "/clientes/recompra", "/procuras", "/produtos", "/produtos/vendas", "/catalogo", "/comissoes", "/whatsapp", "/conta"],
+    estoquista: ["/", "/estoque/separacao", "/estoque/transferencias", "/estoque", "/estoque/inventario", "/pedidos", "/produtos", "/conta"],
+  };
+  const essencial = ESSENCIAL[u.perfil];
+  const extras = n.confirma_py && !gestao ? ["/pedidos/envios-py", "/caixa", "/caixa/contas", "/estoque/transferencias"] : [];
+  const menuCompleto = (await cookies()).get("menu_completo")?.value === "1";
+  const simples = Boolean(essencial) && !menuCompleto;
   // Cada pessoa vê só as áreas liberadas para ela (Equipe → Acessos)
   const grupos = todos
-    .map((g) => ({ ...g, itens: g.itens.filter((i) => { const k = permissaoDoLink(i.href); return !k || pode(u, k); }) }))
+    .map((g) => ({ ...g, itens: g.itens.filter((i) => { const k = permissaoDoLink(i.href); return !k || pode(u, k); })
+      .filter((i) => !simples || essencial!.includes(i.href) || extras.includes(i.href)) }))
     .filter((g) => g.itens.length > 0);
 
   // Teclas de atalho (só das telas que a pessoa pode abrir)
@@ -200,6 +211,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
         </Link>
         <Suspense fallback={null}><MenuLateral grupos={grupos} /></Suspense>
         <div className="lateral-rodape">
+          {essencial && <a href={`/menu?completo=${simples ? "1" : "0"}`}>{simples ? "Ver menu completo" : "Voltar ao menu simples"}</a>}
           <a href="/loja" target="_blank" rel="noopener noreferrer">Ver a loja como cliente ↗</a>
         </div>
       </aside>

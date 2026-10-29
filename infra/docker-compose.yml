@@ -160,13 +160,13 @@ services:
       interna:
         aliases: [vc-whatsapp-redis]
 
-  # Busca os pedidos da Shopee e do Mercado Livre a cada 5 minutos (só produção, só quando há loja conectada)
+  # A cada 5 minutos: busca os pedidos da Shopee e do Mercado Livre e manda o resumo do dia no WhatsApp do gerente (na hora do parâmetro)
   marketplace-sinc:
     image: curlimages/curl:8.10.1
     restart: unless-stopped
     environment:
       SEGREDO: ${MARKETPLACE_SINC_SEGREDO:-}
-    entrypoint: ["sh", "-c", "sleep 60; while true; do curl -sS -m 280 -o /dev/null \"http://vc-app-producao:3000/api/marketplace/sincronizar?chave=$$SEGREDO\" || true; sleep 300; done"]
+    entrypoint: ["sh", "-c", "sleep 60; while true; do curl -sS -m 280 -o /dev/null \"http://vc-app-producao:3000/api/marketplace/sincronizar?chave=$$SEGREDO\" || true; curl -sS -m 60 -o /dev/null \"http://vc-app-producao:3000/api/resumo-diario?chave=$$SEGREDO\" || true; sleep 300; done"]
     depends_on: [app-producao]
     networks: [interna]
 

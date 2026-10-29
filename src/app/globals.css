@@ -654,3 +654,15 @@ button.mini { padding: 4px 10px; font-size: .78rem; }
 .dados-envio { border: 1px solid var(--borda, #ddd); border-radius: 8px; padding: 8px 12px; }
 .dados-envio legend { font-weight: 600; padding: 0 4px; }
 .dados-envio .confirmo { display: flex; gap: 8px; align-items: center; margin: 8px 0 4px; }
+/* Etiquetas de envio: uma por caixa (10 × 15 cm na impressão) */
+.etiquetas { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.etiqueta { border: 2px solid #000; border-radius: 6px; padding: 12px 14px; background: #fff; color: #000; display: flex; flex-direction: column; gap: 4px; font-size: 15px; }
+.etiqueta-topo { display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; letter-spacing: .05em; border-bottom: 1px solid #000; padding-bottom: 4px; }
+.etiqueta-vol { font-size: 14px; }
+.etiqueta-nome { font-size: 22px; font-weight: 800; line-height: 1.15; margin-top: 4px; }
+.etiqueta-end { font-size: 17px; font-weight: 600; white-space: pre-line; }
+.etiqueta-rodape { margin-top: auto; border-top: 1px dashed #000; padding-top: 6px; display: flex; flex-direction: column; font-size: 12px; }
+@media print {
+  .etiquetas { display: block; }
+  .etiqueta { width: 10cm; min-height: 14.5cm; page-break-after: always; break-after: page; margin: 0 auto; }
+}

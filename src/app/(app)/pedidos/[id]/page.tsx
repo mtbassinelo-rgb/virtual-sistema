@@ -453,6 +453,7 @@ export default async function Pedido({ params, searchParams }: {
               <b>{fluxo.entrega_tipo === "envio" ? `Envio · ${fluxo.entrega_meio}` : `Retira: ${fluxo.entrega_meio}`}</b>
               {fluxo.entrega_dados && <span className="pequeno" style={{ whiteSpace: "pre-line", display: "block" }}>{fluxo.entrega_dados}</span>}
               <span className="pequeno suave">informado por {fluxo.entrega_definida_nome ?? "—"} em {dataHora(fluxo.entrega_definida_em)}</span>
+              {fluxo.entrega_tipo === "envio" && <Link className="botao mini" style={{ marginTop: 6 }} href={`/etiquetas?ids=${p.id}`}>🏷️ Etiqueta de envio</Link>}
             </p>
           ) : <p className="suave" style={{ margin: 0 }}>Ainda não informado se é envio ou retirada.</p>}
 

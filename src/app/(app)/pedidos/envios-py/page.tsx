@@ -31,6 +31,7 @@ export default async function ChegandoCde({ searchParams }: { searchParams: Prom
         <div className="pequeno"><b>{e.tipo === "envio" ? e.meio : "Retira na loja CDE"}</b>{e.cidade ? ` · ${e.cidade}` : ""}{e.volumes != null ? ` · ${e.volumes} caixa(s)` : ""}
           {e.despachado_em && <span className="suave"> · saiu do CD {dataHora(e.despachado_em)}</span>}</div>
         {e.dados && <div className="pequeno suave" style={{ whiteSpace: "pre-line" }}>{e.dados}</div>}
+        {e.tipo === "envio" && <Link className="botao mini nao-imprimir" href={`/etiquetas?ids=${e.id}`}>🏷️ Etiqueta</Link>}
         <ul className="envio-itens pequeno">{e.itens.map((i, k) => <li key={k}><b>{Number(i.q).toLocaleString("pt-BR")}×</b> {i.d}</li>)}</ul>
         {Number(e.saldo) > 0 && <div className="pequeno" style={{ color: "var(--aviso)" }}>Falta pagar {dinheiro(e.saldo, e.moeda)}: confirme com a vendedora antes de entregar.</div>}
         <div className="nao-imprimir">
@@ -67,7 +68,8 @@ export default async function ChegandoCde({ searchParams }: { searchParams: Prom
       {d.lista.length === 0 && <div className="painel vazio">Nada chegando agora. 🎉</div>}
       {envios.length > 0 && (
         <section className="painel">
-          <h2>Envios para outras cidades <Selo cor="info">{envios.length}</Selo></h2>
+          <div className="linha entre"><h2 style={{ margin: 0 }}>Envios para outras cidades <Selo cor="info">{envios.length}</Selo></h2>
+            <Link className="botao nao-imprimir" href={`/etiquetas?ids=${envios.map((x) => x.id).join(",")}`}>🏷️ Etiquetas de todos</Link></div>
           <div className="envios-lista">{envios.map((e) => <Cartao key={e.id} e={e} />)}</div>
         </section>
       )}

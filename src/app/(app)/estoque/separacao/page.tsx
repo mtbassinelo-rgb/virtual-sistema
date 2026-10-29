@@ -141,7 +141,8 @@ export default async function Separacao({ searchParams }: { searchParams: Promis
       </section>
 
       <section className="painel" id="saidas">
-        <h2>Envio de pedidos</h2>
+        <div className="linha entre"><h2 style={{ margin: 0 }}>Envio de pedidos</h2>
+          {d.saidas.some((x) => x.entrega_tipo === "envio") && <Link className="botao" href={`/etiquetas?ids=${d.saidas.filter((x) => x.entrega_tipo === "envio").map((x) => x.id).join(",")}`}>🏷️ Etiquetas dos envios</Link>}</div>
         <p className="pequeno suave" style={{ margin: 0 }}>Pedidos já separados. Quando o passeiro levar (ou o pedido ficar pronto para o cliente retirar), toque no <b>✓</b>.</p>
         {d.saidas.filter((x) => x.entrega_tipo).length === 0 ? <div className="vazio">Nada para despachar agora.</div> : (
           <div className="envios-lista">
@@ -157,7 +158,8 @@ export default async function Separacao({ searchParams }: { searchParams: Promis
                 {x.deve && <div className="pequeno" style={{ color: "var(--aviso)" }}>Pagamento ainda pendente: confirme com a vendedora antes de soltar.</div>}
                 <form action={despacharPedido} className="linha entre">
                   <input type="hidden" name="pedido_id" value={x.id} />
-                  <Link className="pequeno" href={`/estoque/separacao/${x.id}`}>ver itens</Link>
+                  <span className="linha" style={{ gap: 10 }}><Link className="pequeno" href={`/estoque/separacao/${x.id}`}>ver itens</Link>
+                    {x.entrega_tipo === "envio" && <Link className="pequeno" href={`/etiquetas?ids=${x.id}`}>🏷️ etiqueta</Link>}</span>
                   <button className="principal">{x.entrega_tipo === "envio" ? "✓ Passeiro levou" : "✓ Pronto para retirar"}</button>
                 </form>
               </div>

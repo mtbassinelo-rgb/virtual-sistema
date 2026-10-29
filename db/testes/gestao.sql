@@ -227,6 +227,22 @@ select teste.como(:'KEILA');
 select teste.falha($$select app.salvar_dados_envio('00000000-0000-0000-0000-00000000ab20', 'Ana', '', '0981', 'Rua 1')$$, 'Preencha', 'Dados de envio exigem os 4 campos');
 select app.salvar_dados_envio(:'CG', 'Ana Pérez', '1234567', '0981 111 111', 'Av. Central 100, Encarnación');
 select teste.ok((select envio_documento = '1234567' and envio_endereco like '%Encarnación' from app.clientes where id = :'CG'), 'Vendedora guarda os dados de envio do cliente');
+-- etiqueta de envio e resumo do dia
+select teste.ok((select envio_nome = 'Ana Pérez' and volumes >= 1 from app.etiquetas_envio(array[current_setting('teste.pb')::uuid])), 'Etiqueta traz os dados de envio do cliente');
+reset role;
+insert into app.whatsapp_conexoes (nome, instancia, estado) values ('Gerência', 'vc-teste-ger', 'conectado');
+update app.parametros set valor = 595981000000 where chave = 'aviso_pagamento_whatsapp';
+update app.parametros set valor = 1 where chave = 'resumo_diario_hora';
+set role vc_app;
+select teste.ok(extract(hour from now() at time zone 'America/Asuncion') < 1 or (select numero = '595981000000' and (dados->>'a_conferir') is not null from app.resumo_diario_pendente()), 'Resumo do dia sai depois da hora');
+select app.resumo_diario_marcar((now() at time zone 'America/Asuncion')::date);
+select teste.ok(not exists (select 1 from app.resumo_diario_pendente()), 'Resumo sai uma vez por dia');
+reset role;
+update app.parametros set valor = 0 where chave in ('aviso_pagamento_whatsapp', 'resumo_diario_hora');
+delete from app.whatsapp_conexoes where instancia = 'vc-teste-ger';
+delete from app.resumo_diario_envios;
+set role vc_app;
+select teste.como(:'KEILA');
 -- desconto num pedido já criado (até o VIP)
 select teste.como(:'KEILA');
 select set_config('teste.pc', app.criar_pedido_vendedora(:'CG', 'GS', :'DG', null, null,
