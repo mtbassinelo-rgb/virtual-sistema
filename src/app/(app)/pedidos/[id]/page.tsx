@@ -548,7 +548,7 @@ export default async function Pedido({ params, searchParams }: {
                   <form action={conferirPagamento}>
                     <input type="hidden" name="pedido_id" value={p.id} /><input type="hidden" name="pagamento_id" value={g.id} />
                     <input type="hidden" name="bling_numero" value={p.bling_numero ?? ""} />
-                    <button className="principal">✓ Confirmar pago</button>
+                    <button className="principal" title="Confirmar que o dinheiro caiu">✓ Pago</button>
                   </form>
                   <details className="recusar">
                     <summary className="botao">Não caiu</summary>
