@@ -175,7 +175,7 @@ export default async function Pedidos({ searchParams }: { searchParams: Promise<
     totais.set(p.moeda, t);
   }
   const linkAtalho = (s: string) => {
-    const q = new URLSearchParams(Object.entries(f).filter(([k, v]) => v && k !== "pagamento") as [string, string][]);
+    const q = new URLSearchParams(Object.entries(f).filter(([k, v]) => v && k !== "pagamento" && k !== "ok" && k !== "erro") as [string, string][]);
     if (s) q.set("pagamento", s);
     return `/pedidos?${q.toString()}`;
   };
