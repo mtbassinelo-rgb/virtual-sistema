@@ -624,3 +624,4 @@ details.recusar > summary::-webkit-details-marker { display: none; }
 .atalhos-lista a:hover { background: var(--afundado); }
 .atalhos-lista kbd { min-width: 22px; text-align: center; opacity: 1; color: var(--marca); }
 @media (max-width: 900px) { .acoes-rapidas .rapido:not(:first-child):not(.teclado) { display: none; } .atalhos-lista { grid-template-columns: 1fr; } }
+.unidade-grade small.conv { font-variant-numeric: tabular-nums; opacity: .9; }

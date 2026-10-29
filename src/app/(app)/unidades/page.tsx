@@ -87,31 +87,42 @@ export default async function Unidades({ searchParams }: { searchParams: Promise
   const meses = Array.from({ length: 12 }, (_, i) => somaMes(mes, i - 11)).reverse();
   const evo = (m: string, dep: string, k: "vendas" | "lucro") => n(d.evolucao.find((r) => r.mes === m && r.deposito_id === dep)?.[k]);
 
-  const Cartao = ({ x, geral }: { x: Un; geral?: boolean }) => (
+  // Moeda de destaque: a moeda em que a unidade mais vendeu no mês (Paraguai = Gs). O outro valor aparece pequeno, pelo câmbio.
+  const cam = d.cambio;
+  const moedaDe = (x: Un): "GS" | "BRL" => (x.vendas_gs / cam >= x.vendas_brl_orig ? "GS" : "BRL");
+  const Val = ({ v, m }: { v: number; m: "GS" | "BRL" }) => m === "GS"
+    ? <><b>{dinheiro(v * cam, "GS")}</b><small className="conv">{R(v)} · câmbio {cam.toLocaleString("pt-BR")}</small></>
+    : <><b>{R(v)}</b><small className="conv">{dinheiro(v * cam, "GS")} · câmbio {cam.toLocaleString("pt-BR")}</small></>;
+  const curto = (v: number, m: "GS" | "BRL") => (m === "GS" ? dinheiro(v * cam, "GS") : R(v));
+
+  const Cartao = ({ x, geral }: { x: Un; geral?: boolean }) => { const m = moedaDe(x); return (
     <section className={`painel unidade-cartao ${geral ? "geral" : ""}`}>
       <div className="linha entre"><h2>{x.nome}</h2>{!geral && <Link className="pequeno" href={`/unidade?d=${x.id}`}>Abrir esta unidade →</Link>}</div>
       <div className="unidade-grade">
-        <div><span>Vendas no mês</span><b>{R(x.vendas)}</b><small>{x.pedidos} pedidos · {x.clientes} clientes</small></div>
-        <div><span>Vendas hoje</span><b>{R(x.hoje)}</b><small>{x.hoje_pedidos} pedido(s)</small></div>
-        <div><span>Lucro bruto</span><b>{R(lb(x))}</b><small>margem {pct(x.rc ? lb(x) / x.rc : null)}</small></div>
-        <div><span>Despesas</span><b>{R(x.fixas + x.variaveis)}</b><small>fixas {R(x.fixas)}</small></div>
-        <div className={res(x) < 0 ? "ruim" : "bom"}><span>Resultado (lucro − despesas)</span><b>{R(res(x))}</b></div>
-        {!geral && <div><span>Mercadoria recebida (custo)</span><b>{R(x.transf_entrou)}</b><small>enviada a outras: {R(x.transf_saiu)}</small></div>}
-        {!geral && <div className={fluxo(x) < 0 ? "ruim" : ""}><span>Caixa do mês</span><b>{R(fluxo(x))}</b><small>recebido − mercadoria − despesas</small></div>}
-        <div><span>A receber</span><b>{R(x.a_receber)}</b><small>{x.vencido > 0 ? `${R(x.vencido)} vencido` : "nada vencido"}</small></div>
-        <div><span>Estoque (custo)</span><b>{R(x.estoque_valor)}</b><small>{x.estoque_itens} produtos com saldo</small></div>
+        <div><span>Vendas no mês</span><Val v={x.vendas} m={m} /><small>{x.pedidos} pedidos · {x.clientes} clientes
+          {x.vendas_gs > 0 && x.vendas_brl_orig > 0 ? ` · vendido ${dinheiro(x.vendas_gs, "GS")} + ${R(x.vendas_brl_orig)}` : ""}</small></div>
+        <div><span>Vendas hoje</span><Val v={x.hoje} m={m} /><small>{x.hoje_pedidos} pedido(s)</small></div>
+        <div><span>Lucro bruto</span><Val v={lb(x)} m={m} /><small>margem {pct(x.rc ? lb(x) / x.rc : null)}</small></div>
+        <div><span>Despesas</span><Val v={x.fixas + x.variaveis} m={m} /><small>fixas {curto(x.fixas, m)}</small></div>
+        <div className={res(x) < 0 ? "ruim" : "bom"}><span>Resultado (lucro − despesas)</span><Val v={res(x)} m={m} /></div>
+        {!geral && <div><span>Mercadoria recebida (custo)</span><Val v={x.transf_entrou} m={m} /><small>enviada a outras: {curto(x.transf_saiu, m)}</small></div>}
+        {!geral && <div className={fluxo(x) < 0 ? "ruim" : ""}><span>Caixa do mês</span><Val v={fluxo(x)} m={m} /><small>recebido − mercadoria − despesas</small></div>}
+        <div><span>A receber</span><Val v={x.a_receber} m={m} /><small>{x.vencido > 0 ? `${curto(x.vencido, m)} vencido` : "nada vencido"}</small></div>
+        <div><span>Estoque (custo)</span><Val v={x.estoque_valor} m={m} /><small>{x.estoque_itens} produtos com saldo</small></div>
         {!geral && <div><span>Caixa do dia</span><b>{x.caixa_aberto ? dinheiro(x.caixa_gs, "GS") : "fechado"}</b><small>{x.a_confirmar ? `${x.a_confirmar} transferência(s) a confirmar` : "nada a confirmar"}</small></div>}
         {!geral && <div><span>Operação</span><b>{x.a_separar} a separar</b><small>{x.transf_pend} pedido(s) entre unidades</small></div>}
       </div>
     </section>
-  );
+  ); };
 
+  const mg = moedaDe(tot);
+  const celula = (v: number) => <>{curto(v, mg)}<div className="pequeno suave">{mg === "GS" ? R(v) : dinheiro(v * cam, "GS")}</div></>;
   return (
     <>
       <section className="cabecalho-pagina">
         <div>
           <h1>Painel das unidades</h1>
-          <p>Geral e por unidade, em R$ (Gs ÷ {d.cambio.toLocaleString("pt-BR")}). Na unidade que recebe mercadoria de outra, o custo enviado conta no "Caixa do mês";
+          <p>Geral e por unidade, na moeda em que mais vendeu (em destaque) e o valor convertido embaixo, pelo câmbio de {d.cambio.toLocaleString("pt-BR")} Gs/R$ (Parâmetros). Na unidade que recebe mercadoria de outra, o custo enviado conta no "Caixa do mês";
             no geral, transferência não é custo (a mercadoria só muda de lugar).</p>
         </div>
         <form className="linha" method="get"><label>Mês<input type="month" name="mes" defaultValue={mes} /></label><button>Ver</button></form>
@@ -128,9 +139,9 @@ export default async function Unidades({ searchParams }: { searchParams: Promise
           <tbody>{meses.map((m) => (
             <tr key={m} className={m === mes ? "atual" : ""}>
               <td><Link href={`/unidades?mes=${m}`}>{nomeMes(m)}</Link></td>
-              {d.unidades.map((x) => [<td key={x.id + "v"} className="num">{R(evo(m, x.id, "vendas"))}</td>, <td key={x.id + "l"} className="num">{R(evo(m, x.id, "lucro"))}</td>])}
-              <td className="num"><b>{R(d.unidades.reduce((s, x) => s + evo(m, x.id, "vendas"), 0))}</b></td>
-              <td className="num"><b>{R(d.unidades.reduce((s, x) => s + evo(m, x.id, "lucro"), 0))}</b></td>
+              {d.unidades.map((x) => [<td key={x.id + "v"} className="num">{celula(evo(m, x.id, "vendas"))}</td>, <td key={x.id + "l"} className="num">{celula(evo(m, x.id, "lucro"))}</td>])}
+              <td className="num"><b>{celula(d.unidades.reduce((s, x) => s + evo(m, x.id, "vendas"), 0))}</b></td>
+              <td className="num"><b>{celula(d.unidades.reduce((s, x) => s + evo(m, x.id, "lucro"), 0))}</b></td>
             </tr>))}</tbody>
         </table></div>
       </section>
