@@ -648,3 +648,4 @@ a.indicador.clicavel { color: inherit; text-decoration: none; cursor: pointer; t
 a.indicador.clicavel:hover { border-color: var(--marca); }
 a.indicador.clicavel:active { transform: scale(.98); }
 #envios, #clientes, #unidades { scroll-margin-top: 70px; }
+button.mini { padding: 4px 10px; font-size: .78rem; }

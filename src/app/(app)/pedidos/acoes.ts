@@ -309,6 +309,25 @@ export async function definirEntrega(fd: FormData) {
   });
 }
 
+/** Gerente confirma, direto da lista, os pagamentos informados de um pedido (✓ Pago). */
+export async function confirmarPagamentosDaLista(fd: FormData) {
+  const u = await exigirUsuario();
+  const pedido = texto(fd, "pedido_id");
+  const volta = texto(fd, "volta").startsWith("/pedidos") ? texto(fd, "volta") : "/pedidos";
+  let erro: string | null = null, n = 0;
+  try {
+    await comUsuario(u.id, async (c) => {
+      const pend = (await c.query("select g.id, p.bling_numero from app.pagamentos g join app.pedidos p on p.id = g.pedido_id where g.pedido_id = $1 and g.status_conferencia = 'pendente'", [pedido])).rows;
+      for (const g of pend) { await c.query("select app.conferir_pagamento($1, $2)", [g.id, g.bling_numero ?? null]); n++; }
+    });
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  revalidatePath("/pedidos");
+  const sep = volta.includes("?") ? "&" : "?";
+  redirect(`${volta}${sep}${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent(`${n} pagamento(s) confirmado(s).`)}`);
+}
+
 /** Loja CDE confirma que despachou pela transportadora o envio para o Paraguai. */
 export async function confirmarEnvioPy(fd: FormData) {
   const u = await exigirUsuario();

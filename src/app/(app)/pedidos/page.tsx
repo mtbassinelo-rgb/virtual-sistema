@@ -3,14 +3,16 @@ import { exigirUsuario, ehGestao, podeEscrever } from "@/lib/auth";
 import { unidadeSistema } from "@/lib/unidade-sistema";
 import { comUsuario } from "@/lib/db";
 import { dinheiro, data, STATUS_COMERCIAL, STATUS_PAGAMENTO, COR_PAGAMENTO, MODALIDADES, type Moeda } from "@/lib/formato";
-import { Selo } from "../avisos";
+import { Avisos, Selo } from "../avisos";
 import { carregarFila, etapaSql, ETAPA_POR_ID, FilaPedidos } from "./fila";
+import { confirmarPagamentosDaLista } from "./acoes";
 
 export const metadata = { title: "Pedidos" };
 
 type Filtros = {
   q?: string; vendedora?: string; de?: string; ate?: string; comercial?: string;
   pagamento?: string; modalidade?: string; canal?: string; deposito?: string; desconto?: string; remocao?: string; origem?: string; etapa?: string;
+  ok?: string; erro?: string;
 };
 
 const ATALHOS: [string, string][] = [
@@ -135,7 +137,9 @@ export default async function Pedidos({ searchParams }: { searchParams: Promise<
     const pedidos = (await c.query(
       `select p.id, p.data_pedido, p.bling_numero, p.numero_externo, p.cliente_nome, p.vendedora_nome, p.moeda,
               p.valor_total, p.recebido, p.saldo, p.a_conferir, p.status_comercial, p.status_pagamento,
-              p.envio_atrasado, p.bling_mudou, p.canal, p.origem, ${etapaSql("p", "px")} etapa
+              p.envio_atrasado, p.bling_mudou, p.canal, p.origem, ${etapaSql("p", "px")} etapa,
+              ${ehGestao(u) ? `(select json_agg(json_build_object('id', g.id, 'comprovante', (select c.id from app.comprovantes c where c.pagamento_id = g.id order by c.enviado_em desc limit 1)) order by g.registrado_em)
+                 from app.pagamentos g where g.pedido_id = p.id and g.status_conferencia = 'pendente')` : "null"} as pendentes
          from app.v_pedidos p join app.pedidos px on px.id = p.id ${where}
         order by p.data_pedido desc, p.criado_em desc limit 300`, par)).rows;
     const vendedoras = (await c.query("select id, nome from app.vendedoras where ativo order by nome")).rows;
@@ -186,6 +190,7 @@ export default async function Pedidos({ searchParams }: { searchParams: Promise<
         {podeEscrever(u) && <Link className="botao principal" href="/pedidos/novo">Novo pedido</Link>}
       </section>
 
+      <Avisos ok={f.ok} erro={f.erro} />
       <FilaPedidos itens={d.fila} titulo="O que fazer em cada pedido" />
 
       {f.etapa && ETAPA_POR_ID[f.etapa] && (
@@ -306,6 +311,18 @@ export default async function Pedidos({ searchParams }: { searchParams: Promise<
                       ? <Link href={`/pedidos/${p.id}`} className={`selo ${ETAPA_POR_ID[p.etapa].cor}`} style={{ textDecoration: "none" }}>{ETAPA_POR_ID[p.etapa].titulo}</Link>
                       : <span className="pequeno suave">{STATUS_COMERCIAL[p.status_comercial]}</span>}
                     {p.envio_atrasado && <> <Selo cor="erro">envio atrasado</Selo></>}
+                    {Array.isArray(p.pendentes) && p.pendentes.length > 0 && (
+                      <div className="linha" style={{ gap: 6, marginTop: 6 }}>
+                        {(p.pendentes as { id: string; comprovante: string | null }[]).map((g, k) => g.comprovante
+                          ? <a key={g.id} className="botao mini" href={`/comprovantes/${g.comprovante}`} target="_blank" rel="noopener noreferrer">📎 Comprovante{p.pendentes.length > 1 ? ` ${k + 1}` : ""}</a>
+                          : <span key={g.id} className="pequeno suave">sem comprovante</span>)}
+                        <form action={confirmarPagamentosDaLista}>
+                          <input type="hidden" name="pedido_id" value={p.id} />
+                          <input type="hidden" name="volta" value={`/pedidos?${new URLSearchParams(Object.entries(f).filter(([k, v]) => typeof v === "string" && !["ok", "erro"].includes(k)) as [string, string][])}`} />
+                          <button className="principal mini" title="Confirmar que o dinheiro caiu">✓ Pago</button>
+                        </form>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
