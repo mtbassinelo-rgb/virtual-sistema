@@ -36,6 +36,24 @@ export async function solicitarTransferencia(fd: FormData) {
   ir(`/estoque/transferencias/${id}`, null, "Pedido enviado ao estoque de origem. Você acompanha aqui: separação, aprovação e chegada.");
 }
 
+/** Loja (ex.: CDE) separa e já envia: sai do estoque da loja na hora. Mesmos campos da separação. */
+export async function separarEEnviar(fd: FormData) {
+  const u = await exigirUsuario();
+  const id = texto(fd, "id");
+  let erro: string | null = null, ok = "";
+  try {
+    const itens = [...fd.entries()].filter(([k]) => k.startsWith("s:")).map(([k, v]) => {
+      const p = k.slice(2);
+      return { produto_id: p, quantidade: fd.get(`f:${p}`) ? 0 : qtd(v) };
+    });
+    const r = await comUsuario(u.id, async (c) => (await c.query("select app.separar_e_enviar_transferencia($1, $2::jsonb) r", [id, JSON.stringify(itens)])).rows[0].r as { tem: number; falta: number });
+    ok = `Separado e enviado: ${r.tem} produto(s) saíram do estoque${r.falta ? `, ${r.falta} em falta` : ""}. Agora é só o destino receber.`;
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  ir(`/estoque/transferencias/${id}`, erro, ok);
+}
+
 /** Estoquista confere o que tem: campos s:<produto_id> com a quantidade separada e f:<produto_id> = não tem. */
 export async function separarTransferencia(fd: FormData) {
   const u = await exigirUsuario();

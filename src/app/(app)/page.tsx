@@ -126,7 +126,13 @@ export default async function Hoje() {
            order by m.conexao_id, m.contato, m.em desc) x
         where not x.enviada order by em limit 50`).catch(() => ({ rows: [] }))).rows as Espera[];
     const enviosPy = (await c.query("select count(*)::int n from app.envios_py_pendentes()").catch(() => ({ rows: [{ n: 0 }] }))).rows[0].n as number;
-    return { fila, mes, receber, comissao, recompra, carrinhos, esperando, semEstoque, destaques, sugestoesCredito, cadastros, site, aConferir, metasPropostas, recusados, envioAtrasado, pagAtrasado, metasPerto, transferencias, portal, separar, confirmar, pendencias, enviosPy };
+    // pedidos de mercadoria que saem de uma loja onde a pessoa trabalha (ex.: CDE → CD Principal)
+    const lojaSeparar = (await c.query(`select t.id, t.numero, de.nome destino, o.nome origem, app.nome_usuario(t.criada_por) quem,
+        (select count(*) from app.transferencia_itens i where i.transferencia_id = t.id)::int itens
+      from app.transferencias t join app.depositos o on o.id = t.origem_id join app.depositos de on de.id = t.destino_id
+      where t.status = 'solicitada' and o.tipo = 'loja' and app.pode_separar_transferencia(t.origem_id) order by t.criada_em`).catch(() => ({ rows: [] }))).rows as
+      { id: string; numero: number; destino: string; origem: string; quem: string | null; itens: number }[];
+    return { fila, mes, receber, comissao, recompra, carrinhos, esperando, semEstoque, destaques, sugestoesCredito, cadastros, site, aConferir, metasPropostas, recusados, envioAtrasado, pagAtrasado, metasPerto, transferencias, portal, separar, confirmar, pendencias, enviosPy, lojaSeparar };
   });
 
   return (
@@ -144,6 +150,17 @@ export default async function Hoje() {
           <span>🚚 <b>{d.enviosPy} envio(s) para o Paraguai</b> chegaram na CDE: despachar pela transportadora e confirmar.</span>
           <span className="botao principal">Ver envios →</span>
         </Link>
+      )}
+
+      {d.lojaSeparar.length > 0 && (
+        <section className="painel" style={{ borderColor: "var(--aviso)" }}>
+          <h2 style={{ margin: 0 }}>📦 Pedidos de mercadoria para separar na loja ({d.lojaSeparar.length})</h2>
+          <p className="pequeno suave" style={{ margin: 0 }}>Outra unidade pediu produtos daqui. Abra, separe e toque em <b>✓ Separado e enviado</b>: sai do estoque da loja na hora.</p>
+          <ul className="lista-simples">{d.lojaSeparar.map((t) => (
+            <li key={t.id}><Link href={`/estoque/transferencias/${t.id}#separar`}><b>#{t.numero}</b> · {t.origem} → {t.destino}</Link>
+              <span className="pequeno suave"> · {t.itens} produto(s){t.quem ? ` · pedido por ${t.quem}` : ""}</span></li>))}
+          </ul>
+        </section>
       )}
 
       <div className="kpis">

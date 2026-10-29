@@ -203,4 +203,19 @@ select teste.ok((select quantidade from app.estoque_saldos where deposito_id = :
 select teste.ok((select quantidade from app.estoque_saldos where deposito_id = :'cd' and produto_id = '00000000-0000-0000-0000-0000000d0b02') = 0, 'Duplicado fica zerado');
 select teste.ok(app.produto_por_codigo('JUN-B') = '00000000-0000-0000-0000-0000000d0b01'::uuid, 'Código antigo aponta para o que fica');
 select teste.ok(not (select ativo from app.produtos where id = '00000000-0000-0000-0000-0000000d0b02'), 'Duplicado fica inativo');
+\echo '== Loja CDE separa e já envia para o CD =='
+reset role;
+delete from app.deposito_responsaveis where deposito_id = :'cde' and usuario_id = :'YESSICA';
+select app._lancar(:'cde', :'UP1', 'entrada_compra', 20, 'teste', 'loja-envia', null);
+set role vc_app;
+select teste.como(:'GERENTE');
+select set_config('teste.t9', app.solicitar_transferencia(:'cde', :'cd', format('[{"produto_id":"%s","quantidade":4}]', :'UP1')::jsonb, 'CD precisa')::text, false);
+select teste.como(:'YESSICA');
+select (select quantidade from app.estoque_saldos where deposito_id = :'cde' and produto_id = :'UP1') as antes \gset
+select app.separar_e_enviar_transferencia(current_setting('teste.t9')::uuid, format('[{"produto_id":"%s","quantidade":4}]', :'UP1')::jsonb);
+select teste.ok((select status = 'enviada' from app.transferencias where id = current_setting('teste.t9')::uuid), 'Quem trabalha na loja separa e já envia');
+select teste.ok((select quantidade from app.estoque_saldos where deposito_id = :'cde' and produto_id = :'UP1') = :'antes'::numeric - 4, 'Sai do estoque da loja na hora');
+select teste.como(:'EST');
+select set_config('teste.t10', app.solicitar_transferencia(:'cd', :'cde', format('[{"produto_id":"%s","quantidade":1}]', :'UP1')::jsonb)::text, false);
+select teste.falha(format($$select app.separar_e_enviar_transferencia(%L, '[]')$$, current_setting('teste.t10')), 'CD seguem', 'Do CD continua separar e aprovar');
 \echo '== Testes das unidades passaram =='

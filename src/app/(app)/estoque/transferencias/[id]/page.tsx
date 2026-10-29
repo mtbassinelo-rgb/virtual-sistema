@@ -5,7 +5,7 @@ import { comUsuario } from "@/lib/db";
 import { dinheiro } from "@/lib/formato";
 import { SITUACAO_TRANSF } from "@/lib/transferencias";
 import { Avisos, Selo } from "../../../avisos";
-import { aprovarTransferencia, cancelarSolicitacao, receberSolicitacao, separarTransferencia } from "../acoes";
+import { aprovarTransferencia, cancelarSolicitacao, receberSolicitacao, separarEEnviar, separarTransferencia } from "../acoes";
 import { Imprimir } from "./imprimir";
 
 export const metadata = { title: "Pedido entre unidades" };
@@ -19,7 +19,7 @@ export default async function Transferencia({ params, searchParams }: { params: 
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const d = await comUsuario(u.id, async (c) => {
     const t = (await c.query(`select t.*, o.nome origem, de.nome destino, app.nome_usuario(t.criada_por) criada_por_nome, app.nome_usuario(t.separada_por) separada_por_nome, app.nome_usuario(t.enviada_por) enviada_por_nome,
-        app.nome_usuario(t.recebida_por) recebida_por_nome, app.nome_usuario(t.cancelada_por) cancelada_por_nome, app.pode_operar_deposito(t.origem_id) opera_origem,
+        app.nome_usuario(t.recebida_por) recebida_por_nome, app.nome_usuario(t.cancelada_por) cancelada_por_nome, app.pode_separar_transferencia(t.origem_id) opera_origem, o.tipo = 'loja' origem_loja,
         app.pode_operar_deposito(t.destino_id) or app.trabalha_na_unidade(t.destino_id) recebe, app.pode_aprovar_transferencia() aprova,
         p.bling_numero pedido_numero
       from app.transferencias t join app.depositos o on o.id = t.origem_id join app.depositos de on de.id = t.destino_id
@@ -79,10 +79,11 @@ export default async function Transferencia({ params, searchParams }: { params: 
 
       {/* Separação: estoquista da origem */}
       {t.status === "solicitada" && t.opera_origem ? (
-        <form id="separar" action={separarTransferencia} className="painel">
+        <form id="separar" action={t.origem_loja ? separarEEnviar : separarTransferencia} className="painel">
           <input type="hidden" name="id" value={t.id} />
           <h2>Separar</h2>
-          <p className="pequeno suave" style={{ margin: 0 }}>Confira cada produto na prateleira. Separou menos? Ajuste a quantidade. Não tem? Marque "Não tem". O estoque só sai quando o envio for aprovado.</p>
+          <p className="pequeno suave" style={{ margin: 0 }}>Confira cada produto na prateleira. Separou menos? Ajuste a quantidade. Não tem? Marque "Não tem".
+            {t.origem_loja ? " Ao confirmar, a mercadoria já sai do estoque da loja e fica a caminho do destino." : " O estoque só sai quando o envio for aprovado."}</p>
           <div className="tabela cartoes"><table>
             <thead><tr><th>Produto</th><th className="num">Pedido</th><th className="num">Tem aqui</th><th>Separado</th><th>Não tem</th></tr></thead>
             <tbody>{itens.map((i) => (
@@ -94,7 +95,7 @@ export default async function Transferencia({ params, searchParams }: { params: 
                 <td data-rot="Não tem"><input type="checkbox" name={`f:${i.produto_id}`} defaultChecked={i.saldo_origem <= 0} aria-label={`Não tem ${i.nome}`} style={{ width: "auto" }} /></td>
               </tr>))}</tbody>
           </table></div>
-          <button className="principal">Separação conferida</button>
+          <button className="principal">{t.origem_loja ? "✓ Separado e enviado" : "Separação conferida"}</button>
         </form>
       ) : (
         <section className="painel">
