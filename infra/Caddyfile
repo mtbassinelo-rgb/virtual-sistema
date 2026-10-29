@@ -2,14 +2,32 @@
 
 # Equipe (produção)
 app.{$DOMINIO} {
-	encode gzip
-	reverse_proxy vc-app-producao:3000
+	# Canal ao vivo da área do estoquista (SSE): sem compressão e sem segurar no buffer
+	@aovivo path /api/estoque/ao-vivo
+	handle @aovivo {
+		reverse_proxy vc-app-producao:3000 {
+			flush_interval -1
+		}
+	}
+	handle {
+		encode gzip
+		reverse_proxy vc-app-producao:3000
+	}
 }
 
 # Ambiente de teste
 teste.{$DOMINIO} {
-	encode gzip
-	reverse_proxy vc-app-teste:3000
+	# Canal ao vivo da área do estoquista (SSE): sem compressão e sem segurar no buffer
+	@aovivo path /api/estoque/ao-vivo
+	handle @aovivo {
+		reverse_proxy vc-app-teste:3000 {
+			flush_interval -1
+		}
+	}
+	handle {
+		encode gzip
+		reverse_proxy vc-app-teste:3000
+	}
 }
 
 # www vai sempre para o endereço sem www: um endereço só, para o cliente não "sair" ao trocar de um para o outro

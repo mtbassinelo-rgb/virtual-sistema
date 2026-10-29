@@ -45,6 +45,14 @@ services:
       WHATSAPP_API_URL: http://vc-whatsapp:8080
       WHATSAPP_API_KEY: ${WHATSAPP_API_KEY:-}
       WHATSAPP_WEBHOOK_SEGREDO: ${WHATSAPP_WEBHOOK_SEGREDO:-}
+      # Pedidos da Shopee / Mercado Livre ao vivo na área do estoquista (docs/PEDIDOS-AO-VIVO.md)
+      MARKETPLACE_WEBHOOK_SEGREDO: ${MARKETPLACE_WEBHOOK_SEGREDO:-}
+      ML_APP_ID: ${ML_APP_ID:-}
+      ML_USER_ID: ${ML_USER_ID:-}
+      ML_ACCESS_TOKEN: ${ML_ACCESS_TOKEN:-}
+      SHOPEE_PARTNER_KEY: ${SHOPEE_PARTNER_KEY:-}
+      SHOPEE_SHOP_ID: ${SHOPEE_SHOP_ID:-}
+      SHOPEE_PUSH_URL: ${SHOPEE_PUSH_URL:-}
     volumes:
       - arquivos_producao:/dados
     depends_on: [db-producao]
@@ -59,6 +67,9 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://vc_app:${APP_TESTE_SENHA:?defina no .env}@db-teste/virtual
+      # Simulação de avisos da Shopee / Mercado Livre (só aqui no teste: aceita aviso sem assinatura e itens de exemplo)
+      MARKETPLACE_WEBHOOK_TESTE: "1"
+      MARKETPLACE_WEBHOOK_SEGREDO: ${MARKETPLACE_WEBHOOK_SEGREDO_TESTE:-}
     volumes:
       - arquivos_teste:/dados
     depends_on: [db-teste]

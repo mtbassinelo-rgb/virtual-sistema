@@ -4,7 +4,7 @@ set -uo pipefail
 cd "$(dirname "$0")"
 : "${DATABASE_URL:?Defina DATABASE_URL (banco de teste)}"
 ./migrar.sh || exit 1
-for t in regras precos metas sessoes estoque atacado kits importacao gestao importacao_lote caixa inteligencia recompra custos marcas precificacao financeiro unidades trocas whatsapp rh lista_inventario pendentes; do
+for t in regras precos metas sessoes estoque atacado kits importacao gestao importacao_lote caixa inteligencia recompra custos marcas precificacao financeiro unidades trocas whatsapp rh lista_inventario pendentes marketplace_ao_vivo; do
   if ! saida=$(psql "$DATABASE_URL" -q -v ON_ERROR_STOP=1 -f "testes/$t.sql" 2>&1); then
     echo "$saida" | grep -E "FALHOU|ERROR" ; echo "Falhou em $t"; exit 1
   fi

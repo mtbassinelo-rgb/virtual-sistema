@@ -2,8 +2,10 @@ import Link from "next/link";
 import { exigirUsuario } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
 import { dinheiro, type Moeda } from "@/lib/formato";
+import { filaAberta, type CartaoFila } from "@/lib/marketplace-fila";
 import { unidadeSistema } from "@/lib/unidade-sistema";
 import { Avisos, Selo } from "../../avisos";
+import { FilaMarketplace } from "./fila-marketplace";
 
 export const metadata = { title: "Área do estoquista" };
 
@@ -15,7 +17,7 @@ export default async function Separacao({ searchParams }: { searchParams: Promis
   const d = await comUsuario(u.id, async (c) => {
     const deps = (await c.query("select id, nome from app.depositos where ativo and app.pode_operar_deposito(id) order by tipo, nome")).rows as { id: string; nome: string }[];
     const ids = deps.filter((x) => !atual || x.id === atual.id).map((x) => x.id);
-    if (!ids.length) return { deps, pedidos: [], transf: [], hoje: { pedidos: 0, transf: 0 }, faltas: [] };
+    if (!ids.length) return { deps, pedidos: [], transf: [], hoje: { pedidos: 0, transf: 0 }, faltas: [], marketplace: [] as CartaoFila[] };
     const pedidos = (await c.query(`select p.id, p.data_pedido, p.criado_em, p.bling_numero, p.moeda, p.valor_total, p.previsao_envio, p.canal, p.origem,
         cl.nome cliente, v.nome vendedora, d.nome deposito,
         (select count(*) from app.pedido_itens i where i.pedido_id = p.id)::int itens,
@@ -37,7 +39,8 @@ export default async function Separacao({ searchParams }: { searchParams: Promis
         from app.pedido_itens_indisponiveis x join app.pedidos p on p.id = x.pedido_id left join app.produtos pr on pr.id = x.produto_id
        where p.deposito_id = any($1::uuid[]) and x.registrado_em > now() - interval '30 days'
        group by 1 order by 2 desc, 3 desc limit 12`, [ids])).rows;
-    return { deps, pedidos, transf, hoje, faltas };
+    const marketplace = await filaAberta(c, ids);
+    return { deps, pedidos, transf, hoje, faltas, marketplace };
   }).catch(() => null);
 
   if (!d) return <div className="painel">Não foi possível carregar a área do estoquista.</div>;
@@ -67,6 +70,8 @@ export default async function Separacao({ searchParams }: { searchParams: Promis
         <div className="indicador"><span className="rotulo">Separados hoje</span><span className="valor">{d.hoje.pedidos + d.hoje.transf}</span>
           <span className="pequeno suave">{d.hoje.pedidos} de clientes · {d.hoje.transf} entre unidades</span></div>
       </section>
+
+      <FilaMarketplace inicial={d.marketplace} deposito={atual?.id ?? null} />
 
       <section className="painel">
         <div className="linha entre" style={{ flexWrap: "wrap" }}>
