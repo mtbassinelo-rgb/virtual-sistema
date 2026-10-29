@@ -6,6 +6,7 @@ import { comUsuario } from "@/lib/db";
 import { PERFIS } from "@/lib/formato";
 import { MenuLateral, type GrupoMenu } from "./menu-lateral";
 import { FiltrosAutomaticos } from "./filtros-automaticos";
+import { Atalhos, type Atalho } from "./atalhos";
 import { unidadeSistema } from "@/lib/unidade-sistema";
 import { permissaoDoLink, pode } from "@/lib/permissoes";
 
@@ -168,6 +169,25 @@ export default async function AreaInterna({ children }: { children: React.ReactN
     .map((g) => ({ ...g, itens: g.itens.filter((i) => { const k = permissaoDoLink(i.href); return !k || pode(u, k); }) }))
     .filter((g) => g.itens.length > 0);
 
+  // Teclas de atalho (só das telas que a pessoa pode abrir)
+  const liberado = (href: string) => { const k = permissaoDoLink(href); return !k || pode(u, k); };
+  const atalhos: Atalho[] = ([
+    { tecla: "N", href: "/pedidos/novo", texto: "Novo pedido" },
+    { tecla: "P", href: "/pedidos", texto: "Pedidos" },
+    { tecla: "O", href: "/orcamentos/novo", texto: "Novo orçamento" },
+    { tecla: "C", href: "/clientes", texto: "Clientes" },
+    { tecla: "X", href: "/caixa", texto: "Caixa do dia" },
+    { tecla: "W", href: "/whatsapp?f=aguardando&o=espera", texto: "WhatsApp esperando resposta" },
+    { tecla: "R", href: "/produtos", texto: "Produtos" },
+    { tecla: "V", href: "/produtos/vendas", texto: "Vendas por produto" },
+    { tecla: "E", href: "/estoque/separacao", texto: "Área do estoquista (separar e envios)" },
+    { tecla: "T", href: "/estoque/transferencias/nova", texto: "Pedir mercadoria à outra unidade" },
+    { tecla: "S", href: "/estoque", texto: "Saldo do estoque" },
+    { tecla: "M", href: "/marketplace", texto: "Marketplace" },
+    { tecla: "H", href: "/", texto: "Início (painel do dia)" },
+  ] as Atalho[]).filter((a) => liberado(a.href));
+  const rapidos = atalhos.filter((a) => (u.perfil === "estoquista" ? ["E", "T"] : ["N", "O", "X"]).includes(a.tecla));
+
   return (
     <div className="casca">
       <aside className="lateral">
@@ -186,6 +206,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
             <label className="sr-only" htmlFor="busca-geral">Buscar no sistema</label>
             <input id="busca-geral" name="q" type="search" placeholder="Buscar produto, cliente ou pedido…" autoComplete="off" />
           </form>
+          <Atalhos atalhos={atalhos} rapidos={rapidos} />
           {un.lista.length > 1 && (
             <nav className="troca-unidade" aria-label="Unidade">
               <a href="/unidade" className={!un.atual ? "atual" : ""} aria-current={!un.atual ? "true" : undefined}>Todas</a>
