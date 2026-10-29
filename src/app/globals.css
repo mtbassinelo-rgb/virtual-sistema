@@ -651,3 +651,6 @@ a.indicador.clicavel:active { transform: scale(.98); }
 button.mini { padding: 4px 10px; font-size: .78rem; }
 @media print { .envio-cartao.chegando { break-inside: avoid; border-color: #999; } .envios-lista { grid-template-columns: 1fr 1fr; } }
 .finalizar-caixa { border: 2px solid var(--ok); gap: 12px; flex-wrap: wrap; }
+.dados-envio { border: 1px solid var(--borda, #ddd); border-radius: 8px; padding: 8px 12px; }
+.dados-envio legend { font-weight: 600; padding: 0 4px; }
+.dados-envio .confirmo { display: flex; gap: 8px; align-items: center; margin: 8px 0 4px; }

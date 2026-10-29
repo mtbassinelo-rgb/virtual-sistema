@@ -307,8 +307,18 @@ export async function avancarEntrega(fd: FormData) {
 export async function definirEntrega(fd: FormData) {
   const pedido = texto(fd, "pedido_id");
   await executar(pedido, "Entrega informada. O pedido aparece para o estoquista despachar.", async (uid) => {
-    await comUsuario(uid, (c) => c.query("select app.definir_entrega($1, $2, $3, nullif($4, ''))",
-      [pedido, texto(fd, "tipo"), texto(fd, "meio"), texto(fd, "dados")]));
+    const tipo = texto(fd, "tipo");
+    let dados = texto(fd, "dados");
+    await comUsuario(uid, async (c) => {
+      if (tipo === "envio") {
+        if (fd.get("confirmo") === null) throw new Error("Confirme o nome, a identidade, o telefone e a direção antes de salvar.");
+        const [nome, doc, tel, dir] = ["envio_nome", "envio_documento", "envio_telefone", "envio_endereco"].map((k) => texto(fd, k));
+        // guarda (ou corrige) na ficha do cliente: fica para os próximos envios
+        await c.query("select app.salvar_dados_envio((select cliente_id from app.pedidos where id = $1), $2, $3, $4, $5)", [pedido, nome, doc, tel, dir]);
+        dados = [`Nome: ${nome}`, `Identidade: ${doc}`, `Telefone: ${tel}`, `Direção: ${dir}`, dados ? `Obs.: ${dados}` : ""].filter(Boolean).join("\n");
+      }
+      await c.query("select app.definir_entrega($1, $2, $3, nullif($4, ''))", [pedido, tipo, texto(fd, "meio"), dados]);
+    });
   });
 }
 

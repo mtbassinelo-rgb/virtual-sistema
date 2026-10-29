@@ -222,6 +222,11 @@ select app.definir_entrega(current_setting('teste.pb')::uuid, 'retira', 'Depósi
 select teste.como(:'GERENTE');
 select app.despachar_pedido(current_setting('teste.pb')::uuid);
 select teste.ok((select status_comercial = 'entregue' and finalizado_em is not null from app.pedidos where id = current_setting('teste.pb')::uuid), 'Pago, conferido e despachado: finaliza sozinho');
+-- dados de envio guardados na ficha do cliente
+select teste.como(:'KEILA');
+select teste.falha($$select app.salvar_dados_envio('00000000-0000-0000-0000-00000000ab20', 'Ana', '', '0981', 'Rua 1')$$, 'Preencha', 'Dados de envio exigem os 4 campos');
+select app.salvar_dados_envio(:'CG', 'Ana Pérez', '1234567', '0981 111 111', 'Av. Central 100, Encarnación');
+select teste.ok((select envio_documento = '1234567' and envio_endereco like '%Encarnación' from app.clientes where id = :'CG'), 'Vendedora guarda os dados de envio do cliente');
 -- desconto num pedido já criado (até o VIP)
 select teste.como(:'KEILA');
 select set_config('teste.pc', app.criar_pedido_vendedora(:'CG', 'GS', :'DG', null, null,

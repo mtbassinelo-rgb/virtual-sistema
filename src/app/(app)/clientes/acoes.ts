@@ -70,6 +70,21 @@ export async function trocarVendedoraCliente(fd: FormData) {
   redirect(`${destino}${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Vendedora do cliente trocada." + (n ? ` ${n} pedido(s) em andamento passaram para ela.` : ""))}`);
 }
 
+/** Dados para envio guardados na ficha (nome de quem recebe, identidade, telefone e direção). */
+export async function salvarDadosEnvio(fd: FormData) {
+  const u = await exigirUsuario();
+  const id = texto(fd, "cliente_id");
+  let erro: string | null = null;
+  try {
+    await comUsuario(u.id, (c) => c.query("select app.salvar_dados_envio($1, $2, $3, $4, $5)",
+      [id, texto(fd, "envio_nome"), texto(fd, "envio_documento"), texto(fd, "envio_telefone"), texto(fd, "envio_endereco")]));
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  revalidatePath(`/clientes/${id}`);
+  redirect(`${voltaCli(fd, id)}${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Dados de envio guardados.")}`);
+}
+
 export async function salvarCliente(fd: FormData) {
   const u = await exigirUsuario();
   const id = texto(fd, "cliente_id");

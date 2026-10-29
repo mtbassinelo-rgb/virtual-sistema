@@ -78,7 +78,7 @@ export default async function Pedido({ params, searchParams }: {
     const p = (await c.query("select * from app.v_pedidos where id = $1", [id])).rows[0];
     if (!p) return null;
     const cliente = p.cliente_id
-      ? (await c.query("select id, nome, whatsapp, telefone, categoria_preco, pais from app.clientes where id = $1", [p.cliente_id])).rows[0]
+      ? (await c.query("select id, nome, whatsapp, telefone, categoria_preco, pais, envio_nome, envio_documento, envio_telefone, envio_endereco from app.clientes where id = $1", [p.cliente_id])).rows[0]
       : null;
     const itens = (await c.query(
       `select i.id, i.codigo, i.descricao, i.quantidade, i.quantidade_pedida, i.preco_unitario, i.desconto, i.total, d.nome as origem,
@@ -459,9 +459,9 @@ export default async function Pedido({ params, searchParams }: {
           {escrever && ["aguardando_cliente", "aguardando_aprovacao", "em_separacao"].includes(p.status_comercial) && cliente && (
             fluxo?.entrega_tipo ? (
               <details><summary className="pequeno">Alterar a entrega</summary>
-                <FormEntrega pedidoId={p.id} pais={cliente.pais} atual={{ tipo: fluxo.entrega_tipo, meio: fluxo.entrega_meio, dados: fluxo.entrega_dados }} />
+                <FormEntrega pedidoId={p.id} pais={cliente.pais} guardado={{ nome: cliente.envio_nome ?? cliente.nome, documento: cliente.envio_documento ?? "", telefone: cliente.envio_telefone ?? cliente.whatsapp ?? cliente.telefone ?? "", endereco: cliente.envio_endereco ?? "", tem: Boolean(cliente.envio_endereco) }} atual={{ tipo: fluxo.entrega_tipo, meio: fluxo.entrega_meio, dados: fluxo.entrega_dados }} />
               </details>
-            ) : <FormEntrega pedidoId={p.id} pais={cliente.pais} atual={{ tipo: null, meio: null, dados: null }} />
+            ) : <FormEntrega pedidoId={p.id} pais={cliente.pais} guardado={{ nome: cliente.envio_nome ?? cliente.nome, documento: cliente.envio_documento ?? "", telefone: cliente.envio_telefone ?? cliente.whatsapp ?? cliente.telefone ?? "", endereco: cliente.envio_endereco ?? "", tem: Boolean(cliente.envio_endereco) }} atual={{ tipo: null, meio: null, dados: null }} />
           )}
 
           {p.status_comercial === "em_separacao" && fluxo?.separacao_conferida_em && (

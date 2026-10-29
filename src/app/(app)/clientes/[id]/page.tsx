@@ -7,7 +7,7 @@ import {
   type Moeda,
 } from "@/lib/formato";
 import { Avisos, Barra, Selo } from "../../avisos";
-import { ativarCliente, atendimentoCliente, cancelarSaldoAnterior, lancarSaldoAnterior, pedirCompraUnidade, trocarVendedoraCliente, bloquearCliente, decidirCompraUnidade, decidirClienteLocal, definirCredito, depositoCliente, recusarSugestaoCredito, salvarCliente, sugerirClienteLocal, sugerirCredito } from "../acoes";
+import { ativarCliente, atendimentoCliente, cancelarSaldoAnterior, lancarSaldoAnterior, pedirCompraUnidade, trocarVendedoraCliente, bloquearCliente, decidirCompraUnidade, decidirClienteLocal, definirCredito, depositoCliente, recusarSugestaoCredito, salvarCliente, salvarDadosEnvio, sugerirClienteLocal, sugerirCredito } from "../acoes";
 import { AcessoCliente } from "./acesso-cliente";
 
 export const metadata = { title: "Cliente" };
@@ -186,6 +186,32 @@ export default async function Cliente({ params, searchParams }: {
       </nav>
 
       {aba === "resumo" && (<>
+        <section className="painel" id="envio">
+          <div className="linha entre"><h2 style={{ margin: 0 }}>Dados para envio</h2>
+            {cli.envio_atualizado_em && <span className="pequeno suave">atualizado em {data(cli.envio_atualizado_em)}</span>}</div>
+          {cli.envio_endereco ? (
+            <div className="ficha-dados" style={{ marginTop: 6 }}>
+              <span><span className="suave">Nome</span> <b>{cli.envio_nome}</b></span>
+              <span><span className="suave">Identidade</span> {cli.envio_documento}</span>
+              <span><span className="suave">Telefone</span> {cli.envio_telefone}</span>
+              <span><span className="suave">Direção</span> {cli.envio_endereco}</span>
+            </div>
+          ) : <p className="pequeno suave" style={{ margin: "6px 0 0" }}>Ainda sem dados de envio. Registre uma vez: ficam guardados e aparecem prontos em todo pedido com envio.</p>}
+          {!ro && (
+            <details open={!cli.envio_endereco} style={{ marginTop: 8 }}>
+              <summary className="pequeno">{cli.envio_endereco ? "Corrigir dados de envio" : "Registrar dados de envio"}</summary>
+              <form action={salvarDadosEnvio} className="campos" style={{ marginTop: 6 }}>
+                <input type="hidden" name="cliente_id" value={cli.id} /><Aba k="resumo" />
+                <label>Nome de quem recebe<input name="envio_nome" required maxLength={120} defaultValue={cli.envio_nome ?? cli.nome} /></label>
+                <label>{cli.pais === "PY" ? "Nº de identidade (CI)" : "Nº de identidade (CPF/RG)"}<input name="envio_documento" required maxLength={40} defaultValue={cli.envio_documento ?? cli.documento ?? ""} /></label>
+                <label>Telefone<input name="envio_telefone" required maxLength={40} inputMode="tel" defaultValue={cli.envio_telefone ?? cli.whatsapp ?? cli.telefone ?? ""} /></label>
+                <label className="largo">Direção (endereço e cidade)<textarea name="envio_endereco" required maxLength={500} rows={2} defaultValue={cli.envio_endereco ?? ""}
+                  placeholder={cli.pais === "PY" ? "Calle, número, barrio, ciudad" : "Rua, número, bairro, cidade, CEP"} /></label>
+                <button className="principal">Guardar dados de envio</button>
+              </form>
+            </details>
+          )}
+        </section>
         {metaAtiva && (
           <section className="painel">
             <div className="linha entre">
