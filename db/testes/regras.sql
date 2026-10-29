@@ -91,6 +91,16 @@ select teste.ok(true, 'Vendedora corrige o próprio pagamento enquanto pendente'
 select teste.como(:'GERENTE');
 -- o nº do Bling é opcional na conferência (0123); quando informado, liga o pedido
 select app.conferir_pagamento('00000000-0000-0000-0000-0000000000e1', 555);
+-- sem nº do Bling (pedido do sistema): confirma só o recebimento
+reset role;
+insert into app.pedidos (id, origem, cliente_id, vendedora_id, data_pedido, moeda, valor_total) values
+  ('00000000-0000-0000-0000-0000000000f8', 'manual', '00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000a1', current_date, 'GS', 1000);
+insert into app.pagamentos (id, pedido_id, valor, data, modalidade, registrado_por)
+values ('00000000-0000-0000-0000-0000000000f9', '00000000-0000-0000-0000-0000000000f8', 1, current_date, 'transferencia', :'GERENTE');
+set role vc_app;
+select teste.como(:'GERENTE');
+select app.conferir_pagamento('00000000-0000-0000-0000-0000000000f9', null);
+select teste.ok((select status_conferencia = 'conferido' from app.pagamentos where id = '00000000-0000-0000-0000-0000000000f9'), 'Confirma pagamento sem nº do Bling');
 select teste.ok((select bling_numero from app.pedidos where id = :'P1') = 555, 'Conferência liga o pedido ao nº 555 do Bling');
 select teste.ok((select status_pagamento from app.v_pedidos where id = :'P1') = 'parcial', 'Pedido fica parcialmente pago');
 select teste.ok((select saldo from app.v_pedidos where id = :'P1') = 550000, 'Saldo pendente correto');
