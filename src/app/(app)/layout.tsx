@@ -144,6 +144,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
           { href: "/financeiro", texto: "Painel financeiro", dica: "DRE, ponto de equilíbrio, lucro por marca e cliente, metas" },
           { href: "/despesas", texto: "Contas a pagar", contador: n.contas_vencidas, dica: "Contas vencidas" },
           { href: "/financeiro/receber", texto: "Contas a receber" },
+          { href: "/financeiro/vendas-avulsas", texto: "Vendas avulsas", dica: "Vendas fora do sistema, lançadas só pelo valor" },
           { href: "/estoque/notas", texto: "Notas de entrada (XML)" },
           { href: "/comissoes", texto: "Comissões" },
         ] }

@@ -17,7 +17,7 @@ type Un = {
   hoje: number; hoje_pedidos: number; recebido: number; transf_entrou: number; transf_saiu: number; fixas: number; variaveis: number;
   a_receber: number; vencido: number; estoque_valor: number; estoque_itens: number; a_separar: number; transf_pend: number;
   caixa_aberto: boolean; caixa_gs: number; a_confirmar: number;
-  lucro_gs: number; lucro_brl: number; hoje_gs: number; hoje_brl: number; desp_gs: number; desp_brl: number; ar_gs: number; ar_brl: number;
+  lucro_gs: number; lucro_brl: number; avulsa_gs: number; avulsa_brl: number; hoje_gs: number; hoje_brl: number; desp_gs: number; desp_brl: number; ar_gs: number; ar_brl: number;
 };
 
 export default async function Unidades({ searchParams }: { searchParams: Promise<{ mes?: string }> }) {
@@ -42,6 +42,12 @@ export default async function Unidades({ searchParams }: { searchParams: Promise
                      sum(${gs("valor_total")}) filter (where data_pedido = current_date) hoje, count(*) filter (where data_pedido = current_date) hoje_n,
                      sum(valor_total) filter (where moeda = 'GS' and data_pedido = current_date) hoje_gs, sum(valor_total) filter (where moeda = 'BRL' and data_pedido = current_date) hoje_brl
                 from app.pedidos where app.conta_como_venda(status_comercial) and data_pedido between $1 and $2 group by 1),
+      av as (select deposito_id, sum(case when moeda = 'GS' then valor / cambio else valor end) brl_total,
+                    sum(case when moeda = 'GS' then valor / cambio else valor end) filter (where custo_brl is not null) rc, sum(custo_brl) custo,
+                    sum(valor) filter (where moeda = 'GS') gs, sum(valor) filter (where moeda = 'BRL') brl,
+                    sum(valor - custo_brl * cambio) filter (where moeda = 'GS' and custo_brl is not null) lucro_gs,
+                    sum(valor - custo_brl) filter (where moeda = 'BRL' and custo_brl is not null) lucro_brl
+               from app.vendas_avulsas where data between $1 and $2 group by 1),
       rec as (select p.deposito_id, sum(${gs("pg.valor", "p.moeda")}) v from app.pagamentos pg join app.pedidos p on p.id = pg.pedido_id
                where pg.status_conferencia <> 'recusado' and pg.data between $1 and $2 group by 1),
       tin as (select destino_id dep, sum(valor_custo) v from app.transferencias where status in ('enviada','recebida','recebida_com_divergencia') and enviada_em::date between $1 and $2 group by 1),
@@ -60,17 +66,19 @@ export default async function Unidades({ searchParams }: { searchParams: Promise
                                           union all select origem_id from app.transferencias where status in ('solicitada','separada')) z group by 1),
       cx as (select deposito_id, true aberto, app.caixa_esperado(id, 'GS') gs from app.caixas where status = 'aberto'),
       conf as (select cx.deposito_id, count(*) n from app.caixa_movimentos m join app.caixas cx on cx.id = m.caixa_id where m.confirmacao = 'pendente' group by 1)
-      select dep.id, dep.nome, dep.codigo, coalesce(it.vendas, 0) vendas, coalesce(it.rc, 0) rc, coalesce(it.custo, 0) custo, coalesce(it.pedidos, 0) pedidos,
-             coalesce(it.clientes, 0) clientes, coalesce(ped.gs, 0) vendas_gs, coalesce(ped.brl, 0) vendas_brl_orig, coalesce(ped.hoje, 0) hoje, coalesce(ped.hoje_n, 0) hoje_pedidos,
+      select dep.id, dep.nome, dep.codigo, coalesce(it.vendas, 0) + coalesce(av.brl_total, 0) vendas, coalesce(it.rc, 0) + coalesce(av.rc, 0) rc,
+             coalesce(it.custo, 0) + coalesce(av.custo, 0) custo, coalesce(it.pedidos, 0) pedidos,
+             coalesce(it.clientes, 0) clientes, coalesce(ped.gs, 0) + coalesce(av.gs, 0) vendas_gs, coalesce(ped.brl, 0) + coalesce(av.brl, 0) vendas_brl_orig,
+             coalesce(av.gs, 0) avulsa_gs, coalesce(av.brl, 0) avulsa_brl, coalesce(ped.hoje, 0) hoje, coalesce(ped.hoje_n, 0) hoje_pedidos,
              coalesce(rec.v, 0) recebido, coalesce(tin.v, 0) transf_entrou, coalesce(tout.v, 0) transf_saiu, coalesce(des.fixas, 0) fixas, coalesce(des.variaveis, 0) variaveis,
              coalesce(ar.v, 0) a_receber, coalesce(ar.venc, 0) vencido, coalesce(est.v, 0) estoque_valor, coalesce(est.itens, 0) estoque_itens,
              coalesce(sep.n, 0) a_separar, coalesce(tp.n, 0) transf_pend, coalesce(cx.aberto, false) caixa_aberto, coalesce(cx.gs, 0) caixa_gs, coalesce(conf.n, 0) a_confirmar,
-             coalesce(it.lucro_gs, 0) lucro_gs, coalesce(it.lucro_brl, 0) lucro_brl, coalesce(ped.hoje_gs, 0) hoje_gs, coalesce(ped.hoje_brl, 0) hoje_brl,
+             coalesce(it.lucro_gs, 0) + coalesce(av.lucro_gs, 0) lucro_gs, coalesce(it.lucro_brl, 0) + coalesce(av.lucro_brl, 0) lucro_brl, coalesce(ped.hoje_gs, 0) hoje_gs, coalesce(ped.hoje_brl, 0) hoje_brl,
              coalesce(des.desp_gs, 0) desp_gs, coalesce(des.desp_brl, 0) desp_brl, coalesce(ar.ar_gs, 0) ar_gs, coalesce(ar.ar_brl, 0) ar_brl
         from dep left join it on it.deposito_id = dep.id left join ped on ped.deposito_id = dep.id left join rec on rec.deposito_id = dep.id
         left join tin on tin.dep = dep.id left join tout on tout.dep = dep.id left join des on des.deposito_id = dep.id left join ar on ar.deposito_id = dep.id
         left join est on est.deposito_id = dep.id left join sep on sep.deposito_id = dep.id left join tp on tp.dep = dep.id left join cx on cx.deposito_id = dep.id
-        left join conf on conf.deposito_id = dep.id
+        left join conf on conf.deposito_id = dep.id left join av on av.deposito_id = dep.id
        order by dep.codigo = 'cd-foz' desc, dep.nome`, [ini, fim])).rows.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) =>
          [k, ["id", "nome", "codigo", "caixa_aberto"].includes(k) ? v : n(v)]))) as Un[];
     // despesas da empresa sem unidade (geral)
@@ -82,7 +90,15 @@ export default async function Unidades({ searchParams }: { searchParams: Promise
         coalesce(sum(x.receita) filter (where x.moeda = 'GS'), 0) vendas_gs, coalesce(sum(x.receita) filter (where x.moeda = 'BRL'), 0) vendas_brl,
         coalesce(sum(x.receita - x.custo_brl * x.receita / nullif(x.receita_brl, 0)) filter (where x.moeda = 'GS' and x.custo_brl is not null), 0) lucro_gs,
         coalesce(sum(x.receita - x.custo_brl) filter (where x.moeda = 'BRL' and x.custo_brl is not null), 0) lucro_brl
-      from app.fin_itens($1, $2) x join app.pedidos p on p.id = x.pedido_id group by 1, 2`, [ini12, fim])).rows;
+      from app.fin_itens($1, $2) x join app.pedidos p on p.id = x.pedido_id group by 1, 2
+      union all
+      select to_char(date_trunc('month', a.data), 'YYYY-MM'), a.deposito_id,
+        sum(case when a.moeda = 'GS' then a.valor / a.cambio else a.valor end),
+        coalesce(sum(case when a.moeda = 'GS' then a.valor / a.cambio else a.valor end) filter (where a.custo_brl is not null), 0) - coalesce(sum(a.custo_brl), 0),
+        coalesce(sum(a.valor) filter (where a.moeda = 'GS'), 0), coalesce(sum(a.valor) filter (where a.moeda = 'BRL'), 0),
+        coalesce(sum(a.valor - a.custo_brl * a.cambio) filter (where a.moeda = 'GS' and a.custo_brl is not null), 0),
+        coalesce(sum(a.valor - a.custo_brl) filter (where a.moeda = 'BRL' and a.custo_brl is not null), 0)
+      from app.vendas_avulsas a where a.data between $1 and $2 group by 1, 2`, [ini12, fim])).rows;
     return { cambio, unidades, geral, evolucao };
   });
 
@@ -91,14 +107,14 @@ export default async function Unidades({ searchParams }: { searchParams: Promise
   const fluxo = (x: Un) => x.recebido - x.transf_entrou - x.fixas - x.variaveis;
   const NUM = ["vendas", "rc", "custo", "pedidos", "clientes", "vendas_gs", "vendas_brl_orig", "hoje", "hoje_pedidos", "recebido", "transf_entrou", "transf_saiu",
     "fixas", "variaveis", "a_receber", "vencido", "estoque_valor", "estoque_itens", "a_separar", "transf_pend", "caixa_gs", "a_confirmar",
-    "lucro_gs", "lucro_brl", "hoje_gs", "hoje_brl", "desp_gs", "desp_brl", "ar_gs", "ar_brl"] as const;
+    "lucro_gs", "lucro_brl", "avulsa_gs", "avulsa_brl", "hoje_gs", "hoje_brl", "desp_gs", "desp_brl", "ar_gs", "ar_brl"] as const;
   const tot = { id: "todas", nome: "Geral", codigo: "geral", caixa_aberto: false,
     ...Object.fromEntries(NUM.map((k) => [k, d.unidades.reduce((s, x) => s + x[k], 0)])) } as Un;
   tot.fixas += n(d.geral.fixas); tot.variaveis += n(d.geral.variaveis);
   // geral: transferência entre unidades não é custo da empresa (só muda de lugar)
   const meses = Array.from({ length: 12 }, (_, i) => somaMes(mes, i - 11)).reverse();
   type K = "vendas" | "lucro" | "vendas_gs" | "vendas_brl" | "lucro_gs" | "lucro_brl";
-  const evo = (m: string, dep: string, k: K) => n(d.evolucao.find((r) => r.mes === m && r.deposito_id === dep)?.[k]);
+  const evo = (m: string, dep: string, k: K) => d.evolucao.filter((r) => r.mes === m && r.deposito_id === dep).reduce((s, r) => s + n(r[k]), 0);
   const evoT = (m: string, k: K) => d.unidades.reduce((s, x) => s + evo(m, x.id, k), 0);
   // célula da tabela: valor real em Gs (+ R$ se houver) e o total convertido embaixo
   const celReal = (g: number, b: number, tot: number) => <>{g || !b ? dinheiro(g, "GS") : R(b)}{g && b ? <span className="pequeno"> + {R(b)}</span> : null}
@@ -120,7 +136,7 @@ export default async function Unidades({ searchParams }: { searchParams: Promise
     <section className={`painel unidade-cartao ${geral ? "geral" : ""}`}>
       <div className="linha entre"><h2>{x.nome}</h2>{!geral && <Link className="pequeno" href={`/unidade?d=${x.id}`}>Abrir esta unidade →</Link>}</div>
       <div className="unidade-grade">
-        <div><span>Vendas no mês</span><Real gs={x.vendas_gs} brl={x.vendas_brl_orig} total={x.vendas_gs / cam + x.vendas_brl_orig} /><small>{x.pedidos} pedidos · {x.clientes} clientes</small></div>
+        <div><span>Vendas no mês</span><Real gs={x.vendas_gs} brl={x.vendas_brl_orig} total={x.vendas_gs / cam + x.vendas_brl_orig} /><small>{x.pedidos} pedidos · {x.clientes} clientes{x.avulsa_gs + x.avulsa_brl > 0 ? <> · inclui <Link href="/financeiro/vendas-avulsas">venda avulsa {x.avulsa_gs > 0 ? dinheiro(x.avulsa_gs, "GS") : ""}{x.avulsa_gs > 0 && x.avulsa_brl > 0 ? " + " : ""}{x.avulsa_brl > 0 ? dinheiro(x.avulsa_brl, "BRL") : ""}</Link></> : null}</small></div>
         <div><span>Vendas hoje</span><Real gs={x.hoje_gs} brl={x.hoje_brl} total={x.hoje} /><small>{x.hoje_pedidos} pedido(s)</small></div>
         <div><span>Lucro bruto</span><Real gs={x.lucro_gs} brl={x.lucro_brl} total={lb(x)} /><small>margem {pct(x.rc ? lb(x) / x.rc : null)}</small></div>
         <div><span>Despesas</span><Real gs={x.desp_gs} brl={x.desp_brl} total={x.fixas + x.variaveis} /><small>fixas {curto(x.fixas, m)}</small></div>

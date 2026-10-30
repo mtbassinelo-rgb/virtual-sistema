@@ -106,10 +106,14 @@ export default async function Hoje() {
       { id: string; cliente: string; vendedora: string; data_pedido: string; itens: string }[];
     const fila = await carregarFila(c, dep);
     const meu = (gestao ? "" : "and v.vendedora_id = app.minha_vendedora()") + " " + naUnidade("v");
-    const mes = (await c.query(`select v.moeda, coalesce(sum(v.valor_total), 0) vendido, count(*)::int n
+    const avulsas = gestao ? `union all select a.moeda, a.valor, 0, a.valor from app.vendas_avulsas a
+          where a.data >= date_trunc('month', current_date) ${naUnidade("a")}` : "";
+    const mes = (await c.query(`select moeda, coalesce(sum(valor), 0) vendido, sum(n)::int n, coalesce(sum(avulsa), 0) avulsa from (
+        select v.moeda, v.valor_total valor, 1 n, 0 avulsa
         from app.v_pedidos v where v.status_comercial <> 'cancelado' and v.data_pedido >= date_trunc('month', current_date) ${meu}
           and not exists (select 1 from app.canais k where k.codigo = v.canal and k.marketplace)
-       group by 1 order by 1 desc`)).rows as { moeda: Moeda; vendido: string; n: number }[];
+        ${avulsas}) z
+       group by 1 order by 1 desc`)).rows as { moeda: Moeda; vendido: string; n: number; avulsa: string }[];
     const receber = (await c.query(`select v.moeda, coalesce(sum(v.saldo), 0) saldo, count(*)::int n from app.v_pedidos v
         where v.saldo > 0 and v.status_comercial <> 'cancelado' ${meu} group by 1 order by 1 desc`)).rows as { moeda: Moeda; saldo: string; n: number }[];
     const comissao = gestao ? [] : (await c.query(`select moeda, comissao from app.comissoes(date_trunc('month', current_date)::date)
@@ -167,7 +171,7 @@ export default async function Hoje() {
         {d.mes.length === 0 && <div className="kpi marca"><span className="rotulo">{gestao ? "Vendido no mês" : "Você vendeu no mês"}</span><span className="valor">—</span></div>}
         {d.mes.map((m) => (
           <div key={m.moeda} className="kpi marca"><span className="rotulo">{gestao ? "Vendido no mês" : "Você vendeu no mês"} ({m.moeda === "GS" ? "Gs" : "R$"})</span>
-            <span className="valor num">{dinheiro(m.vendido, m.moeda)}</span><span className="pequeno">{m.n} pedido(s)</span></div>
+            <span className="valor num">{dinheiro(m.vendido, m.moeda)}</span><span className="pequeno">{m.n} pedido(s){Number(m.avulsa) > 0 ? <> + <Link href="/financeiro/vendas-avulsas">{dinheiro(m.avulsa, m.moeda)} avulsa</Link></> : null}</span></div>
         ))}
         {d.comissao.filter((x) => x.comissao !== null).map((x) => (
           <Link key={x.moeda} href="/comissoes" className="kpi"><span className="rotulo">Sua comissão no mês</span>

@@ -83,3 +83,18 @@ select teste.como(:'GERENTE');
 select teste.ok(app.marcar_separados_ate(current_date - 1) >= 1, 'Marca os pedidos até a data');
 select teste.ok((select separacao_conferida_em is not null from app.pedidos where id = '00000000-0000-0000-0000-00000000e901'), 'Pedido fica como separado');
 \echo '== Testes de separados em lote passaram =='
+
+
+
+\echo '== Vendas avulsas =='
+set role vc_app;
+select teste.como(:'KEILA');
+select teste.falha($$select app.lancar_venda_avulsa((select id from app.depositos where codigo = 'loja-cde'), current_date, 'GS', 1000, 'x')$$, 'gerente ou dono', 'Vendedora não lança venda avulsa');
+select teste.como(:'GERENTE');
+select teste.falha($$select app.lancar_venda_avulsa((select id from app.depositos where codigo = 'loja-cde'), current_date, 'GS', 0, 'x')$$, 'valor', 'Não aceita valor zero');
+select app.lancar_venda_avulsa((select id from app.depositos where codigo = 'loja-cde'), current_date - 3, 'GS', 13000000, 'Vendas antigas pelos comprovantes') as va \gset
+select teste.ok((select receita = 13000000 and receita_brl = round(13000000 / coalesce(app.param('cambio_custo_gs'), 1300), 2) and custo_brl is null
+                   from app.fin_itens(current_date - 5, current_date) where marca = 'Venda avulsa'), 'Venda avulsa entra no financeiro sem custo');
+select app.excluir_venda_avulsa(:'va');
+select teste.ok(not exists (select 1 from app.vendas_avulsas where id = :'va'), 'Exclui a venda avulsa');
+\echo '== Testes de vendas avulsas passaram =='
