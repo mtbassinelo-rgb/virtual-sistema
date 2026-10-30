@@ -60,3 +60,19 @@ export async function despacharPedido(fd: FormData) {
   redirect(erro ? `/estoque/separacao?erro=${encodeURIComponent(erro)}#saidas`
     : `/estoque/separacao?ok=${encodeURIComponent(tipo === "envio" ? "Pedido despachado com o passeiro." : "Pedido pronto para o cliente retirar.")}#saidas`);
 }
+
+
+/** Gerência: marca como separados todos os pedidos da fila feitos até a data (já saíram fisicamente). */
+export async function marcarSeparadosAte(fd: FormData) {
+  const u = await exigirUsuario();
+  let erro: string | null = null, n = 0;
+  try {
+    const ate = texto(fd, "ate");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ate)) throw new Error("Escolha a data.");
+    n = await comUsuario(u.id, async (c) => Number((await c.query("select app.marcar_separados_ate($1::date) n", [ate])).rows[0].n));
+  } catch (e) {
+    erro = mensagemErro(e);
+  }
+  revalidatePath("/estoque/separacao");
+  redirect(erro ? `/estoque/separacao?erro=${encodeURIComponent(erro)}` : `/estoque/separacao?ok=${encodeURIComponent(`${n} pedido(s) marcados como separados.`)}`);
+}

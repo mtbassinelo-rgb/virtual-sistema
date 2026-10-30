@@ -4,7 +4,7 @@ import { comUsuario } from "@/lib/db";
 import { dinheiro, type Moeda } from "@/lib/formato";
 import { unidadeSistema } from "@/lib/unidade-sistema";
 import { Avisos, Selo } from "../../avisos";
-import { marcarEnvio, despacharPedido } from "./acoes";
+import { marcarEnvio, despacharPedido, marcarSeparadosAte } from "./acoes";
 
 export const metadata = { title: "Área do estoquista" };
 
@@ -92,6 +92,16 @@ export default async function Separacao({ searchParams }: { searchParams: Promis
       </section>
 
       <Avisos ok={f.ok} erro={f.erro} />
+      {gestao && (
+        <details className="painel">
+          <summary><b>Marcar pedidos antigos como separados</b> <span className="pequeno suave">(gerência)</span></summary>
+          <form action={marcarSeparadosAte} className="linha" style={{ flexWrap: "wrap", alignItems: "end", marginTop: 8 }}>
+            <label>Pedidos feitos até<input type="date" name="ate" required /></label>
+            <button className="principal">Marcar como separados</button>
+            <span className="pequeno suave">Para pedidos que já saíram fisicamente: ficam como separados com tudo o que foi pedido. Itens, total e estoque não mudam.</span>
+          </form>
+        </details>
+      )}
       <section className="atalhos">
         <Link className="atalho" href="/estoque/inventario"><b>Balanço de estoque</b><span>Contar a prateleira e acertar o saldo</span></Link>
       </section>

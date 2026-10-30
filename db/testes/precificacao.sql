@@ -69,3 +69,17 @@ select teste.ok((select quantidade from app.estoque_saldos where produto_id = '0
 select teste.ok((select frete_unidade from app.frete_medio_notas() where marca = 'MARCA CHEGA') = round(861.0 / 1848, 4), 'Frete da nota entra na média da marca (861 ÷ 1848)');
 select teste.falha($$select app.receber_nota('$$ || :'nota' || $$', '$$ || :'dep' || $$')$$, 'já foi recebida', 'Não recebe duas vezes');
 \echo '== Testes de notas passaram =='
+
+\echo '== Marcar separados em lote =='
+reset role;
+select id as cli from app.clientes limit 1 \gset
+select id as vend from app.vendedoras limit 1 \gset
+insert into app.pedidos (id, cliente_id, vendedora_id, deposito_id, moeda, data_pedido, status_comercial, origem, valor_total)
+values ('00000000-0000-0000-0000-00000000e901', :'cli', :'vend', :'dep', 'GS', current_date - 2, 'em_separacao', 'manual', 0);
+set role vc_app;
+select teste.como(:'KEILA');
+select teste.falha($$select app.marcar_separados_ate(current_date)$$, 'gerente ou dono', 'Vendedora não marca em lote');
+select teste.como(:'GERENTE');
+select teste.ok(app.marcar_separados_ate(current_date - 1) >= 1, 'Marca os pedidos até a data');
+select teste.ok((select separacao_conferida_em is not null from app.pedidos where id = '00000000-0000-0000-0000-00000000e901'), 'Pedido fica como separado');
+\echo '== Testes de separados em lote passaram =='
