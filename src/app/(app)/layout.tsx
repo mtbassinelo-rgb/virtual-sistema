@@ -176,6 +176,10 @@ export default async function AreaInterna({ children }: { children: React.ReactN
   };
   const essencial = ESSENCIAL[u.perfil];
   const extras = n.confirma_py && !gestao ? ["/pedidos/envios-py", "/caixa", "/caixa/contas", "/estoque/transferencias"] : [];
+  // quem é responsável por algum estoque (ex.: vendedora da CDE) vê também o inventário daquele estoque
+  const respEstoque = !gestao && u.perfil === "vendedora" && await comUsuario(u.id, async (c) =>
+    (await c.query("select exists (select 1 from app.deposito_responsaveis where usuario_id = app.uid()) as ok")).rows[0].ok as boolean).catch(() => false);
+  if (respEstoque) extras.push("/estoque/inventario");
   const menuCompleto = (await cookies()).get("menu_completo")?.value === "1";
   const simples = Boolean(essencial) && !menuCompleto;
   // Cada pessoa vê só as áreas liberadas para ela (Equipe → Acessos)
