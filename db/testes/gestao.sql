@@ -366,4 +366,21 @@ select teste.como(:'KEILA');
 update app.parametros set valor = 1 where chave = 'cambio_custo_gs';
 select teste.ok(app.param('cambio_custo_gs') = 1250, 'Vendedora não altera parâmetros');
 reset role;
+\echo '== Vender o estoque de outra unidade (CD principal vende o que está na CDE) =='
+select id as cdeu from app.depositos where codigo = 'loja-cde' \gset
+select app._lancar(:'cdeu', :'G1', 'entrada_compra', 5, 'teste', 'gestao-outra', null);
+set role vc_app;
+select teste.como(:'KEILA');
+select teste.falha(format($$select app.criar_pedido_vendedora(%L, 'GS', %L, null, null, '[{"produto_id":"%s","quantidade":9,"origem":"%s"}]', false)$$, :'CG', :'DG', :'G1', :'cdeu'),
+  'insuficiente', 'Não vende da CDE mais do que tem lá');
+select set_config('teste.po', app.criar_pedido_vendedora(:'CG', 'GS', :'DG', null, null,
+  jsonb_build_array(jsonb_build_object('produto_id', :'G1', 'quantidade', 1), jsonb_build_object('produto_id', :'G1', 'quantidade', 3, 'origem', :'cdeu')), false)::text, false);
+reset role;
+select teste.ok((select t.status = 'solicitada' and t.origem_id = :'cdeu' and t.destino_id = :'DG'
+                   and (select sum(quantidade_solicitada) from app.transferencia_itens where transferencia_id = t.id) = 3
+                   from app.transferencias t where t.pedido_id = current_setting('teste.po')::uuid), 'Pedido cria a solicitação à CDE com o que sai de lá (3)');
+select teste.ok((select count(*) = 2 from app.pedido_itens where pedido_id = current_setting('teste.po')::uuid), 'Item do CD e item da CDE ficam separados no pedido');
+update app.pedidos set status_comercial = 'cancelado' where id = current_setting('teste.po')::uuid;
+select teste.ok((select status = 'cancelada' from app.transferencias where pedido_id = current_setting('teste.po')::uuid), 'Pedido cancelado cancela a solicitação');
+reset role;
 \echo 'Testes de gestão comercial passaram.'

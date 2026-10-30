@@ -166,14 +166,15 @@ export async function criarPedidoSemPerder(fd: FormData): Promise<{ erro?: strin
   try {
     const cliente = texto(fd, "cliente_id");
     if (!cliente) throw new Error("Escolha o cliente.");
-    const itens: { produto_id: string; quantidade?: number; caixas?: number; preco?: number }[] = [];
+    const itens: { produto_id: string; quantidade?: number; caixas?: number; preco?: number; origem?: string }[] = [];
     for (let i = 0; i < 300; i++) {
       const produto = texto(fd, `produto_${i}`);
       const cx = numero(fd, `cx_${i}`);
       const qtd = numero(fd, `qtd_${i}`);
       const preco = numero(fd, `preco_${i}`);
       if (!produto) continue;
-      const extra = preco && preco > 0 ? { preco } : {};
+      const origem = texto(fd, `origem_${i}`);
+      const extra = { ...(preco && preco > 0 ? { preco } : {}), ...(/^[0-9a-f-]{36}$/i.test(origem) ? { origem } : {}) };
       if (qtd && qtd > 0) itens.push({ produto_id: produto, quantidade: qtd, ...extra });
       else if (cx && cx > 0) itens.push({ produto_id: produto, caixas: cx, ...extra });
     }
@@ -483,4 +484,12 @@ export async function precoTabela(cliente: string, moeda: string, produto: strin
     [cliente, produto, ["GS", "BRL"].includes(moeda) ? moeda : ""]));
   const x = r.rows[0];
   return { preco: x?.preco == null ? null : Number(x.preco), piso: x?.piso == null ? null : Number(x.piso), moeda: x?.moeda ?? null };
+}
+
+/** Estoque do produto em cada unidade (Novo pedido: de onde sai). */
+export async function estoqueUnidades(produto: string): Promise<{ id: string; nome: string; saldo: number }[]> {
+  const u = await exigirUsuario();
+  if (!/^[0-9a-f-]{36}$/i.test(produto)) return [];
+  const r = await comUsuario(u.id, (c) => c.query("select deposito_id id, nome, saldo from app.estoque_por_unidade($1)", [produto]));
+  return r.rows.map((x) => ({ id: x.id, nome: x.nome, saldo: Number(x.saldo) }));
 }

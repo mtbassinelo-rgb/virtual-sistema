@@ -30,7 +30,9 @@ export default async function SepararPedido({ params, searchParams }: { params: 
         from app.pedido_itens i left join app.produtos pr on pr.id = i.produto_id left join app.depositos o on o.id = i.deposito_origem_id
        where i.pedido_id = $1 order by pr.marca nulls last, i.descricao`, [id])).rows;
     const feito = (await c.query("select item_id, descricao, pedida::float pedida, separada::float separada from app.pedido_separacao where pedido_id = $1 order by descricao", [id])).rows;
-    return { p, itens, feito };
+    const transf = (await c.query(`select t.id, t.status, o.nome origem from app.transferencias t join app.depositos o on o.id = t.origem_id
+       where t.pedido_id = $1 and t.status <> 'cancelada' order by t.criada_em`, [id])).rows as { id: string; status: string; origem: string }[];
+    return { p, itens, feito, transf };
   });
   if (!d) notFound();
   const { p } = d;
@@ -56,6 +58,14 @@ export default async function SepararPedido({ params, searchParams }: { params: 
           <p>Vendedora: <b>{p.vendedora}</b> · pedido de {dataHora(p.criado_em)}{p.bling_numero ? ` · nº ${p.bling_numero}` : ""}
             {p.previsao_envio ? <> · enviar até <b>{data(p.previsao_envio)}</b></> : ""} · {p.deposito}</p>
           {p.observacoes && <div className="aviso-caixa pequeno"><b>Observação:</b> {p.observacoes}</div>}
+          {d.transf.map((t) => (
+            <div key={t.id} className={`aviso-caixa pequeno ${["recebida", "recebida_com_divergencia"].includes(t.status) ? "" : "info"}`}>
+              Parte deste pedido vem da <b>{t.origem}</b>:{" "}
+              {t.status === "solicitada" ? "esperando a unidade separar e enviar." : t.status === "separada" ? "separado lá, esperando aprovar o envio."
+                : t.status === "enviada" ? "a caminho — receba a transferência quando chegar." : "já chegou."}{" "}
+              <Link href={`/estoque/transferencias/${t.id}`}>ver</Link>
+            </div>
+          ))}
         </div>
       </section>
       <Avisos erro={f.erro} />

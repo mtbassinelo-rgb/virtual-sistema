@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { BuscaLista } from "../../busca-lista";
-import { precoTabela } from "../acoes";
+import { estoqueUnidades, precoTabela } from "../acoes";
 
 type Opcao = { v: string; t: string; d?: string };
 type Piso = { preco: number | null; piso: number | null; moeda: "GS" | "BRL" | null };
@@ -22,8 +22,11 @@ const num = (s: string) => {
  * Linhas de produtos do pedido: começa com 10 e o botão acrescenta mais.
  * Preço por peça é opcional: vazio = tabela do cliente. A vendedora pode baixar até o VIP, nunca menos (o banco confere).
  */
-export function LinhasItens({ opcoes, inicial = 10, podeBaixar = false }: { opcoes: Opcao[]; inicial?: number; podeBaixar?: boolean }) {
+export function LinhasItens({ opcoes, inicial = 10, podeBaixar = false, unidades = [] }: {
+  opcoes: Opcao[]; inicial?: number; podeBaixar?: boolean; unidades?: { id: string; nome: string }[];
+}) {
   const [n, setN] = useState(inicial);
+  const [estoques, setEstoques] = useState<Record<number, { produto: string; lista: { id: string; nome: string; saldo: number }[] }>>({});
   const [pisos, setPisos] = useState<Record<number, Piso & { chave: string }>>({});
   const [precos, setPrecos] = useState<Record<number, string>>({});
   const tabela = useRef<HTMLTableElement>(null);
@@ -34,6 +37,9 @@ export function LinhasItens({ opcoes, inicial = 10, podeBaixar = false }: { opco
     if (!form) return;
     const v = (nome: string) => (form.elements.namedItem(nome) as HTMLInputElement | null)?.value ?? "";
     const cliente = v("cliente_id"), moeda = v("moeda"), produto = v(`produto_${i}`);
+    if (unidades.length > 1 && produto && estoques[i]?.produto !== produto) {
+      estoqueUnidades(produto).then((lista) => setEstoques((e) => ({ ...e, [i]: { produto, lista } }))).catch(() => undefined);
+    }
     const chave = `${cliente}|${moeda}|${produto}`;
     if (!cliente || !produto) { setPisos((p) => ({ ...p, [i]: { preco: null, piso: null, moeda: null, chave } })); return; }
     if (pisos[i]?.chave === chave) return;
@@ -45,7 +51,7 @@ export function LinhasItens({ opcoes, inicial = 10, podeBaixar = false }: { opco
     <>
       <table ref={tabela} style={{ minWidth: 520 }} data-sem-filtro>
         <thead><tr><th style={{ width: 36 }}>#</th><th>Produto</th><th style={{ width: 100 }}>Caixas</th><th style={{ width: 100 }}>ou peças</th>
-          <th style={{ width: 150 }}>Preço por peça</th></tr></thead>
+          <th style={{ width: 150 }}>Preço por peça</th>{unidades.length > 1 && <th style={{ width: 150 }}>Sai de</th>}</tr></thead>
         <tbody>
           {Array.from({ length: n }, (_, i) => {
             const piso = pisos[i];
@@ -57,6 +63,9 @@ export function LinhasItens({ opcoes, inicial = 10, podeBaixar = false }: { opco
                 <td className="num suave">{i + 1}</td>
                 <td>
                   <BuscaLista name={`produto_${i}`} opcoes={opcoes} ariaLabel={`Produto ${i + 1}`} placeholder="Digite nome ou código (ex.: sha%uva)" />
+                  {estoques[i]?.lista.length ? (
+                    <div className="pequeno suave">Estoque: {estoques[i].lista.map((x) => `${x.nome} ${x.saldo.toLocaleString("pt-BR")}`).join(" · ")}</div>
+                  ) : null}
                 </td>
                 <td><input name={`cx_${i}`} inputMode="numeric" aria-label={`Caixas ${i + 1}`} onFocus={() => consultar(i)} /></td>
                 <td><input name={`qtd_${i}`} inputMode="decimal" aria-label={`Peças ${i + 1}`} onFocus={() => consultar(i)} /></td>
@@ -69,6 +78,14 @@ export function LinhasItens({ opcoes, inicial = 10, podeBaixar = false }: { opco
                   {!abaixo && !podeBaixar && minimo != null && piso?.preco != null && minimo < piso.preco && (
                     <div className="pequeno suave">pode baixar até {fmt(minimo, piso.moeda)}</div>)}
                 </td>
+                {unidades.length > 1 && (
+                  <td>
+                    <select name={`origem_${i}`} defaultValue="" aria-label={`De onde sai o produto ${i + 1}`} onFocus={() => consultar(i)}>
+                      <option value="">Depósito do pedido</option>
+                      {unidades.map((x) => <option key={x.id} value={x.id}>{x.nome}</option>)}
+                    </select>
+                  </td>
+                )}
               </tr>
             );
           })}
@@ -78,7 +95,8 @@ export function LinhasItens({ opcoes, inicial = 10, podeBaixar = false }: { opco
         <button type="button" onClick={() => setN((x) => Math.min(x + 1, 300))}>+ Adicionar produto</button>
         <button type="button" className="discreto" onClick={() => setN((x) => Math.min(x + 10, 300))}>+ 10 linhas</button>
         <span className="pequeno suave">{n} linhas · linhas vazias são ignoradas · preço vazio = tabela do cliente
-          {podeBaixar ? "" : " · pode baixar até o preço VIP, nunca menos"}</span>
+          {podeBaixar ? "" : " · pode baixar até o preço VIP, nunca menos"}
+          {unidades.length > 1 ? " · \"Sai de\": produto de outra unidade vira pedido entre unidades automático" : ""}</span>
       </div>
     </>
   );

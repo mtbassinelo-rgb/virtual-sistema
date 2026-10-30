@@ -22,6 +22,7 @@ export default async function NovoPedido({ searchParams }: { searchParams: Promi
       `select c.id, c.nome, c.categoria_preco, c.moeda, v.nome as vendedora from app.clientes c
          join app.vendedoras v on v.id = c.vendedora_id where c.mesclado_em is null and c.ativo order by c.nome`)).rows,
     produtos: (await c.query("select id, codigo, nome, unidades_caixa from app.produtos where ativo and not marketplace order by nome")).rows,
+    unidades: (await c.query("select id, nome from app.depositos where ativo order by tipo, nome")).rows as { id: string; nome: string }[],
     exigeEstoque: Number((await c.query("select app.param('pedido_exige_estoque') v")).rows[0].v ?? 0) === 1,
     depositos: (await c.query(
       ehGestao(u)
@@ -69,7 +70,7 @@ export default async function NovoPedido({ searchParams }: { searchParams: Promi
         </label>
         <label>Previsão de envio<input name="previsao_envio" type="date" defaultValue={hojeISO(2)} /></label>
         <div className="largo tabela" style={{ overflow: "visible" }}>
-          <LinhasItens opcoes={opcoesProdutos} podeBaixar={ehGestao(u) || pode(u, "preco_abaixo")} />
+          <LinhasItens opcoes={opcoesProdutos} podeBaixar={ehGestao(u) || pode(u, "preco_abaixo")} unidades={d.unidades} />
         </div>
         <fieldset className="largo desconto-pedido">
           <legend>Desconto no pedido</legend>
