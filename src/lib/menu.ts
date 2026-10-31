@@ -76,6 +76,7 @@ export function montarMenu(gestao: boolean, n: Contadores, aprovar = 0): GrupoMe
       { href: "/estoque/inventario", texto: "Inventário (contagem)" },
       { href: "/relatorios?aba=estoque", texto: "Para comprar / estoque baixo" },
       { href: "/relatorios/compra", texto: "Planejar compra por marca", dica: "Escolha a marca: estoque, venda por mês, quando acaba e quanto comprar" },
+      ...(gestao ? [{ href: "/estoque/pedido-compra", texto: "Pedido de compra por marca", dica: "Lista da marca com custo sem frete: preencha as quantidades e exporte a planilha" }] : []),
       ...(gestao ? [{ href: "/estoque/notas", texto: "Notas a chegar", dica: "Lance a nota do fornecedor; o estoque sobe quando confirmar a chegada" }] : []),
       ...(gestao ? [{ href: "/inteligencia?aba=compras", texto: "Compras e fornecedores", dica: "Compras com frete e câmbio, e prazo de reposição" }] : []),
       ...(gestao ? [{ href: "/inteligencia/fornecedores", texto: "Comparativo de fornecedores", dica: "Cílios e unhas: onde comprar mais barato (Dafu, Zhang, Fonte da Beleza, Nexxo e outros), com a planilha" }] : []),

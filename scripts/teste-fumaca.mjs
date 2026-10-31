@@ -112,7 +112,7 @@ ok((await abrir("/loja/pedido/token-que-nao-existe-123456")).html.includes("inv"
     "Cliente abre o pedido pelo link, sem login");
 }
 
-for (const tela of ["/estoque/historico", "/estoque/historico?ver=itens&marca=Maycrene", "/estoque/historico?usuario=sistema&tipo=ajuste_entrada", "/relatorios/compra", "/relatorios/compra?marca=Maycrene", "/relatorios/compra?marca=Maycrene&todos=1&dias=60&prazo=10", "/promocoes", "/estoque/importar", "/estoque/precos", "/produtos", "/produtos/novo", "/produtos?filtro=sem-foto", "/site"]) {
+for (const tela of ["/estoque/historico", "/estoque/historico?ver=itens&marca=Maycrene", "/estoque/historico?usuario=sistema&tipo=ajuste_entrada", "/relatorios/compra", "/relatorios/compra?marca=Maycrene", "/relatorios/compra?marca=Maycrene&todos=1&dias=60&prazo=10", "/estoque/pedido-compra", "/estoque/pedido-compra?marca=Maycrene", "/estoque/pedido-compra/planilha?marca=Maycrene", "/promocoes", "/estoque/importar", "/estoque/precos", "/produtos", "/produtos/novo", "/produtos?filtro=sem-foto", "/site"]) {
   const r = await abrir(tela, await sessao("gerente@teste.local"));
   ok(r.status === 200 && !r.html.includes("Application error"), `Gerente: ${tela} abre`);
 }
@@ -120,6 +120,11 @@ for (const tela of ["/estoque/historico", "/estoque/historico?ver=itens&marca=Ma
 const impKeila = await abrir("/estoque/importar", await sessao("keila@teste.local"));
 const semAcesso = (r) => (r.status >= 300 && r.status < 400 && r.local.includes("/sem-permissao")) || r.html.includes("Sem acesso a esta área") || r.html.includes("Só gerente ou dono");
 ok(semAcesso(impKeila), "Vendedora não importa produtos");
+{
+  const r = await abrir("/estoque/pedido-compra?marca=Maycrene", await sessao("keila@teste.local"));
+  ok(r.status !== 200 || !r.html.includes("Total sem frete"), "Vendedora não vê o pedido de compra (custo)");
+  ok((await abrir("/estoque/pedido-compra/planilha?marca=Maycrene", await sessao("keila@teste.local"))).status === 403, "Vendedora não exporta o pedido de compra");
+}
 ok(semAcesso(await abrir("/equipe", await sessao("keila@teste.local"))), "Vendedora não abre Equipe e acessos");
 for (const tela of ["/estoque", "/relatorios", "/estoque/historico"]) {
   ok(semAcesso(await abrir(tela, await sessao("keila@teste.local"))), `Vendedora não abre ${tela}`);

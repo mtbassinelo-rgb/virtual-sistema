@@ -164,6 +164,7 @@ export default async function PlanejarCompra({ searchParams }: {
             </table></div>
           )}
           {aComprar.length > 0 && <CopiarLista texto={`Pedido ${titulo}\n${textoLista}`} />}
+          {gestao && marca && <div className="linha" style={{ marginTop: 8 }}><Link className="botao" href={`/estoque/pedido-compra?marca=${encodeURIComponent(marca)}`}>Montar o pedido de compra desta marca</Link></div>}
         </section>
       )}
     </>
