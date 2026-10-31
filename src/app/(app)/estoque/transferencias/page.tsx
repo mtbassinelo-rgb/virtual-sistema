@@ -74,21 +74,21 @@ export default async function Transferencias({ searchParams }: { searchParams: P
       <nav className="filtros">{VISOES.map((v) => <Link key={v.k} href={`/estoque/transferencias?ver=${v.k}&mes=${mes}`} className={v.k === visao.k ? "ativo" : ""}>{v.t}</Link>)}</nav>
       <section className="painel">
         {d.lista.length === 0 ? <div className="vazio">Nenhum pedido aqui.</div> : (
-          <div className="tabela"><table>
+          <div className="tabela cartoes"><table>
             <thead><tr><th>Nº</th><th>Pedido em</th><th>De → Para</th><th>Itens</th><th>Situação</th>{gestao && <th>Custo</th>}<th>Quem pediu</th><th></th></tr></thead>
             <tbody>{d.lista.map((t) => {
               const s = SITUACAO_TRANSF[t.status] ?? { t: t.status, cor: "" };
               const acao = t.status === "solicitada" ? "Separar" : t.status === "separada" && d.aprova ? "Aprovar" : t.status === "enviada" ? "Receber" : "Ver";
               return (
                 <tr key={t.id}>
-                  <td className="num">#{t.numero}</td>
-                  <td>{new Date(t.criada_em).toLocaleDateString("pt-BR")}</td>
-                  <td>{t.origem} → <b>{t.destino}</b>{t.observacao && <div className="pequeno suave">{t.observacao}</div>}</td>
-                  <td className="num">{t.itens} prod. · {Number(t.pecas).toLocaleString("pt-BR")} pç{["separada", "enviada", "recebida", "recebida_com_divergencia"].includes(t.status) && Number(t.enviadas) < Number(t.pecas) && <div className="pequeno" style={{ color: "var(--aviso)" }}>{Number(t.enviadas).toLocaleString("pt-BR")} separadas</div>}</td>
-                  <td><Selo cor={s.cor}>{s.t}</Selo></td>
-                  {gestao && <td className="num">{t.valor_custo != null ? dinheiro(t.valor_custo, "BRL") : "—"}</td>}
-                  <td>{t.criada_por_nome ?? "—"}</td>
-                  <td><Link className={acao === "Ver" ? "" : "botao"} href={`/estoque/transferencias/${t.id}`}>{acao}</Link></td>
+                  <td className="num titulo">#{t.numero}</td>
+                  <td data-rot="Pedido em">{new Date(t.criada_em).toLocaleDateString("pt-BR")}</td>
+                  <td data-rot="De → Para">{t.origem} → <b>{t.destino}</b>{t.observacao && <div className="pequeno suave">{t.observacao}</div>}</td>
+                  <td className="num" data-rot="Itens">{t.itens} prod. · {Number(t.pecas).toLocaleString("pt-BR")} pç{["separada", "enviada", "recebida", "recebida_com_divergencia"].includes(t.status) && Number(t.enviadas) < Number(t.pecas) && <div className="pequeno" style={{ color: "var(--aviso)" }}>{Number(t.enviadas).toLocaleString("pt-BR")} separadas</div>}</td>
+                  <td data-rot="Situação"><Selo cor={s.cor}>{s.t}</Selo></td>
+                  {gestao && <td className="num" data-rot="Custo">{t.valor_custo != null ? dinheiro(t.valor_custo, "BRL") : "—"}</td>}
+                  <td data-rot="Quem pediu">{t.criada_por_nome ?? "—"}</td>
+                  <td className="acao"><Link className={acao === "Ver" ? "" : "botao"} href={`/estoque/transferencias/${t.id}`}>{acao}</Link></td>
                 </tr>);
             })}</tbody>
           </table></div>

@@ -127,7 +127,7 @@ export function Contagem({ deposito, itens }: { deposito: string; itens: ItemInv
         </div>
         <div className="pequeno suave">{feitos} produto(s) contado(s) neste aparelho · {lista.length} na lista{feitos > 0 ? ` · ao salvar: +${resumo.mais} / −${resumo.menos} peças` : ""}</div>
       </section>
-      <div className="tabela"><table>
+      <div className="tabela cartoes"><table>
         <thead><tr><th>Produto</th><th className="num">No sistema</th><th className="num">Contado</th><th className="num">{acao === "somar" ? "Vai entrar" : "Diferença"}</th></tr></thead>
         <tbody>{lista.slice(0, 400).map((i) => {
           const v = contado[i.id];
@@ -135,7 +135,7 @@ export function Contagem({ deposito, itens }: { deposito: string; itens: ItemInv
           const dif = q != null ? mudanca(i, q) : null;
           return (
             <tr key={i.id} className={i.id === ultimo ? "linha-destaque" : ""}>
-              <td>
+              <td className="titulo">
                 <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                   {/* foto para reconhecer o produto na prateleira (clique para ver grande) */}
                   {i.foto
@@ -144,12 +144,12 @@ export function Contagem({ deposito, itens }: { deposito: string; itens: ItemInv
                   <div>{i.nome}<div className="pequeno suave">{i.codigo}{i.marca ? ` · ${i.marca}` : ""}{i.caixa ? ` · caixa com ${i.caixa}` : ""}</div>{i.kits && <div className="pequeno" title={i.kits}>🧩 Peça de kit: {i.kits.length > 70 ? i.kits.slice(0, 70) + "…" : i.kits}</div>}</div>
                 </div>
               </td>
-              <td className="num">{i.saldo.toLocaleString("pt-BR")} pç{i.caixa && i.caixa > 1 ? <div className="pequeno suave">{Math.floor(i.saldo / i.caixa)} cx{i.saldo % i.caixa ? ` + ${i.saldo % i.caixa} pç` : ""}</div> : null}</td>
-              <td className="num"><input value={v ?? ""} style={{ width: 80 }} aria-label={`Contado de ${i.nome}`} placeholder={modo === "caixa" && i.caixa ? "caixas" : "peças"}
+              <td className="num" data-rot="No sistema">{i.saldo.toLocaleString("pt-BR")} pç{i.caixa && i.caixa > 1 ? <div className="pequeno suave">{Math.floor(i.saldo / i.caixa)} cx{i.saldo % i.caixa ? ` + ${i.saldo % i.caixa} pç` : ""}</div> : null}</td>
+              <td className="num" data-rot="Contado"><input value={v ?? ""} style={{ width: 80 }} aria-label={`Contado de ${i.nome}`} placeholder={modo === "caixa" && i.caixa ? "caixas" : "peças"}
                     onChange={(e) => { marcarBase(i.id); setContado((m) => ({ ...m, [i.id]: e.target.value.replace(/[^\dcxaiCXAI.,*+\s]/g, "").replace(/^(\d+)\+/, modo === "caixa" ? "$1cx+" : "$1+") })); }} />
                 {v && q != null && String(q) !== v.trim() && <div className="pequeno suave">= {q} pç</div>}
                 {v && q == null && <div className="pequeno texto-erro">inválido</div>}</td>
-              <td className={`num ${dif && acao === "substituir" ? "texto-erro" : ""}`}>{dif == null ? "" : dif > 0 ? `+${dif}` : dif}</td>
+              <td className={`num ${dif && acao === "substituir" ? "texto-erro" : ""}`} data-rot={acao === "somar" ? "Vai entrar" : "Diferença"}>{dif == null ? "" : dif > 0 ? `+${dif}` : dif}</td>
             </tr>
           );
         })}</tbody>

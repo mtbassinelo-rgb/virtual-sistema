@@ -62,7 +62,7 @@ export default async function Separacao({ searchParams }: { searchParams: Promis
         e.prazo, e.etapa, e.preparado_em, app.nome_usuario(e.preparado_por) preparado_por
       from app.marketplace_envios e join app.canais k on k.codigo = e.canal
       where e.deposito_id = any($1::uuid[]) and (e.etapa = 'a_preparar' or (e.etapa = 'preparado' and e.preparado_em > now() - interval '3 days'))
-      order by e.etapa, e.prazo nulls last, e.criado_em limit 300`, [ids]).catch(() => ({ rows: [] }))).rows as Envio[];
+      order by e.etapa, (e.prazo < now()) desc nulls last, e.prazo nulls last, e.criado_em limit 300`, [ids]).catch(() => ({ rows: [] }))).rows as Envio[];
     const embaladosHoje = (await c.query(`select count(*)::int n from app.marketplace_envios
       where deposito_id = any($1::uuid[]) and preparado_em::date = current_date`, [ids]).catch(() => ({ rows: [{ n: 0 }] }))).rows[0].n as number;
     // Pedidos separados: como saem (a vendedora informa) e o ✓ do estoquista quando o passeiro leva

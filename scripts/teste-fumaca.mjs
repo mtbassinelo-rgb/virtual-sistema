@@ -45,11 +45,15 @@ const clienteKeila = (await db.query(
 for (const [email, quem] of [["gerente@teste.local", "Gerente"], ["keila@teste.local", "Keila"]]) {
   const cookie = await sessao(email);
   // vendedora só tem a área dela: sem estoque geral nem relatórios da empresa
-  const soGestao = ["/relatorios?aba=site", "/estoque", "/estoque?situacao=zerado", "/estoque?situacao=com"];
-  for (const tela of ["/", "/pedidos", "/pedidos?pagamento=aguardando", "/pedidos/novo", "/caixa", "/estoque/inventario", "/pedidos?desconto=pendente", "/catalogo?marca=Rhenuks", "/loja/esqueci", `/pedidos/${pedidoKeila}`,
+  const soGestao = ["/relatorios?aba=site", "/estoque", "/estoque?situacao=zerado", "/estoque?situacao=com", "/aprovacoes"];
+  for (const tela of ["/", "/pedidos", "/pedidos?pagamento=aguardando", "/pedidos/novo", "/caixa", "/estoque/inventario", "/pedidos?desconto=pendente", "/catalogo?marca=Rhenuks", "/loja/esqueci", `/pedidos/${pedidoKeila}`, `/pedidos/novo?repetir=${pedidoKeila}`, "/clientes?novo=1&whatsapp=595981000000", "/busca?q=comissao",
                       "/clientes", `/clientes/${clienteKeila}`, "/metas", ...(quem === "Gerente" ? soGestao : [])]) {
     const r = await abrir(tela, cookie);
     ok(r.status === 200 && !r.html.includes("Application error"), `${quem}: ${tela} abre`);
+  }
+  if (quem === "Keila") {
+    const ap = await abrir("/aprovacoes", cookie);
+    ok(ap.status !== 200 || ap.html.includes("permiss"), "Keila não abre Aprovações (só gestão)");
   }
   const outro = await abrir(`/pedidos/${pedidoYessica}`, cookie);
   if (quem === "Keila") ok(outro.status === 404, "Keila não abre pedido da Yessica");

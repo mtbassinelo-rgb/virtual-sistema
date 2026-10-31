@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { exigirUsuario } from "@/lib/auth";
+import { exigirUsuario, ehGestao } from "@/lib/auth";
+import { montarMenu, SEM_CONTADORES } from "@/lib/menu";
+import { permissaoDoLink, pode } from "@/lib/permissoes";
 import { comUsuario } from "@/lib/db";
 import { dinheiro, data, STATUS_COMERCIAL, type Moeda } from "@/lib/formato";
 import { Selo } from "../avisos";
@@ -19,23 +21,41 @@ export default async function Busca({ searchParams }: { searchParams: Promise<{ 
       where cliente_nome ilike $1 or bling_numero::text = $2 order by data_pedido desc limit 12`, [like, q])).rows;
     return { produtos, clientes, pedidos };
   });
-  const nada = d && !d.produtos.length && !d.clientes.length && !d.pedidos.length;
+  // Telas do sistema cujo nome ou explicação contém o que foi digitado (sem acento e sem maiúsculas)
+  const norm = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const termos = norm(q).split(/\s+/).filter((t) => t.length >= 2);
+  const vistas = new Set<string>();
+  const telas = termos.length === 0 ? [] : montarMenu(ehGestao(u), { ...SEM_CONTADORES, confirma_py: true })
+    .flatMap((g) => g.itens.map((i) => ({ ...i, grupo: g.titulo })))
+    .filter((i) => { const k = permissaoDoLink(i.href); return !k || pode(u, k); })
+    .filter((i) => { const t = norm(`${i.texto} ${i.dica ?? ""} ${i.grupo}`); return termos.every((x) => t.includes(x)); })
+    .filter((i) => (vistas.has(i.href) ? false : (vistas.add(i.href), true)))
+    .slice(0, 12);
+  const nada = d && !telas.length && !d.produtos.length && !d.clientes.length && !d.pedidos.length;
 
   return (
     <>
       <section className="cabecalho-pagina">
         <div>
           <h1>Busca</h1>
-          <p>Procure em produtos, clientes e pedidos ao mesmo tempo, pelo nome, código, código de barras, WhatsApp ou número do pedido.</p>
+          <p>Procure telas do sistema, produtos, clientes e pedidos ao mesmo tempo: pelo nome da tela (ex.: despesas, comissão), nome, código, código de barras, WhatsApp ou número do pedido.</p>
         </div>
       </section>
       <form className="painel linha" method="get">
-        <label style={{ flex: 1, minWidth: 220 }}>O que você procura?<input name="q" defaultValue={q} autoFocus placeholder="Ex.: matizador, Maria Salão, 1520" /></label>
+        <label style={{ flex: 1, minWidth: 220 }}>O que você procura?<input name="q" defaultValue={q} autoFocus placeholder="Ex.: despesas, matizador, Maria Salão, 1520" /></label>
         <button className="principal">Buscar</button>
       </form>
       {!d && <div className="painel vazio">Digite pelo menos 2 letras.</div>}
       {nada && <div className="painel vazio">Nada encontrado para “{q}”. Tente só uma parte do nome.</div>}
-      {d && d.produtos.length > 0 && (
+      {telas.length > 0 && (
+        <section className="painel">
+          <h2>Telas do sistema</h2>
+          <ul className="crm-lista">{telas.map((t) => (
+            <li key={t.href}><Link href={t.href} className="crm-quem">{t.texto}<small>{t.grupo}{t.dica ? ` · ${t.dica}` : ""}</small></Link>
+              <Link className="botao mini" href={t.href}>Abrir →</Link></li>))}</ul>
+        </section>
+      )}
+            {d && d.produtos.length > 0 && (
         <section className="painel">
           <div className="linha entre"><h2>Produtos</h2><Link href={`/produtos?q=${encodeURIComponent(q)}&filtro=todos`}>Ver todos</Link></div>
           <div className="tabela"><table><tbody>{d.produtos.map((p) => (
