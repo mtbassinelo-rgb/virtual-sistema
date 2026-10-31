@@ -9,7 +9,7 @@ import { aprovarCadastro } from "../site/acoes";
 
 export const metadata = { title: "Clientes" };
 
-export default async function Clientes({ searchParams }: { searchParams: Promise<{ q?: string; vendedora?: string; compra?: string; situacao?: string; unidade?: string; erro?: string; ok?: string }> }) {
+export default async function Clientes({ searchParams }: { searchParams: Promise<{ q?: string; vendedora?: string; compra?: string; situacao?: string; unidade?: string; erro?: string; ok?: string; novo?: string; whatsapp?: string; nome?: string }> }) {
   const u = await exigirUsuario();
   const f = await searchParams;
   const par: unknown[] = [];
@@ -53,6 +53,7 @@ export default async function Clientes({ searchParams }: { searchParams: Promise
       <section className="linha entre">
         <div><h1>Clientes</h1><div className="suave pequeno">{d.clientes.length} cliente(s)
           {porUnidade && atual && <> · só os da unidade <b>{atual.nome}</b> (<a href={`/clientes?${new URLSearchParams({ ...(f.q ? { q: f.q } : {}), unidade: "todas" })}`}>ver de todas as unidades</a>)</>}</div></div>
+        {podeEscrever(u) && <a className="botao principal" href="/clientes?novo=1#cadastrar">+ Cadastrar cliente</a>}
       </section>
       <Avisos erro={f.erro} ok={f.ok} />
       {d.leads.length > 0 && (
@@ -154,13 +155,13 @@ export default async function Clientes({ searchParams }: { searchParams: Promise
       )}
 
       {podeEscrever(u) && (
-        <details className="painel">
+        <details className="painel" id="cadastrar" open={f.novo === "1" || undefined}>
           <summary>Cadastrar cliente</summary>
           <form action={criarCliente} className="campos" style={{ marginTop: 10 }}>
             {atual && <input type="hidden" name="deposito" value={atual.id} />}
             {atual && <p className="largo pequeno suave" style={{ margin: 0 }}>O cliente fica ligado à unidade <b>{atual.nome}</b> (vê o estoque e os preços dela).</p>}
-            <label className="largo">Nome ou empresa<input name="nome" required /></label>
-            <label>WhatsApp<input name="whatsapp" placeholder="595981000000" /></label>
+            <label className="largo">Nome ou empresa<input name="nome" required defaultValue={f.nome ?? ""} autoFocus={f.novo === "1" || undefined} /></label>
+            <label>WhatsApp<input name="whatsapp" placeholder="595981000000" defaultValue={(f.whatsapp ?? "").replace(/\D/g, "")} /></label>
             <label>Telefone<input name="telefone" /></label>
             <label>Cidade<input name="cidade" /></label>
             <label>Departamento / Estado<input name="departamento" /></label>

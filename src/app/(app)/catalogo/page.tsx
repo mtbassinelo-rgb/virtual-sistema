@@ -8,7 +8,7 @@ export const metadata = { title: "Catálogo para enviar" };
 
 const TABELAS: Record<string, { nome: string; moeda: Moeda }> = {
   py_normal: { nome: "Paraguai · Normal (Gs)", moeda: "GS" }, py_vip: { nome: "Paraguai · VIP (Gs)", moeda: "GS" },
-  br_normal: { nome: "Brasil · Gold (R$)", moeda: "BRL" }, br_vip: { nome: "Brasil · Platinum (R$)", moeda: "BRL" },
+  br_normal: { nome: "Brasil · Normal / Gold (R$)", moeda: "BRL" }, br_vip: { nome: "Brasil · VIP / Platinum (R$)", moeda: "BRL" },
 };
 
 export default async function Catalogo({ searchParams }: { searchParams: Promise<{ marca?: string | string[]; tabela?: string; estoque?: string }> }) {

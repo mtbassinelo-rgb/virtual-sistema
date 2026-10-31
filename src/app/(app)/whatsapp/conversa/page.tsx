@@ -115,6 +115,11 @@ export default async function Conversa({ searchParams }: { searchParams: Promise
               <h2 style={{ marginTop: 0 }}>Cliente</h2>
               <p><Link href={`/clientes/${cli.id}`}><b>{cli.nome}</b></Link><br />
                 <span className="pequeno suave">{cli.vendedora} · {cli.categoria_preco === "vip" ? "VIP" : "Normal"}{cli.cidade ? ` · ${cli.cidade}` : ""}</span></p>
+              <div className="linha" style={{ gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+                <Link className="botao principal mini" href={`/pedidos/novo?cliente=${cli.id}`}>+ Novo pedido</Link>
+                {pedidos[0] && <Link className="botao mini" href={`/pedidos/novo?repetir=${pedidos[0].id}`}>↻ Repetir último</Link>}
+                <Link className="botao mini" href={`/orcamentos/novo?cliente=${cli.id}`}>Orçamento</Link>
+              </div>
               {tot.map((t) => (
                 <div key={t.moeda} className="indicador" style={{ marginBottom: 8 }}>
                   <span className="rotulo">Comprou nos últimos 12 meses</span>
@@ -138,7 +143,12 @@ export default async function Conversa({ searchParams }: { searchParams: Promise
               <p className="pequeno">Este número não está no cadastro de clientes{k.contato.startsWith("lid:") ? " (o WhatsApp escondeu o número deste contato)" : ""}.</p>
               <Selo cor="info">Lead</Selo>
               <p className="pequeno suave">Ao cadastrar o cliente com este WhatsApp, a conversa passa a aparecer ligada a ele, com os pedidos.</p>
-              <Link className="botao" href="/clientes">Ir para Clientes</Link>
+              <div className="linha" style={{ gap: 6, flexWrap: "wrap" }}>
+                {!k.contato.startsWith("lid:")
+                  ? <Link className="botao principal" href={`/clientes?novo=1&whatsapp=${encodeURIComponent(k.contato)}${k.nome ? `&nome=${encodeURIComponent(k.nome)}` : ""}#cadastrar`}>+ Cadastrar com este WhatsApp</Link>
+                  : <Link className="botao" href="/clientes?novo=1#cadastrar">+ Cadastrar cliente</Link>}
+                <Link className="botao" href="/orcamentos/novo">Orçamento</Link>
+              </div>
             </>
           )}
           <p className="pequeno suave" style={{ marginBottom: 0 }}>Atualizado {dataHora(new Date())}. Fotos e áudios aparecem só como tipo.</p>

@@ -156,6 +156,9 @@ export default async function Cliente({ params, searchParams }: {
         </div>
         <div className="ficha-acoes">
           {!ro && <Link className="botao principal" href={`/pedidos/novo?cliente=${cli.id}`}>Novo pedido</Link>}
+          {!ro && (() => { const ult = d.pedidos.find((x) => x.status_comercial !== "cancelado"); return ult
+            ? <Link className="botao" href={`/pedidos/novo?repetir=${ult.id}`} title={`Novo pedido com os mesmos produtos do pedido de ${data(ult.data_pedido)} (preços de hoje)`}>↻ Repetir último pedido</Link> : null; })()}
+          {!ro && <Link className="botao" href={`/orcamentos/novo?cliente=${cli.id}`}>Orçamento</Link>}
           {whats && <a className="botao whatsapp" href={whats} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
           {!ro && <Link className="botao" href={`/metas?cliente=${cli.id}#propor`}>Propor meta</Link>}
         </div>

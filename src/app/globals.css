@@ -690,8 +690,6 @@ button.mini { padding: 4px 10px; font-size: .78rem; }
 .fazer-item.aviso { border-left-color: #d99a25; } .fazer-item.aviso .fazer-n { color: #b07812; }
 .fazer-item.ok { border-left-color: var(--ok); } .fazer-item.ok .fazer-n { color: var(--ok); }
 
-/* Próximo passo do pedido com o botão da ação */
-.proximo-passo { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 
 /* Menu: total de pendências no título do grupo fechado */
 .menu-lateral summary .contador { margin-left: auto; }

@@ -22,10 +22,18 @@ const num = (s: string) => {
  * Linhas de produtos do pedido: começa com 10 e o botão acrescenta mais.
  * Preço por peça é opcional: vazio = tabela do cliente. A vendedora pode baixar até o VIP, nunca menos (o banco confere).
  */
-export function LinhasItens({ opcoes, inicial = 10, podeBaixar = false, unidades = [] }: {
+export function LinhasItens({ opcoes, inicial = 10, podeBaixar = false, unidades = [], iniciais = [], caixa = {} }: {
   opcoes: Opcao[]; inicial?: number; podeBaixar?: boolean; unidades?: { id: string; nome: string }[];
+  /** Itens já preenchidos (repetir um pedido anterior): produto e caixas ou peças. */
+  iniciais?: { produto: string; cx?: number | null; qtd?: number | null }[];
+  /** Peças por caixa de cada produto (para a soma parcial). */
+  caixa?: Record<string, number>;
 }) {
-  const [n, setN] = useState(inicial);
+  const [n, setN] = useState(Math.max(inicial, iniciais.length + 3));
+  // Caixas e peças digitadas em cada linha: só para mostrar a soma parcial (o banco recalcula tudo ao criar)
+  const [qtds, setQtds] = useState<Record<number, { cx: string; qtd: string }>>(() =>
+    Object.fromEntries(iniciais.map((x, i) => [i, { cx: x.cx ? String(x.cx) : "", qtd: x.qtd ? String(x.qtd) : "" }])));
+  const mudarQtd = (i: number, campo: "cx" | "qtd", v: string) => setQtds((q) => ({ ...q, [i]: { cx: q[i]?.cx ?? "", qtd: q[i]?.qtd ?? "", [campo]: v } }));
   const [estoques, setEstoques] = useState<Record<number, { produto: string; lista: { id: string; nome: string; saldo: number }[] }>>({});
   const [pisos, setPisos] = useState<Record<number, Piso & { chave: string }>>({});
   const [precos, setPrecos] = useState<Record<number, string>>({});
@@ -47,6 +55,19 @@ export function LinhasItens({ opcoes, inicial = 10, podeBaixar = false, unidades
     setPisos((p) => ({ ...p, [i]: { ...r, chave } }));
   }
 
+  // Soma parcial: peças × (preço digitado ou preço de tabela). Só aparece quando há preço conhecido.
+  let pecas = 0, caixas = 0, total = 0, semPreco = 0, moedaTotal: "GS" | "BRL" | null = null;
+  for (let i = 0; i < n; i++) {
+    const q = qtds[i]; if (!q) continue;
+    const produto = pisos[i]?.chave.split("|")[2] ?? "";
+    const cx = num(q.cx), pc = num(q.qtd);
+    const un = pc > 0 ? pc : cx * (caixa[produto] ?? 1);
+    if (un <= 0) continue;
+    pecas += un; if (cx > 0 && !(pc > 0)) caixas += cx;
+    const preco = num(precos[i] ?? "") || pisos[i]?.preco || 0;
+    if (preco > 0) { total += un * preco; moedaTotal = moedaTotal ?? pisos[i]?.moeda ?? null; } else semPreco++;
+  }
+
   return (
     <>
       <table ref={tabela} style={{ minWidth: 520 }} data-sem-filtro>
@@ -62,13 +83,15 @@ export function LinhasItens({ opcoes, inicial = 10, podeBaixar = false, unidades
               <tr key={i}>
                 <td className="num suave">{i + 1}</td>
                 <td>
-                  <BuscaLista name={`produto_${i}`} opcoes={opcoes} ariaLabel={`Produto ${i + 1}`} placeholder="Digite nome ou código (ex.: sha%uva)" />
+                  <BuscaLista name={`produto_${i}`} opcoes={opcoes} ariaLabel={`Produto ${i + 1}`} placeholder="Digite nome ou código (ex.: sha%uva)" defaultValue={iniciais[i]?.produto} />
                   {estoques[i]?.lista.length ? (
                     <div className="pequeno suave">Estoque: {estoques[i].lista.map((x) => `${x.nome} ${x.saldo.toLocaleString("pt-BR")}`).join(" · ")}</div>
                   ) : null}
                 </td>
-                <td><input name={`cx_${i}`} inputMode="numeric" aria-label={`Caixas ${i + 1}`} onFocus={() => consultar(i)} /></td>
-                <td><input name={`qtd_${i}`} inputMode="decimal" aria-label={`Peças ${i + 1}`} onFocus={() => consultar(i)} /></td>
+                <td><input name={`cx_${i}`} inputMode="numeric" aria-label={`Caixas ${i + 1}`} onFocus={() => consultar(i)}
+                  defaultValue={iniciais[i]?.cx ? String(iniciais[i].cx) : undefined} onChange={(e) => { mudarQtd(i, "cx", e.target.value); consultar(i); }} /></td>
+                <td><input name={`qtd_${i}`} inputMode="decimal" aria-label={`Peças ${i + 1}`} onFocus={() => consultar(i)}
+                  defaultValue={iniciais[i]?.qtd ? String(iniciais[i].qtd) : undefined} onChange={(e) => { mudarQtd(i, "qtd", e.target.value); consultar(i); }} /></td>
                 <td>
                   <input name={`preco_${i}`} inputMode="decimal" aria-label={`Preço por peça ${i + 1}`} value={precos[i] ?? ""}
                     placeholder={piso?.preco != null ? fmt(piso.preco, piso.moeda) : "da tabela"}
@@ -91,6 +114,13 @@ export function LinhasItens({ opcoes, inicial = 10, podeBaixar = false, unidades
           })}
         </tbody>
       </table>
+      {pecas > 0 && (
+        <div className="aviso-caixa info linha entre" style={{ marginTop: 8 }} aria-live="polite">
+          <span><b>{pecas.toLocaleString("pt-BR")}</b> peça(s){caixas > 0 ? <> · <b>{caixas.toLocaleString("pt-BR")}</b> caixa(s)</> : null}</span>
+          <span>{total > 0 ? <>Total estimado <b className="num">{fmt(total, moedaTotal)}</b></> : "Escolha o cliente para ver o total"}
+            {semPreco > 0 && total > 0 ? <span className="pequeno suave"> · {semPreco} linha(s) sem preço ainda</span> : null}</span>
+        </div>
+      )}
       <div className="linha" style={{ marginTop: 8, gap: 8 }}>
         <button type="button" onClick={() => setN((x) => Math.min(x + 1, 300))}>+ Adicionar produto</button>
         <button type="button" className="discreto" onClick={() => setN((x) => Math.min(x + 10, 300))}>+ 10 linhas</button>

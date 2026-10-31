@@ -12,7 +12,7 @@ import { pode } from "@/lib/permissoes";
 
 export const metadata = { title: "Novo pedido" };
 
-export default async function NovoPedido({ searchParams }: { searchParams: Promise<{ erro?: string; cliente?: string }> }) {
+export default async function NovoPedido({ searchParams }: { searchParams: Promise<{ erro?: string; cliente?: string; repetir?: string }> }) {
   const u = await exigirUsuario();
   if (!podeEscrever(u)) redirect("/pedidos");
   const f = await searchParams;
@@ -30,7 +30,21 @@ export default async function NovoPedido({ searchParams }: { searchParams: Promi
         : `select d.id, d.nome, vd.padrao from app.depositos d join app.vendedora_depositos vd on vd.deposito_id = d.id
             where vd.vendedora_id = $1 and d.ativo order by vd.padrao desc, d.nome`,
       ehGestao(u) ? [] : [u.vendedora_id])).rows,
+    // Repetir um pedido anterior: mesmo cliente e mesmos produtos (quantidade em caixas quando fecha caixa); preço sempre o de hoje
+    repetir: f.repetir && /^[0-9a-f-]{36}$/i.test(f.repetir)
+      ? (await c.query(`select p.cliente_id, p.data_pedido, i.produto_id, sum(coalesce(i.quantidade_pedida, i.quantidade)) qtd, pr.unidades_caixa
+           from app.pedidos p join app.pedido_itens i on i.pedido_id = p.id join app.produtos pr on pr.id = i.produto_id
+          where p.id = $1 and pr.ativo and not pr.marketplace
+          group by p.cliente_id, p.data_pedido, i.produto_id, pr.unidades_caixa, pr.nome order by pr.nome`, [f.repetir]).catch(() => ({ rows: [] }))).rows as
+          { cliente_id: string | null; data_pedido: string; produto_id: string; qtd: string; unidades_caixa: number | null }[]
+      : [],
   }));
+  const iniciais = d.repetir.map((x) => {
+    const q = Number(x.qtd), uc = Number(x.unidades_caixa ?? 0);
+    return uc > 1 && q % uc === 0 ? { produto: String(x.produto_id), cx: q / uc } : { produto: String(x.produto_id), qtd: q };
+  });
+  const clienteInicial = f.cliente ?? (d.repetir[0]?.cliente_id ? String(d.repetir[0].cliente_id) : "");
+  const caixa = Object.fromEntries(d.produtos.filter((p) => Number(p.unidades_caixa) > 0).map((p) => [String(p.id), Number(p.unidades_caixa)]));
   const opcoesProdutos = d.produtos.map((p) => ({ v: String(p.id), t: `${p.nome}`,
     d: `${p.codigo}${p.unidades_caixa ? ` · caixa com ${p.unidades_caixa}` : ""}` }));
 
@@ -45,12 +59,16 @@ export default async function NovoPedido({ searchParams }: { searchParams: Promi
           {" "}Ainda não é cliente ou só quer saber o preço? <Link href="/orcamentos/novo">Faça um orçamento</Link>.</div>
       </section>
       <Avisos erro={f.erro} />
+      {iniciais.length > 0 && (
+        <div className="aviso-caixa info">Repetindo o pedido de {new Date(d.repetir[0].data_pedido).toLocaleDateString("pt-BR", { timeZone: "UTC" })}: {iniciais.length} produto(s) já preenchidos.
+          Ajuste as quantidades com o cliente. Os preços são os de hoje (tabela do cliente).</div>
+      )}
       {d.depositos.length === 0 && !ehGestao(u) && (
         <div className="aviso-caixa aviso">Você ainda não tem depósito liberado para vender. Peça ao gerente.</div>
       )}
       <FormPedido>
         <label className="largo">Cliente
-          <BuscaLista name="cliente_id" required defaultValue={f.cliente ?? ""} ariaLabel="Cliente"
+          <BuscaLista name="cliente_id" required defaultValue={clienteInicial} ariaLabel="Cliente"
             placeholder="Digite o nome do cliente (use % como coringa)"
             opcoes={d.clientes.map((c) => ({ v: String(c.id), t: String(c.nome),
               d: `${c.moeda === "GS" ? "Gs" : "R$"} ${c.categoria_preco === "vip" ? "VIP" : "Normal"}${ehGestao(u) ? ` · ${c.vendedora}` : ""}` }))} />
@@ -70,7 +88,7 @@ export default async function NovoPedido({ searchParams }: { searchParams: Promi
         </label>
         <label>Previsão de envio<input name="previsao_envio" type="date" defaultValue={hojeISO(2)} /></label>
         <div className="largo tabela" style={{ overflow: "visible" }}>
-          <LinhasItens opcoes={opcoesProdutos} podeBaixar={ehGestao(u) || pode(u, "preco_abaixo")} unidades={d.unidades} />
+          <LinhasItens opcoes={opcoesProdutos} podeBaixar={ehGestao(u) || pode(u, "preco_abaixo")} unidades={d.unidades} iniciais={iniciais} caixa={caixa} />
         </div>
         <fieldset className="largo desconto-pedido">
           <legend>Desconto no pedido</legend>

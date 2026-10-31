@@ -144,8 +144,12 @@ export default async function Pedido({ params, searchParams }: {
     const ajustaSeparacao = Number((await c.query("select app.param('vendedora_ajusta_separacao') v")).rows[0]?.v ?? 0) === 1;
     // Parâmetros → vendedora_cancela_pedido: vendedora cancela o próprio pedido antes de sair
     const cancelaVendedora = Number((await c.query("select app.param('vendedora_cancela_pedido') v")).rows[0]?.v ?? 0) === 1;
+    // Dados para pagamento: vem preenchido com a última conta usada pela mesma vendedora nessa moeda (pode editar)
+    const contaSugerida = (await c.query(`select conta_pagamento from app.v_pedidos
+        where vendedora_id = $1 and moeda = $2 and conta_pagamento is not null and id <> $3
+        order by total_confirmado_em desc nulls last limit 1`, [p.vendedora_id, p.moeda, id]).catch(() => ({ rows: [] }))).rows[0]?.conta_pagamento as string | undefined;
     return { p, cliente, itens, fluxo, transf, bling, pagamentos, comprovantes, atendimentos, depositos, historico, indisponiveis,
-             trocas, remocoes, editavelItens, produtos, ajustaSeparacao, cancelaVendedora };
+             trocas, remocoes, editavelItens, produtos, ajustaSeparacao, cancelaVendedora, contaSugerida: contaSugerida ?? "" };
   });
   if (!d) notFound();
   const { p, cliente } = d;
@@ -195,6 +199,18 @@ export default async function Pedido({ params, searchParams }: {
     remocaoPendente: d.remocoes.some((r) => r.status === "pendente" && r.item_id === i.id),
   }));
   const passo = proximoPasso(p, fluxo);
+  // Botão do próximo passo: leva direto ao lugar da página onde se faz (sem procurar)
+  const separadoSemTotal = naSeparacao && (fluxo?.separacao_conferida_em || ehBling) && !fluxo?.total_confirmado_em;
+  const acaoPasso: { href: string; texto: string } | null = !escrever || p.status_comercial === "cancelado" ? null
+    : p.status_comercial === "aguardando_cliente" ? { href: "#link-cliente", texto: "Mandar link ao cliente" }
+    : p.status_comercial === "aguardando_aprovacao" ? { href: "#itens", texto: "Conferir itens" }
+    : separar ? { href: `/estoque/separacao/${p.id}`, texto: "Separar agora" }
+    : separadoSemTotal ? { href: "#total", texto: "Mandar total e conta" }
+    : naSeparacao && Number(p.saldo) - Number(p.a_conferir) > 0 ? { href: "#pagamentos", texto: "Registrar pagamento" }
+    : naSeparacao && gestao && Number(p.a_conferir) > 0 ? { href: "#pagamentos", texto: "Conferir pagamento" }
+    : naSeparacao && !fluxo?.entrega_tipo && p.origem !== "bling" ? { href: "#entrega", texto: "Informar entrega" }
+    : ["enviado", "aguardando_retirada"].includes(p.status_comercial) ? { href: "#entrega", texto: "Finalizar" }
+    : null;
   const pendentes = d.pagamentos.filter((g) => g.status_conferencia === "pendente");
   const resolvidos = d.pagamentos.filter((g) => g.status_conferencia !== "pendente");
   const feitos = [
@@ -213,7 +229,7 @@ export default async function Pedido({ params, searchParams }: {
         <div>
           <Link href="/pedidos">← Pedidos</Link>
           <h1 style={{ marginTop: 4 }}>
-            {p.bling_numero ? `Pedido ${p.bling_numero}` : "Pedido sem nº do Bling"} · {cliente?.nome ?? "Sem cliente"}
+            {p.bling_numero ? `Pedido ${p.bling_numero}` : `Pedido de ${data(p.data_pedido)}`} · {cliente?.nome ?? "Sem cliente"}
           </h1>
           <div className="linha pequeno suave">
             <span>{data(p.data_pedido)}</span><span>{p.vendedora_nome}</span><span>Canal: {p.canal}</span>
@@ -224,6 +240,7 @@ export default async function Pedido({ params, searchParams }: {
         </div>
         <div className="linha">
           {cliente && <Link className="botao" href={`/clientes/${cliente.id}`}>Ficha do cliente</Link>}
+          {escrever && cliente && !ehBling && <Link className="botao" href={`/pedidos/novo?repetir=${p.id}`} title="Novo pedido com os mesmos produtos (preços de hoje)">↻ Repetir</Link>}
           <Link className="botao" href={`/pedidos/${p.id}/resumo`}>Resumo para o cliente</Link>
           {whats && <a className="botao whatsapp" href={whats} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
         </div>
@@ -240,7 +257,10 @@ export default async function Pedido({ params, searchParams }: {
               </li>
             ))}
           </ol>
-          {passo && <div className="proximo-passo"><span>Próximo passo</span><b>{passo}</b></div>}
+          {passo && <div className="proximo-passo"><span>Próximo passo</span><b>{passo}</b>
+            {acaoPasso && (acaoPasso.href.startsWith("#")
+              ? <a className="botao principal mini" style={{ marginLeft: "auto" }} href={acaoPasso.href}>{acaoPasso.texto} →</a>
+              : <Link className="botao principal mini" style={{ marginLeft: "auto" }} href={acaoPasso.href}>{acaoPasso.texto} →</Link>)}</div>}
           {p.status_comercial === "em_separacao" && p.origem !== "bling" && !fluxo?.separacao_conferida_em && !(gestao || fluxo?.opera) && (
             <span className="pequeno suave">Aguardando a expedição conferir a separação.</span>
           )}
@@ -284,7 +304,7 @@ export default async function Pedido({ params, searchParams }: {
       {p.desconto_qtd_status === "aprovado" && <div className="aviso-caixa ok">Desconto por quantidade de {Number(p.desconto_qtd_pct)}% liberado pelo gerente.</div>}
 
       {p.status_comercial === "aguardando_cliente" && (
-        <section className="painel" style={{ borderColor: "var(--marca)" }}>
+        <section className="painel" id="link-cliente" style={{ borderColor: "var(--marca)" }}>
           <h2>Aguardando o cliente confirmar</h2>
           <p className="suave">Mande o link ao cliente. Ele confere o pedido, ajusta as caixas e confirma; aí o pedido vai para a separação.
             Cada link novo cancela o anterior.</p>
@@ -411,12 +431,13 @@ export default async function Pedido({ params, searchParams }: {
         </div>
       )}
       {escrever && p.status_comercial === "em_separacao" && (fluxo?.separacao_conferida_em || p.origem === "bling") && !fluxo?.total_confirmado_em && (
-        <details className="painel">
-          <summary><b>Mandar o total e a conta ao cliente</b> <span className="pequeno suave">(opcional) · total separado {dinheiro(p.valor_total, moeda)}</span></summary>
+        <details className="painel" id="total" open>
+          <summary><b>Mandar o total e a conta ao cliente</b> <span className="pequeno suave">· total separado {dinheiro(p.valor_total, moeda)} · depois disso o pagamento já fica aberto para registrar</span></summary>
           <form action={confirmarTotal} className="campos" style={{ marginTop: 8 }}>
             <input type="hidden" name="pedido_id" value={p.id} />
             <label className="largo">Dados para pagamento (banco, conta, titular)
-              <textarea name="conta" required placeholder="Ex.: Banco Continental · Cuenta 0000000 · Virtual Cosméticos" />
+              <textarea name="conta" required defaultValue={d.contaSugerida} placeholder="Ex.: Banco Continental · Cuenta 0000000 · Virtual Cosméticos" />
+              {d.contaSugerida && <span className="pequeno suave">Preenchido com a última conta usada nos seus pedidos em {moeda === "GS" ? "Gs" : "R$"}. Confira antes de confirmar.</span>}
             </label>
             <button className="principal">Confirmar total</button>
           </form>
@@ -607,7 +628,7 @@ export default async function Pedido({ params, searchParams }: {
                   defaultValue={String(Number(p.saldo) - Number(p.a_conferir)).replace(".", ",")} /></label>
                 <label>Data<input name="data" type="date" required defaultValue={hojeISO()} /></label>
                 <label>Como pagou
-                  <select name="modalidade" defaultValue="transferencia">
+                  <select name="modalidade" defaultValue={moeda === "BRL" ? "pix" : "transferencia"}>
                     {Object.entries(MODALIDADES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
                 </label>

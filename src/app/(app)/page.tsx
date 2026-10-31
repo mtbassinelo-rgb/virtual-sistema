@@ -148,7 +148,7 @@ export default async function Hoje({ searchParams }: { searchParams: Promise<{ o
   // Para fazer agora: cada pendência vira um botão com o número, na ordem do que é mais urgente. Zerou, some.
   const etapa = (id: string) => d.fila.filter((i) => i.etapa === id).length;
   const contasVencidas = (d.destaques?.contas ?? []).reduce((a, x) => a + x.vencidas, 0);
-  const fazer: Fazer[] = (gestao ? [
+  const fazerTodos: Fazer[] = gestao ? [
     { n: d.aprov ? totalAprovacoes(d.aprov) : 0, href: "/aprovacoes", titulo: "Aprovações", dica: "Pagamentos, descontos, crédito, metas…", cor: "aviso" },
     { n: d.separar.length, href: "/estoque/separacao", titulo: "Pedidos para separar", dica: "Esperando a expedição" },
     { n: d.portal.length, href: "/pedidos?etapa=aprovar", titulo: "Pedidos do site", dica: "Conferir e mandar separar", cor: "aviso" },
@@ -168,7 +168,8 @@ export default async function Hoje({ searchParams }: { searchParams: Promise<{ o
     { n: d.esperando.length, href: "/whatsapp?f=aguardando&o=espera", titulo: "WhatsApp sem resposta", dica: "Cliente esperando" },
     { n: d.recompra.length, href: "/clientes/recompra", titulo: "Clientes para chamar", dica: "Passaram do ritmo de compra" },
     { n: d.carrinhos.length, href: "/clientes/carrinhos", titulo: "Carrinhos parados", dica: "Montaram e não enviaram" },
-  ] as Fazer[]).filter((x) => x.n > 0);
+  ];
+  const fazer = fazerTodos.filter((x) => x.n > 0);
 
   return (
     <>

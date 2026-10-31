@@ -134,6 +134,7 @@ export default async function Recompra({ searchParams }: { searchParams: Promise
                         <input type="hidden" name="cliente_id" value={l.cliente_id} /><input type="hidden" name="volta" value={volta} />
                         <button className="discreto" title="Registrar que o cliente foi chamado">Chamei</button>
                       </form>
+                      <Link className="botao" href={`/pedidos/novo?cliente=${l.cliente_id}`} title="Abrir um pedido para este cliente">+ Pedido</Link>
                     </div>
                   </td>
                 </tr>);
