@@ -13,6 +13,7 @@ export const PERMISSOES: Permissao[] = [
   { chave: "clientes", nome: "Clientes", rotas: ["/clientes"] },
   { chave: "metas", nome: "Metas", rotas: ["/metas"] },
   { chave: "whatsapp", nome: "Acompanhamento do WhatsApp (vendedora vê só o número dela)", rotas: ["/whatsapp"] },
+  { chave: "aprovacoes", nome: "Aprovações (pagamentos, descontos, crédito, metas e outras decisões numa tela só)", rotas: ["/aprovacoes"], gestao: true },
   { chave: "desempenho", nome: "Desempenho das vendedoras (WhatsApp)", rotas: ["/desempenho"], gestao: true },
   { chave: "whatsapp_conexoes", nome: "Conectar números de WhatsApp (QR Code)", rotas: ["/whatsapp/conexoes"], gestao: true },
   { chave: "promocoes", nome: "Promoções", rotas: ["/promocoes"] },

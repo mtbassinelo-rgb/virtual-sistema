@@ -60,6 +60,7 @@ export function MenuLateral({ grupos }: { grupos: GrupoMenu[] }) {
               <Link key={g.id} href={i.href} className={`grupo-unico ${temAtivo ? "atual" : ""}`} aria-current={temAtivo ? "page" : undefined}>
                 <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">{ICONES[g.icone]}</svg>
                 <span>{g.titulo}</span>
+                {i.contador ? <span className="contador" style={{ marginLeft: "auto" }}>{i.contador}</span> : null}
               </Link>
             );
           }
@@ -68,6 +69,8 @@ export function MenuLateral({ grupos }: { grupos: GrupoMenu[] }) {
               <summary className={temAtivo ? "atual" : ""}>
                 <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">{ICONES[g.icone]}</svg>
                 <span>{g.titulo}</span>
+                {/* fechado, o grupo mostra quanto há esperando nos itens dele */}
+                {(() => { const t = g.itens.reduce((a, i) => a + (i.contador ?? 0), 0); return t > 0 ? <span className="contador" title="Pendências neste grupo">{t}</span> : null; })()}
               </summary>
               <ul>
                 {g.itens.map((i) => {

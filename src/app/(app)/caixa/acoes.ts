@@ -86,6 +86,7 @@ export async function confirmarRecebimento(fd: FormData): Promise<void> {
     await comUsuario(u.id, (c) => c.query("select app.confirmar_recebimento_caixa($1, $2, $3)", [Number(texto(fd, "mov")), texto(fd, "ok") === "1", texto(fd, "motivo") || null]));
   } catch { /* o erro aparece porque o item continua na lista */ }
   revalidatePath("/caixa");
+  revalidatePath("/aprovacoes");
 }
 
 /** Cadastro das contas bancárias (gerente/dono). */

@@ -11,6 +11,7 @@ import { Atalhos, type Atalho } from "./atalhos";
 import { OcultarValores } from "./ocultar-valores";
 import { unidadeSistema } from "@/lib/unidade-sistema";
 import { permissaoDoLink, pode } from "@/lib/permissoes";
+import { contarAprovacoes, totalAprovacoes } from "@/lib/aprovacoes";
 
 async function acaoSair() {
   "use server";
@@ -42,14 +43,17 @@ export default async function AreaInterna({ children }: { children: React.ReactN
                or (status = 'enviada' and (app.pode_operar_deposito(destino_id) or app.trabalha_na_unidade(destino_id))))::int as transf_acao
   `)).rows[0] as { pedidos_abertos: number; confirma_py: boolean; envios_py: number; contas_vencidas: number; procuras: number; fotos: number; sem_preco: number; fora_site: number; carrinhos: number; chegaram: number; descontos: number; remocoes: number; prod_pendentes: number; a_separar: number; transf_acao: number }).catch(() => ({ pedidos_abertos: 0, confirma_py: false, envios_py: 0, contas_vencidas: 0, procuras: 0, fotos: 0, sem_preco: 0, fora_site: 0, carrinhos: 0, chegaram: 0, descontos: 0, remocoes: 0, prod_pendentes: 0, a_separar: 0, transf_acao: 0 }));
 
+  // Tudo que espera decisão da gerência (tela Aprovações)
+  const aprovar = gestao ? totalAprovacoes(await comUsuario(u.id, (c) => contarAprovacoes(c)).catch(() => ({} as never))) : 0;
+
   // Menu: Dashboard → operação do dia (vendas, clientes) → cadastro (produtos, estoque) → loja e marketing → análise → financeiro → configurações
   const todos: GrupoMenu[] = [
     gestao
       ? { id: "inicio", titulo: "Dashboard", icone: "inicio", itens: [
           { href: "/", texto: "Painel do dia", dica: "Pedidos, pagamentos, envios e pendências de hoje" },
+          { href: "/aprovacoes", texto: "Aprovações", contador: aprovar, dica: "Pagamentos, descontos, remoções, crédito, metas, cliente local e envios: tudo que espera sua decisão, numa tela só" },
           { href: "/saude-financeira", texto: "Saúde financeira", dica: "Vendas, compras, despesas, margens e plano de ação (área do dono)" },
           { href: "/relatorios?aba=resultado", texto: "Resultado do mês" },
-          { href: "/inteligencia/fornecedores", texto: "Comparativo de fornecedores", dica: "Cílios e unhas: onde comprar mais barato (Dafu, Zhang, Fonte da Beleza, Nexxo e outros), com a planilha" },
         ] }
       : { id: "inicio", titulo: "Início", icone: "inicio", itens: [{ href: "/", texto: "Meu dia" }] },
     { id: "vendas", titulo: "Vendas", icone: "vendas", itens: [
@@ -111,6 +115,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
       { href: "/relatorios/compra", texto: "Planejar compra por marca", dica: "Escolha a marca: estoque, venda por mês, quando acaba e quanto comprar" },
       ...(gestao ? [{ href: "/estoque/notas", texto: "Notas a chegar", dica: "Lance a nota do fornecedor; o estoque sobe quando confirmar a chegada" }] : []),
       ...(gestao ? [{ href: "/inteligencia?aba=compras", texto: "Compras e fornecedores", dica: "Compras com frete e câmbio, e prazo de reposição" }] : []),
+      ...(gestao ? [{ href: "/inteligencia/fornecedores", texto: "Comparativo de fornecedores", dica: "Cílios e unhas: onde comprar mais barato (Dafu, Zhang, Fonte da Beleza, Nexxo e outros), com a planilha" }] : []),
       { href: "/estoque/historico", texto: "Histórico do estoque", dica: "Quem mexeu no estoque, quando e em quais produtos" },
       ...(gestao ? [{ href: "/estoque/importar", texto: "Importar do Bling" }] : []),
     ] },
@@ -145,7 +150,7 @@ export default async function AreaInterna({ children }: { children: React.ReactN
           { href: "/despesas", texto: "Contas a pagar", contador: n.contas_vencidas, dica: "Contas vencidas" },
           { href: "/financeiro/receber", texto: "Contas a receber" },
           { href: "/financeiro/vendas-avulsas", texto: "Vendas avulsas", dica: "Vendas fora do sistema, lançadas só pelo valor" },
-          { href: "/estoque/notas", texto: "Notas de entrada (XML)" },
+          { href: "/estoque/notas?de=financeiro", texto: "Notas de entrada (XML)", dica: "Mesma tela de Estoque → Notas a chegar" },
           { href: "/comissoes", texto: "Comissões" },
         ] }
       : { id: "financeiro", titulo: "Comissão", icone: "financeiro", itens: [{ href: "/comissoes", texto: "Minha comissão" }] },
@@ -204,8 +209,12 @@ export default async function AreaInterna({ children }: { children: React.ReactN
     { tecla: "S", href: "/estoque", texto: "Saldo do estoque" },
     { tecla: "M", href: "/marketplace", texto: "Marketplace" },
     { tecla: "H", href: "/", texto: "Início (painel do dia)" },
+    { tecla: "A", href: "/aprovacoes", texto: "Aprovações (tudo que espera decisão)" },
+    { tecla: "F", href: "/financeiro", texto: "Painel financeiro" },
+    { tecla: "D", href: "/despesas", texto: "Contas a pagar" },
+    { tecla: "U", href: "/unidades", texto: "Painel das unidades" },
   ] as Atalho[]).filter((a) => liberado(a.href));
-  const rapidos = atalhos.filter((a) => (u.perfil === "estoquista" ? ["E", "T"] : ["N", "O", "X"]).includes(a.tecla));
+  const rapidos = atalhos.filter((a) => (u.perfil === "estoquista" ? ["E", "T"] : gestao ? ["N", "A", "X"] : ["N", "O", "X"]).includes(a.tecla));
 
   return (
     <div className="casca">

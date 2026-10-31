@@ -666,3 +666,40 @@ button.mini { padding: 4px 10px; font-size: .78rem; }
   .etiquetas { display: block; }
   .etiqueta { width: 10cm; min-height: 14.5cm; page-break-after: always; break-after: page; margin: 0 auto; }
 }
+
+/* ===== Revisão de usabilidade (out/2026): Aprovações, "Para fazer agora" e ajustes de tablet ===== */
+.chips-filas { display: flex; flex-wrap: wrap; gap: 8px; }
+.chips-filas .chip { text-decoration: none; padding: 6px 12px; }
+.chips-filas .chip .contador { margin-left: 2px; }
+.cartoes-aprovar { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 10px; }
+.cartao-aprovar { border: 1px solid var(--linha); border-radius: 10px; padding: 10px 12px; background: var(--superficie); display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.cartao-aprovar a { overflow-wrap: anywhere; }
+.acoes-aprovar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 2px; }
+.acoes-aprovar input { width: auto; }
+
+/* Para fazer agora: cada pendência vira um botão grande com o número; some quando zera */
+.fazer-agora { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr)); gap: 8px; }
+.fazer-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--linha); border-left: 4px solid var(--marca);
+  background: var(--superficie); text-decoration: none; color: var(--texto); min-width: 0; }
+.fazer-item:hover { border-color: var(--marca); }
+.fazer-item .fazer-n { font-size: 1.35rem; font-weight: 750; color: var(--marca); font-variant-numeric: tabular-nums; min-width: 28px; text-align: center; }
+.fazer-item span:last-child { display: flex; flex-direction: column; min-width: 0; }
+.fazer-item b { font-weight: 600; }
+.fazer-item small { color: var(--suave); font-size: .75rem; }
+.fazer-item.erro { border-left-color: var(--erro); } .fazer-item.erro .fazer-n { color: var(--erro); }
+.fazer-item.aviso { border-left-color: #d99a25; } .fazer-item.aviso .fazer-n { color: #b07812; }
+.fazer-item.ok { border-left-color: var(--ok); } .fazer-item.ok .fazer-n { color: var(--ok); }
+
+/* Próximo passo do pedido com o botão da ação */
+.proximo-passo { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+
+/* Menu: total de pendências no título do grupo fechado */
+.menu-lateral summary .contador { margin-left: auto; }
+.menu-lateral summary:has(.contador)::after { margin-left: 6px; }
+.menu-lateral details[open] > summary .contador { display: none; }
+
+/* Topo no celular: quebra a linha em vez de estourar */
+@media (max-width: 700px) {
+  .barra-topo { flex-wrap: wrap; row-gap: 6px; }
+  .barra-topo .busca-geral { flex: 1 1 100%; order: 10; }
+}

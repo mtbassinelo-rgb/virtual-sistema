@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { exigirUsuario } from "@/lib/auth";
 import { comUsuario, mensagemErro } from "@/lib/db";
 import { texto } from "@/lib/formato";
+import { destinoVolta } from "@/lib/volta";
 
 const ir = (url: string, erro: string | null, ok: string) => {
   revalidatePath("/estoque/transferencias");
@@ -81,7 +82,8 @@ export async function aprovarTransferencia(fd: FormData) {
   } catch (e) {
     erro = mensagemErro(e);
   }
-  ir(`/estoque/transferencias/${id}`, erro, "Envio aprovado: a mercadoria saiu do estoque de origem e está a caminho.");
+  if (destinoVolta(fd)) revalidatePath("/aprovacoes");
+  ir(destinoVolta(fd) ?? `/estoque/transferencias/${id}`, erro, "Envio aprovado: a mercadoria saiu do estoque de origem e está a caminho.");
 }
 
 export async function cancelarSolicitacao(fd: FormData) {

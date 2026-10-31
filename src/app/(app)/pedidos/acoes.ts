@@ -11,13 +11,14 @@ import { numero, texto } from "@/lib/formato";
 import { pastaArquivos } from "@/lib/arquivos";
 import { avisarPagamento } from "@/lib/aviso-pagamento";
 import type { PoolClient } from "pg";
+import { comAviso, destinoVolta } from "@/lib/volta";
 
 const TIPOS_COMPROVANTE: Record<string, string> = {
   "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "application/pdf": "pdf",
 };
 const MAX_COMPROVANTE = 10 * 1024 * 1024;
 
-async function executar(pedidoId: string, ok: string, fn: (uid: string) => Promise<void>) {
+async function executar(pedidoId: string, ok: string, fn: (uid: string) => Promise<void>, fd?: FormData) {
   const u = await exigirUsuario();
   let erro: string | null = null;
   try {
@@ -26,6 +27,9 @@ async function executar(pedidoId: string, ok: string, fn: (uid: string) => Promi
     erro = mensagemErro(e);
   }
   revalidatePath(`/pedidos/${pedidoId}`);
+  // decidido pela tela de Aprovações (ou pelo Início): volta para ela
+  const volta = fd ? destinoVolta(fd) : null;
+  if (volta) { revalidatePath("/aprovacoes"); revalidatePath("/"); redirect(comAviso(volta, erro, ok)); }
   const destino = `/pedidos/${pedidoId}?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent(ok)}`;
   redirect(destino);
 }
@@ -93,14 +97,14 @@ export async function conferirPagamento(fd: FormData) {
     // nº do Bling é opcional: quando o pedido já tem, confere; quando não tem, confirma só o recebimento
     const nBling = texto(fd, "bling_numero").replace(/\D/g, "") || null;
     await comUsuario(uid, (c) => c.query("select app.conferir_pagamento($1, $2)", [texto(fd, "pagamento_id"), nBling]));
-  });
+  }, fd);
 }
 
 export async function recusarPagamento(fd: FormData) {
   const pedido = texto(fd, "pedido_id");
   await executar(pedido, "Pagamento recusado. A vendedora verá o motivo.", async (uid) => {
     await comUsuario(uid, (c) => c.query("select app.recusar_pagamento($1, $2)", [texto(fd, "pagamento_id"), texto(fd, "motivo")]));
-  });
+  }, fd);
 }
 
 export async function atualizarPedido(fd: FormData) {
@@ -269,7 +273,7 @@ export async function decidirPedidoPortal(fd: FormData) {
   const aprovar = texto(fd, "decisao") === "aprovar";
   await executar(pedido, aprovar ? "Pedido aprovado e enviado para separação." : "Pedido recusado.", async (uid) => {
     await comUsuario(uid, (c) => c.query("select app.decidir_pedido_portal($1, $2, nullif($3,''))", [pedido, aprovar, texto(fd, "motivo")]));
-  });
+  }, fd);
 }
 
 export async function conferirSeparacao(fd: FormData) {
@@ -380,7 +384,7 @@ export async function cdeClienteRetirou(fd: FormData) {
 export async function confirmarPagamentosDaLista(fd: FormData) {
   const u = await exigirUsuario();
   const pedido = texto(fd, "pedido_id");
-  const volta = texto(fd, "volta").startsWith("/pedidos") ? texto(fd, "volta") : "/pedidos";
+  const volta = texto(fd, "volta").startsWith("/pedidos") ? texto(fd, "volta") : destinoVolta(fd) ?? "/pedidos";
   let erro: string | null = null, n = 0;
   try {
     await comUsuario(u.id, async (c) => {
@@ -390,7 +394,7 @@ export async function confirmarPagamentosDaLista(fd: FormData) {
   } catch (e) {
     erro = mensagemErro(e);
   }
-  revalidatePath("/pedidos");
+  revalidatePath("/pedidos"); revalidatePath("/aprovacoes"); revalidatePath("/");
   const sep = volta.includes("?") ? "&" : "?";
   redirect(`${volta}${sep}${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent(`${n} pagamento(s) confirmado(s).`)}`);
 }
@@ -414,7 +418,7 @@ export async function decidirDescontoQuantidade(fd: FormData) {
   const liberar = texto(fd, "liberar") === "1";
   await executar(pedido, liberar ? "Desconto liberado: os preços do pedido já estão com o desconto." : "Desconto não liberado: o pedido segue com o preço normal.", async (uid) => {
     await comUsuario(uid, (c) => c.query("select app.decidir_desconto_quantidade($1, $2)", [pedido, liberar]));
-  });
+  }, fd);
 }
 
 /** Código digitado na lista ("CÓDIGO · nome" ou só o código) → id do produto. */
@@ -469,7 +473,7 @@ export async function decidirRemocao(fd: FormData) {
   await executar(pedido, aprovar ? "Remoção autorizada: o item saiu do pedido e foi para a lista de procurados sem estoque." : "Remoção recusada.", async (uid) => {
     await comUsuario(uid, (c) => c.query("select app.decidir_remocao_item($1, $2, nullif($3,''))",
       [texto(fd, "remocao_id"), aprovar, texto(fd, "motivo_decisao")]));
-  });
+  }, fd);
 }
 
 /** Preço de tabela (por peça) do produto para o cliente: o mínimo que a vendedora pode cobrar. */

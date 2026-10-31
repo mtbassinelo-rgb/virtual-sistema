@@ -3,18 +3,22 @@ import { redirect } from "next/navigation";
 import { exigirUsuario, ehGestao } from "@/lib/auth";
 import { comUsuario } from "@/lib/db";
 import { dinheiro, data, dataHora, linkWhatsApp, MODALIDADES, telefone, type Moeda } from "@/lib/formato";
-import { Selo } from "./avisos";
+import { Avisos, Selo } from "./avisos";
 import { apagarPedidosSite, marcarPedidoSiteAtendido } from "./acoes-site";
 import { carregarFila, FilaPedidos } from "./pedidos/fila";
 import { unidadeSistema } from "@/lib/unidade-sistema";
+import { contarAprovacoes, totalAprovacoes } from "@/lib/aprovacoes";
+import { registrarContatoRecompra } from "./clientes/acoes";
 
 type Recompra = { cliente_id: string; nome: string; whatsapp: string | null; vendedora: string; atraso_dias: number; dias_desde: number; alto_valor: boolean; moeda: Moeda; valor_medio: string | null };
 type Carrinho = { cliente_id: string; cliente: string; whatsapp: string | null; vendedora: string; itens: number; atualizado_em: string };
-type Espera = { contato: string; texto: string | null; em: string };
+type Espera = { contato: string; texto: string | null; em: string; conexao_id: string; nome: string | null };
+type Fazer = { n: number; href: string; titulo: string; dica: string; cor?: "erro" | "aviso" | "ok" };
 
 export const metadata = { title: "Hoje" };
 
-export default async function Hoje() {
+export default async function Hoje({ searchParams }: { searchParams: Promise<{ ok?: string; erro?: string }> }) {
+  const aviso = await searchParams;
   const u = await exigirUsuario();
   // estoquista não tem painel de vendas: vai direto para a área dele
   if (u.perfil === "estoquista") redirect("/estoque/separacao");
@@ -119,13 +123,14 @@ export default async function Hoje() {
     const comissao = gestao ? [] : (await c.query(`select moeda, comissao from app.comissoes(date_trunc('month', current_date)::date)
         where vendedora_id = app.minha_vendedora()`).catch(() => ({ rows: [] }))).rows as { moeda: Moeda; comissao: string | null }[];
     const recompra = (await c.query(`select r.* from app.recompra_clientes() r
-        where r.atraso_dias > 0 and exists (select 1 from app.clientes cl where cl.id = r.cliente_id and cl.ativo)
+        where r.atraso_dias > 0 and (r.ultimo_contato is null or r.ultimo_contato < current_date) and exists (select 1 from app.clientes cl where cl.id = r.cliente_id and cl.ativo)
           ${gestao ? "" : "and r.vendedora_id = app.minha_vendedora()"}
         order by r.alto_valor desc, r.atraso_dias desc limit 6`).catch(() => ({ rows: [] }))).rows as Recompra[];
     const carrinhos = (await c.query(`select * from app.carrinhos_parados() where avisado_em is null order by atualizado_em desc limit 5`)
       .catch(() => ({ rows: [] }))).rows as Carrinho[];
-    const esperando = (await c.query(`select contato, texto, em from (
-          select distinct on (m.conexao_id, m.contato) m.contato, m.texto, m.em, m.enviada
+    const esperando = (await c.query(`select contato, texto, em, conexao_id,
+          (select k.nome from app.whatsapp_contatos k where k.conexao_id = x.conexao_id and k.contato = x.contato limit 1) nome from (
+          select distinct on (m.conexao_id, m.contato) m.conexao_id, m.contato, m.texto, m.em, m.enviada
             from app.whatsapp_mensagens m where m.em > now() - interval '3 days'
            order by m.conexao_id, m.contato, m.em desc) x
         where not x.enviada order by em limit 50`).catch(() => ({ rows: [] }))).rows as Espera[];
@@ -136,8 +141,34 @@ export default async function Hoje() {
       from app.transferencias t join app.depositos o on o.id = t.origem_id join app.depositos de on de.id = t.destino_id
       where t.status = 'solicitada' and o.tipo = 'loja' and app.pode_separar_transferencia(t.origem_id) order by t.criada_em`).catch(() => ({ rows: [] }))).rows as
       { id: string; numero: number; destino: string; origem: string; quem: string | null; itens: number }[];
-    return { fila, mes, receber, comissao, recompra, carrinhos, esperando, semEstoque, destaques, sugestoesCredito, cadastros, site, aConferir, metasPropostas, recusados, envioAtrasado, pagAtrasado, metasPerto, transferencias, portal, separar, confirmar, pendencias, enviosPy, lojaSeparar };
+    const aprov = gestao ? await contarAprovacoes(c) : null;
+    return { aprov, fila, mes, receber, comissao, recompra, carrinhos, esperando, semEstoque, destaques, sugestoesCredito, cadastros, site, aConferir, metasPropostas, recusados, envioAtrasado, pagAtrasado, metasPerto, transferencias, portal, separar, confirmar, pendencias, enviosPy, lojaSeparar };
   });
+
+  // Para fazer agora: cada pendência vira um botão com o número, na ordem do que é mais urgente. Zerou, some.
+  const etapa = (id: string) => d.fila.filter((i) => i.etapa === id).length;
+  const contasVencidas = (d.destaques?.contas ?? []).reduce((a, x) => a + x.vencidas, 0);
+  const fazer: Fazer[] = (gestao ? [
+    { n: d.aprov ? totalAprovacoes(d.aprov) : 0, href: "/aprovacoes", titulo: "Aprovações", dica: "Pagamentos, descontos, crédito, metas…", cor: "aviso" },
+    { n: d.separar.length, href: "/estoque/separacao", titulo: "Pedidos para separar", dica: "Esperando a expedição" },
+    { n: d.portal.length, href: "/pedidos?etapa=aprovar", titulo: "Pedidos do site", dica: "Conferir e mandar separar", cor: "aviso" },
+    { n: d.semEstoque.length, href: "#sem-estoque", titulo: "Pedidos com esgotado", dica: "Avisar o cliente ou trocar", cor: "erro" },
+    { n: d.envioAtrasado.length, href: "#atrasados", titulo: "Envios atrasados", dica: "Previsão de envio vencida", cor: "erro" },
+    { n: d.pagAtrasado.length, href: "/pedidos?pagamento=atrasado", titulo: "Pagamentos atrasados", dica: "Cobrar o cliente", cor: "erro" },
+    { n: contasVencidas, href: "/despesas", titulo: "Contas vencidas", dica: "Contas a pagar", cor: "erro" },
+    { n: d.esperando.length, href: "/whatsapp?f=aguardando&o=espera", titulo: "WhatsApp sem resposta", dica: "Cliente esperando" },
+  ] : [
+    { n: d.recusados.length, href: "#recusados", titulo: "Pagamento recusado", dica: "Corrigir com o cliente", cor: "erro" },
+    { n: d.confirmar.length, href: "#confirmar", titulo: "Separados: avisar cliente", dica: "Mandar total e conta", cor: "ok" },
+    { n: d.portal.length, href: "/pedidos?etapa=aprovar", titulo: "Pedidos do site", dica: "Conferir e mandar separar", cor: "aviso" },
+    { n: d.semEstoque.length, href: "#sem-estoque", titulo: "Pedidos com esgotado", dica: "Avisar o cliente ou trocar", cor: "erro" },
+    { n: etapa("cobrar"), href: "/pedidos?etapa=cobrar", titulo: "Cobrar", dica: "Total enviado, falta pagar", cor: "aviso" },
+    { n: d.pagAtrasado.length, href: "/pedidos?pagamento=atrasado", titulo: "Pagamentos atrasados", dica: "Vencidos", cor: "erro" },
+    { n: d.envioAtrasado.length, href: "#atrasados", titulo: "Envios atrasados", dica: "Previsão vencida", cor: "erro" },
+    { n: d.esperando.length, href: "/whatsapp?f=aguardando&o=espera", titulo: "WhatsApp sem resposta", dica: "Cliente esperando" },
+    { n: d.recompra.length, href: "/clientes/recompra", titulo: "Clientes para chamar", dica: "Passaram do ritmo de compra" },
+    { n: d.carrinhos.length, href: "/clientes/carrinhos", titulo: "Carrinhos parados", dica: "Montaram e não enviaram" },
+  ] as Fazer[]).filter((x) => x.n > 0);
 
   return (
     <>
@@ -147,6 +178,25 @@ export default async function Hoje() {
           <div className="suave">{gestao ? "O que precisa de atenção hoje." : "Seu painel: pedidos, clientes para chamar e conversas esperando."}{atual ? <> Mostrando só <b>{atual.nome}</b>.</> : ""}</div>
         </div>
         <Link className="botao principal" href="/pedidos/novo">+ Novo pedido</Link>
+      </section>
+
+      <Avisos ok={aviso.ok} erro={aviso.erro} />
+
+      <section className="painel" aria-label="Para fazer agora">
+        <div className="linha entre">
+          <h2 style={{ margin: 0 }}>Para fazer agora</h2>
+          {gestao && <Link className="pequeno" href="/aprovacoes">abrir Aprovações →</Link>}
+        </div>
+        {fazer.length === 0 ? <p className="suave pequeno" style={{ margin: 0 }}>Nada pendente. Tudo em dia. 👏</p> : (
+          <div className="fazer-agora">
+            {fazer.map((x) => (
+              <Link key={x.href + x.titulo} href={x.href} className={`fazer-item ${x.cor ?? ""}`}>
+                <span className="fazer-n">{x.n}</span>
+                <span><b>{x.titulo}</b><small>{x.dica}</small></span>
+              </Link>
+            ))}
+          </div>
+        )}
       </section>
 
       {d.enviosPy > 0 && (
@@ -186,7 +236,7 @@ export default async function Hoje() {
       </div>
 
       {!gestao && d.confirmar.length > 0 && (
-        <section className="painel" style={{ borderColor: d.confirmar.some((x) => x.faltas > 0) ? "var(--erro)" : "var(--ok)" }}>
+        <section className="painel" id="confirmar" style={{ borderColor: d.confirmar.some((x) => x.faltas > 0) ? "var(--erro)" : "var(--ok)" }}>
           <h2>Separados pela expedição: confirme com o cliente ({d.confirmar.length})</h2>
           <ul className="crm-lista">{d.confirmar.map((x) => (
             <li key={x.id}>
@@ -212,7 +262,12 @@ export default async function Hoje() {
                 <li key={r.cliente_id}>
                   <Link href={`/clientes/${r.cliente_id}`} className="crm-quem">{r.nome}{r.alto_valor && " ⭐"}
                     <small>{r.dias_desde} dias sem comprar · {r.atraso_dias} de atraso{gestao ? ` · ${r.vendedora}` : ""}</small></Link>
-                  {z && <a className="botao whatsapp mini" href={z} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
+                  <span className="linha" style={{ gap: 4, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                    {z && <a className="botao whatsapp mini" href={z} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
+                    <form action={registrarContatoRecompra}><input type="hidden" name="cliente_id" value={r.cliente_id} /><input type="hidden" name="volta" value="/" />
+                      <button className="mini" title="Registrar que você chamou o cliente (sai da lista do Início até amanhã)">✓ Chamei</button></form>
+                    <Link className="botao mini" href={`/pedidos/novo?cliente=${r.cliente_id}`} title="Abrir um pedido para este cliente">+ Pedido</Link>
+                  </span>
                 </li>);
             })}</ul>
           )}
@@ -222,7 +277,7 @@ export default async function Hoje() {
           {d.esperando.length === 0 ? <p className="suave pequeno">Ninguém esperando. Tudo respondido.</p> : (
             <ul className="crm-lista">{d.esperando.slice(0, 6).map((m, k) => (
               <li key={k}>
-                <span className="crm-quem">{telefone(m.contato)}<small>{(m.texto ?? "(mídia)").slice(0, 60)}</small></span>
+                <Link href={`/whatsapp/conversa?w=${m.conexao_id}&c=${encodeURIComponent(m.contato)}`} className="crm-quem">{m.nome ?? telefone(m.contato)}<small>{(m.texto ?? "(mídia)").slice(0, 60)}</small></Link>
                 <span className="pequeno suave num">{dataHora(m.em)}</span>
               </li>))}</ul>
           )}
@@ -248,17 +303,19 @@ export default async function Hoje() {
         {gestao && <Link className="atalho" href="/produtos/precos-rapido"><b>Editar preços</b><span>Preencher e ajustar preços na tabela</span></Link>}
         <Link className="atalho" href="/produtos"><b>Produtos</b><span>Buscar, ativar, fotos e caixas</span></Link>
         {gestao && <Link className="atalho" href="/relatorios"><b>Relatórios</b><span>Vendas, mais vendidos e estoque</span></Link>}
-        <Link className="atalho" href="/estoque"><b>Estoque</b><span>Saldo por depósito e ajustes</span></Link>
+        {gestao && <Link className="atalho" href="/estoque"><b>Estoque</b><span>Saldo por depósito e ajustes</span></Link>}
+        {!gestao && <Link className="atalho" href="/orcamentos/novo"><b>Novo orçamento</b><span>Mandar preços pelo WhatsApp</span></Link>}
+        {!gestao && <Link className="atalho" href="/catalogo"><b>Catálogo para enviar</b><span>Por marca, com fotos e preços</span></Link>}
       </nav>
 
       {d.destaques && <Destaques d={d.destaques} />}
 
       <div className="indicadores">
         {gestao && (
-          <div className="indicador">
+          <Link href="/aprovacoes#pagamentos" className="indicador" style={{ textDecoration: "none", color: "inherit" }}>
             <span className="rotulo">Pagamentos a conferir</span>
             <span className="valor">{d.aConferir.length}</span>
-          </div>
+          </Link>
         )}
         {gestao && (
           <Link href="/metas?status=proposta" className="indicador" style={{ textDecoration: "none", color: "inherit" }}>
@@ -281,7 +338,7 @@ export default async function Hoje() {
       </div>
 
       {d.semEstoque.length > 0 && (
-        <section className="painel">
+        <section className="painel" id="sem-estoque">
           <h2 style={{ margin: 0 }}>Pedidos com produto esgotado ({d.semEstoque.length})</h2>
           <p className="pequeno suave" style={{ margin: 0 }}>O cliente não vê que está esgotado. Confira com o estoque/fornecedor e avise o cliente: prazo de chegada ou troca do produto.</p>
           <div className="tabela"><table style={{ minWidth: 0 }}>
@@ -381,7 +438,7 @@ export default async function Hoje() {
       )}
 
       {d.recusados.length > 0 && (
-        <section className="painel">
+        <section className="painel" id="recusados">
           <h2>Pagamentos recusados (últimos 7 dias)</h2>
           <ul className="lista-simples">
             {d.recusados.map((g) => (
@@ -394,7 +451,7 @@ export default async function Hoje() {
         </section>
       )}
 
-      <div className="duas-colunas">
+      <div className="duas-colunas" id="atrasados">
         <section className="painel">
           <h2>Envios atrasados</h2>
           {d.envioAtrasado.length === 0 ? <p className="suave">Nenhum envio atrasado.</p> : (
@@ -443,7 +500,7 @@ export default async function Hoje() {
             <ul className="lista-simples">
               {d.transferencias.map((t) => (
                 <li key={t.id}>
-                  <Link href="/estoque#transferencias">Nº {t.numero}</Link>: {t.origem} → {t.destino}, enviada em {data(t.enviada_em)}
+                  <Link href={`/estoque/transferencias/${t.id}`}>Nº {t.numero}</Link>: {t.origem} → {t.destino}, enviada em {data(t.enviada_em)}
                 </li>
               ))}
             </ul>

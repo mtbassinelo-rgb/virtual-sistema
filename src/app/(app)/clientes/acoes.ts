@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { comAviso, destinoVolta } from "@/lib/volta";
 import { exigirUsuario } from "@/lib/auth";
 import { comUsuario, mensagemErro } from "@/lib/db";
 import { numero, texto } from "@/lib/formato";
@@ -195,6 +196,8 @@ export async function decidirCompraUnidade(fd: FormData) {
   revalidatePath(`/clientes/${id}`);
   revalidatePath("/clientes");
   const destino = texto(fd, "volta") === "lista" ? "/clientes?compra=aguardando&" : `${voltaCli(fd, id)}`;
+  const voltaAp = destinoVolta(fd);
+  if (voltaAp) { revalidatePath("/aprovacoes"); revalidatePath("/"); redirect(comAviso(voltaAp, erro, liberar ? "Compra por unidade liberada." : "Cliente compra só caixa fechada.")); }
   redirect(`${destino}${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent(liberar ? "Compra por unidade liberada." : "Cliente compra só caixa fechada.")}`);
 }
 
@@ -227,6 +230,8 @@ export async function decidirClienteLocal(fd: FormData) {
   revalidatePath(`/clientes/${id}`);
   revalidatePath("/inteligencia");
   const destino = volta === "inteligencia" ? "/inteligencia?aba=retirada&" : `${voltaCli(fd, id)}`;
+  const voltaAp = destinoVolta(fd);
+  if (voltaAp) { revalidatePath("/aprovacoes"); revalidatePath("/"); redirect(comAviso(voltaAp, erro, local ? "Cliente marcado como local." : "Cliente não é mais local.")); }
   redirect(`${destino}${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent(local ? "Cliente marcado como local." : "Cliente não é mais local.")}`);
 }
 
@@ -279,6 +284,8 @@ export async function definirCredito(fd: FormData) {
     erro = mensagemErro(e);
   }
   revalidatePath(`/clientes/${id}`);
+  const voltaAp = destinoVolta(fd);
+  if (voltaAp) { revalidatePath("/aprovacoes"); revalidatePath("/"); redirect(comAviso(voltaAp, erro, "Linha de crédito atualizada.")); }
   redirect(`${voltaCli(fd, id)}${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Linha de crédito atualizada.")}`);
 }
 
@@ -307,6 +314,8 @@ export async function recusarSugestaoCredito(fd: FormData) {
     erro = mensagemErro(e);
   }
   revalidatePath(`/clientes/${id}`);
+  const voltaAp = destinoVolta(fd);
+  if (voltaAp) { revalidatePath("/aprovacoes"); revalidatePath("/"); redirect(comAviso(voltaAp, erro, "Sugestão de crédito recusada.")); }
   redirect(`${voltaCli(fd, id)}${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent("Sugestão de crédito recusada.")}`);
 }
 

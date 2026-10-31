@@ -5,8 +5,9 @@ import { redirect } from "next/navigation";
 import { exigirUsuario } from "@/lib/auth";
 import { comUsuario, mensagemErro } from "@/lib/db";
 import { numero, texto } from "@/lib/formato";
+import { comAviso, destinoVolta } from "@/lib/volta";
 
-async function executar(ok: string, fn: (uid: string) => Promise<unknown>) {
+async function executar(ok: string, fn: (uid: string) => Promise<unknown>, fd?: FormData) {
   const u = await exigirUsuario();
   let erro: string | null = null;
   try {
@@ -15,6 +16,8 @@ async function executar(ok: string, fn: (uid: string) => Promise<unknown>) {
     erro = mensagemErro(e);
   }
   revalidatePath("/metas");
+  const volta = fd ? destinoVolta(fd) : null;
+  if (volta) { revalidatePath("/aprovacoes"); revalidatePath("/"); redirect(comAviso(volta, erro, ok)); }
   redirect(`/metas?${erro ? "erro=" + encodeURIComponent(erro) : "ok=" + encodeURIComponent(ok)}`);
 }
 
@@ -34,7 +37,7 @@ export async function proporMeta(fd: FormData) {
 export async function decidirMeta(fd: FormData) {
   const aprovar = texto(fd, "decisao") === "aprovar";
   await executar(aprovar ? "Meta aprovada." : "Meta recusada.", (uid) =>
-    comUsuario(uid, (c) => c.query("select app.decidir_meta($1, $2, nullif($3,''))", [texto(fd, "meta_id"), aprovar, texto(fd, "motivo")])));
+    comUsuario(uid, (c) => c.query("select app.decidir_meta($1, $2, nullif($3,''))", [texto(fd, "meta_id"), aprovar, texto(fd, "motivo")])), fd);
 }
 
 export async function cancelarMeta(fd: FormData) {
